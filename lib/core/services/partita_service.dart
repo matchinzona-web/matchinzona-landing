@@ -148,6 +148,7 @@ class PartitaService {
     required String orarioFine,
     int ospitiExtra = 0,
     bool isPartitaPrivata = false,
+    bool isPagato = false,
   }) async {
     try {
       if (ospitiExtra < 0) {
@@ -289,6 +290,7 @@ class PartitaService {
         'p_giocatori_iniziali': giocatoriTotaliIniziali,
         'p_is_public': !isPartitaPrivata,
         'p_max_giocatori_custom': maxGiocatori,
+        'p_is_pagato': isPagato,
       });
 
       if (result['status'] == 'error') return result['message'];

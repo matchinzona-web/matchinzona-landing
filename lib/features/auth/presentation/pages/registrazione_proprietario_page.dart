@@ -6,9 +6,9 @@ import 'package:app_campi/core/theme/app_theme.dart';
 import 'package:app_campi/features/admin/presentation/widgets/foto_societa_widget.dart';
 import 'package:app_campi/features/admin/presentation/widgets/telefono_form_widget.dart';
 import 'package:app_campi/features/admin/presentation/widgets/indirizzo_form_widget.dart';
-import 'package:app_campi/features/admin/presentation/pages/configurazione_orari.dart';
 import 'package:app_campi/features/admin/presentation/service/geocoding_service.dart';
 import 'package:app_campi/features/auth/data/auth_repository.dart';
+import 'package:app_campi/features/admin/presentation/pages/attivazione_pagamenti_page.dart';
 
 const Color _coloreElementi = AppTheme.neonOrange;
 
@@ -58,6 +58,7 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
   final _confermaPasswordFocus = FocusNode();
 
   String? _stripeCustomerId;
+  Map<String, double>? _coordinateIndirizzoSelezionato;
   bool _mostraPassword = false;
   bool _mostraConfermaPassword = false;
   String _telefonoCompleto = '';
@@ -220,17 +221,16 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
         String indirizzoUnito =
             '${(_viaInternalController?.text ?? _viaController.text).trim()} ${_civicoController.text.trim()}, ${_cittaController.text.trim()}, ${_provinciaController.text.trim().toUpperCase()}';
 
-        Map<String, double>? coordinate =
-            await GeocodingService.ottieniCoordinate(indirizzoUnito);
-        coordinate ??= await GeocodingService.ottieniCoordinate(
-          '${_cittaController.text.trim()}, ${_provinciaController.text.trim().toUpperCase()}',
-        );
+        Map<String, double>? coordinate = _coordinateIndirizzoSelezionato;
+
+        coordinate ??= await GeocodingService.ottieniCoordinate(indirizzoUnito);
 
         if (coordinate == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                'Indirizzo non trovato! Verifica via, civico e città.',
+                'Non riesco a localizzare questo indirizzo. '
+                'Controlla via, civico, città e provincia.',
               ),
               backgroundColor: Colors.redAccent,
             ),
@@ -283,7 +283,8 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => ConfigurazioneOrari(idSocieta: idSocieta),
+              builder: (context) =>
+                  AttivazionePagamentiPage(idSocieta: idSocieta),
             ),
           );
         }
@@ -405,8 +406,23 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
                     cittaFocus: _cittaFocus,
                     provinciaFocus: _provinciaFocus,
                     campiAbbandonati: _campiAbbandonati,
+
                     onViaControllerReady: (controller) {
                       _viaInternalController = controller;
+                    },
+
+                    onCoordinateSelezionate: (coordinate) {
+                      setState(() {
+                        _coordinateIndirizzoSelezionato = coordinate;
+                      });
+                    },
+
+                    onIndirizzoModificato: () {
+                      if (_coordinateIndirizzoSelezionato != null) {
+                        setState(() {
+                          _coordinateIndirizzoSelezionato = null;
+                        });
+                      }
                     },
                   ),
                   const SizedBox(height: 20),

@@ -12,11 +12,15 @@ import 'features/auth/presentation/pages/login_utente.dart';
 import 'features/auth/presentation/pages/registrazione_utente.dart';
 import 'features/home/presentation/views/onboarding_screen.dart';
 import 'package:app_campi/features/auth/presentation/pages/registrazione_proprietario_page.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  Stripe.publishableKey =
+      "pk_test_51TgQ7WFxZCOuiQIAWEPNT2Kc7Lz9nfU8kTdNDoy36EfKi8zBcGt4r6GiNVbWI3mlYfTe2F1Y3dFCZ9k6hRdavFCH00Kbrz8a7q";
+  await Stripe.instance.applySettings();
 
   await initializeDateFormatting('it_IT', null);
 

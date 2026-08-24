@@ -388,7 +388,13 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                     );
                   }
                 } else if (value == 'logout') {
-                  await Supabase.instance.client.auth.signOut();
+                  try {
+                    await Supabase.instance.client.auth.signOut(
+                      scope: SignOutScope.local,
+                    );
+                  } catch (e) {
+                    debugPrint("Errore o timeout durante il logout: $e");
+                  }
                   if (context.mounted) {
                     Navigator.of(
                       context,

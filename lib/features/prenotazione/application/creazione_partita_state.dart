@@ -19,6 +19,7 @@ class CreazionePartitaState {
   final String sportSelezionato;
   final String fasciaOraria;
   final Map<String, double> prezziPerSocieta;
+  final MetodoPagamento metodoPagamentoScelto;
 
   CreazionePartitaState({
     this.isLoading = false,
@@ -37,6 +38,7 @@ class CreazionePartitaState {
     this.sportSelezionato = 'calcio_5',
     this.fasciaOraria = 'tutto',
     this.prezziPerSocieta = const {},
+    this.metodoPagamentoScelto = MetodoPagamento.inSede,
   }) : dataSelezionata = dataSelezionata ?? DateTime.now();
 
   CreazionePartitaState copyWith({
@@ -58,6 +60,7 @@ class CreazionePartitaState {
     bool clearCampo = false,
     bool clearOrario = false,
     Map<String, double>? prezziPerSocieta,
+    MetodoPagamento? metodoPagamentoScelto,
   }) {
     return CreazionePartitaState(
       isLoading: isLoading ?? this.isLoading,
@@ -83,6 +86,8 @@ class CreazionePartitaState {
       fasciaOraria:
           fasciaOraria ?? this.fasciaOraria, // <-- VALORE REALE ASSEGNATO QUI
       prezziPerSocieta: prezziPerSocieta ?? this.prezziPerSocieta,
+      metodoPagamentoScelto:
+          metodoPagamentoScelto ?? this.metodoPagamentoScelto,
     );
   }
 

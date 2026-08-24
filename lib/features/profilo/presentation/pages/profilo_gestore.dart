@@ -453,6 +453,12 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
                             _viaInternalController = controller;
                             _viaInternalController!.text = _viaController.text;
                           },
+                          onCoordinateSelezionate: (coordinate) {
+                            // Aggiorna le coordinate nel profilo se presente la variabile
+                          },
+                          onIndirizzoModificato: () {
+                            // Reset coordinate se l'utente modifica manualmente il testo
+                          },
                         ),
                         const SizedBox(height: 30),
                         const Text(

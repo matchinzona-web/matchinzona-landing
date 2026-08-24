@@ -276,8 +276,18 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
   void aggiornaOspiti(int ospiti) =>
       state = state.copyWith(ospitiExtra: ospiti);
 
-  void aggiornaTipoPartita(bool isPrivata) =>
-      state = state.copyWith(isPartitaPrivata: isPrivata);
+  void aggiornaTipoPartita(bool isPrivata) {
+    state = state.copyWith(
+      isPartitaPrivata: isPrivata,
+      // 🟢 Se passa a cerca giocatori, resetta forzatamente a Paga al Campo
+      metodoPagamentoScelto: isPrivata
+          ? state.metodoPagamentoScelto
+          : MetodoPagamento.inSede,
+    );
+  }
+
+  void selezionaMetodoPagamento(MetodoPagamento metodo) =>
+      state = state.copyWith(metodoPagamentoScelto: metodo);
 
   Future<void> confermaMatch(Utente organizzatore) async {
     if (state.oraInizioSelezionata == null || state.campoSelezionato == null) {
@@ -294,6 +304,11 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
                 1) // 🟢 Per il doppio fa 4 - 1 = 3 ospiti extra (Totale 4 giocatori)
           : state.ospitiExtra;
 
+      // 🟢 isPagato è true SOLO se la partita è privata (campo intero) ed è stato scelto Paga Ora
+      final bool pagatoEffettivo =
+          state.isPartitaPrivata &&
+          state.metodoPagamentoScelto == MetodoPagamento.pagaOra;
+
       final errore = await _partitaService.creaNuovaPartita(
         campo: state.campoSelezionato!,
         organizzatore: organizzatore,
@@ -302,6 +317,7 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
         orarioFine: _calcolaOrarioFine(state.oraInizioSelezionata!),
         ospitiExtra: ospitiFinali,
         isPartitaPrivata: state.isPartitaPrivata,
+        isPagato: pagatoEffettivo,
       );
 
       if (errore != null) {

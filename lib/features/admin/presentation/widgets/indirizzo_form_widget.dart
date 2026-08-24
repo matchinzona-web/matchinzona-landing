@@ -14,6 +14,8 @@ class IndirizzoFormWidget extends StatefulWidget {
   final FocusNode provinciaFocus;
   final Map<String, bool> campiAbbandonati;
   final Function(TextEditingController) onViaControllerReady;
+  final Function(Map<String, double>) onCoordinateSelezionate;
+  final VoidCallback onIndirizzoModificato;
 
   const IndirizzoFormWidget({
     super.key,
@@ -27,6 +29,8 @@ class IndirizzoFormWidget extends StatefulWidget {
     required this.provinciaFocus,
     required this.campiAbbandonati,
     required this.onViaControllerReady,
+    required this.onCoordinateSelezionate,
+    required this.onIndirizzoModificato,
   });
 
   @override
@@ -35,6 +39,7 @@ class IndirizzoFormWidget extends StatefulWidget {
 
 class _IndirizzoFormWidgetState extends State<IndirizzoFormWidget> {
   TextEditingController? _viaInternalController;
+  bool _selezionandoSuggerimento = false;
 
   Future<List<Map<String, String>>> _cercaIndirizzi(String query) async {
     if (query.length < 3) return [];
@@ -75,6 +80,8 @@ class _IndirizzoFormWidgetState extends State<IndirizzoFormWidget> {
             'provincia': provincia.length > 2
                 ? provincia.substring(0, 2).toUpperCase()
                 : provincia.toUpperCase(),
+            'latitudine': item['lat']?.toString() ?? '',
+            'longitudine': item['lon']?.toString() ?? '',
           };
         }).toList();
       }
@@ -159,9 +166,27 @@ class _IndirizzoFormWidgetState extends State<IndirizzoFormWidget> {
           },
           displayStringForOption: (opt) => opt['via'] ?? '',
           onSelected: (opt) {
+            _selezionandoSuggerimento = true;
+
             widget.viaController.text = opt['via'] ?? '';
             widget.cittaController.text = opt['citta'] ?? '';
             widget.provinciaController.text = opt['provincia'] ?? '';
+
+            final double? latitudine = double.tryParse(opt['latitudine'] ?? '');
+
+            final double? longitudine = double.tryParse(
+              opt['longitudine'] ?? '',
+            );
+
+            if (latitudine != null && longitudine != null) {
+              widget.onCoordinateSelezionate({
+                'latitudine': latitudine,
+                'longitudine': longitudine,
+              });
+            }
+
+            _selezionandoSuggerimento = false;
+
             FocusScope.of(context).requestFocus(widget.civicoFocus);
           },
           fieldViewBuilder: (ctx, controller, focusNode, onComplete) {
@@ -170,6 +195,10 @@ class _IndirizzoFormWidgetState extends State<IndirizzoFormWidget> {
               controller.text = widget.viaController.text;
               controller.addListener(() {
                 widget.viaController.text = controller.text;
+
+                if (!_selezionandoSuggerimento) {
+                  widget.onIndirizzoModificato();
+                }
               });
               widget.onViaControllerReady(controller);
             }

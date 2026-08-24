@@ -13,6 +13,7 @@ class Partita {
   int numeroGiocatoriPrenotati;
   String statoPartita;
   bool isPublic;
+  final bool isPagato;
   final int? maxGiocatori; // 🟢 Campo opzionale dal DB
 
   List<GiocatorePartita> listaGiocatoriIscritti;
@@ -27,6 +28,7 @@ class Partita {
     this.numeroGiocatoriPrenotati = 1,
     this.statoPartita = 'aperta',
     this.isPublic = true,
+    this.isPagato = false,
     this.maxGiocatori,
     this.listaGiocatoriIscritti = const [],
   });
@@ -103,6 +105,7 @@ class Partita {
       numeroGiocatoriPrenotati: json['numero_giocatori_prenotati'] as int? ?? 1,
       statoPartita: json['stato_partita'] as String? ?? 'aperta',
       isPublic: json['is_public'] as bool? ?? true,
+      isPagato: json['is_pagato'] as bool? ?? false,
       maxGiocatori:
           json['max_giocatori']
               as int?, // 🟢 FONDAMENTALE: Legge la nuova colonna da Supabase!

@@ -7,23 +7,20 @@ const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") ?? "", {
   httpClient: Stripe.createFetchHttpClient(),
 });
 
-// Funzione di utilità per mappare l'ID prezzo di Stripe con il nome piano e i limiti reali
 function ottieniSpecifichePiano(priceId: string): {
   nome: string;
   limite: number;
 } {
-  // Sostituisci i codici 'price_...' con i reali ID Prezzo che trovi sulla Dashboard di Stripe
   switch (priceId) {
-    case "price_1Th5bHFxZCOuiQIAaia7ASFn": // ID Prezzo del tuo piano Start
+    case "price_1Th5bHFxZCOuiQIAaia7ASFn":
       return { nome: "START", limite: 1 };
-    case "price_1TgjxqFxZCOuiQIA9CjLu34s": // ID Prezzo del tuo piano Pro
+    case "price_1TgjxqFxZCOuiQIA9CjLu34s":
       return { nome: "PRO", limite: 2 };
-    case "price_1Th5c2FxZCOuiQIAM6obraB0": // ID Prezzo del tuo piano Premium
+    case "price_1Th5c2FxZCOuiQIAM6obraB0":
       return { nome: "ENTERPRISE", limite: 4 };
-    case "price_1Th5cRFxZCOuiQIA4VAKya37": // ID Prezzo del tuo piano Premium
+    case "price_1Th5cRFxZCOuiQIA4VAKya37":
       return { nome: "ELITE", limite: 5 };
     default:
-      // Fallback sicuro se non riconosce il codice (almeno 1 campo lo lasciamo gestire)
       return { nome: "NESSUNO", limite: 0 };
   }
 }
@@ -34,7 +31,6 @@ serve(async (req) => {
   let event;
 
   try {
-    // DOPO
     event = await stripe.webhooks.constructEventAsync(
       body,
       signature,
@@ -59,31 +55,20 @@ serve(async (req) => {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
 
-      // Recuperiamo i dettagli dell'abbonamento appena creato per sapere cosa ha comprato
       const subscription = await stripe.subscriptions.retrieve(
         session.subscription as string,
       );
       const priceId = subscription.items.data[0].price.id;
-
       const specifiche = ottieniSpecifichePiano(priceId);
-      console.log(
-        `CHECKOUT - priceId: ${priceId}, piano: ${specifiche.nome}, limite: ${specifiche.limite}`,
-      ); // ← aggiungi questa riga
-
-      console.log(
-        `Nuovo abbonamento per cliente ${session.customer}. Piano: ${specifiche.nome}`,
-      );
-      console.log(`client_reference_id: ${session.client_reference_id}`);
-      console.log(`customer: ${session.customer}`);
 
       await supabaseClient
         .from("societa")
         .update({
           piano_attuale: specifiche.nome,
           limite_campi: specifiche.limite,
-          stripe_customer_id: session.customer, // Aggiorna o blinda il customer ID
+          stripe_customer_id: session.customer,
         })
-        .eq("id_utente", session.client_reference_id); // Assicurati che passi l'ID utente nel client_reference_id al checkout iniziale
+        .eq("id_utente", session.client_reference_id);
     }
 
     // ==========================================================
@@ -92,19 +77,12 @@ serve(async (req) => {
     if (event.type === "customer.subscription.updated") {
       const subscription = event.data.object;
       const priceId = subscription.items.data[0].price.id;
-
       const specifiche = ottieniSpecifichePiano(priceId);
 
-      // Se l'utente ha annullato ma il periodo non è ancora finito, Stripe lo mette in 'active' con cancel_at_period_end = true
-      // Se vuoi bloccarlo solo alla fine, gestisci lo stato normalmente
       if (
         subscription.status === "active" ||
         subscription.status === "trialing"
       ) {
-        console.log(
-          `Modifica abbonamento per cliente ${subscription.customer}. Nuovo Piano: ${specifiche.nome}`,
-        );
-
         await supabaseClient
           .from("societa")
           .update({
@@ -121,17 +99,34 @@ serve(async (req) => {
     if (event.type === "customer.subscription.deleted") {
       const subscription = event.data.object;
 
+      await supabaseClient
+        .from("societa")
+        .update({
+          piano_attuale: "NESSUNO",
+          limite_campi: 0,
+        })
+        .eq("stripe_customer_id", subscription.customer);
+    }
+
+    // ==========================================================
+    // 4. AGGIORNAMENTO STATO ONBOARDING STRIPE CONNECT (GESTORE)
+    // ==========================================================
+    if (event.type === "account.updated") {
+      const account = event.data.object;
+      const chargesEnabled = account.charges_enabled === true;
+      const payoutsEnabled = account.payouts_enabled === true;
+
       console.log(
-        `Abbonamento cancellato o scaduto per cliente ${subscription.customer}`,
+        `Account Connect ${account.id} aggiornato. Charges: ${chargesEnabled}, Payouts: ${payoutsEnabled}`,
       );
 
       await supabaseClient
         .from("societa")
         .update({
-          piano_attuale: "NESSUNO", // Scriviamo "NESSUNO" o "START" (ma bloccato)
-          limite_campi: 0, // <--- IMPOSTATO A 0 COME DISCI TU! Bloccato totalmente.
+          stripe_charges_enabled: chargesEnabled,
+          stripe_payouts_enabled: payoutsEnabled,
         })
-        .eq("stripe_customer_id", subscription.customer);
+        .eq("stripe_account_id", account.id);
     }
   } catch (error) {
     console.error(`Errore durante l'aggiornamento del DB Supabase:`, error);

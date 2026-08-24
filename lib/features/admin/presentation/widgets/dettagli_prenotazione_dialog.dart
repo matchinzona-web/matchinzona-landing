@@ -16,6 +16,7 @@ class DettagliPrenotazioneDialog extends StatelessWidget {
         partita['orario_inizio']?.toString().substring(0, 5) ?? '--:--';
     final String orarioFine =
         partita['orario_fine']?.toString().substring(0, 5) ?? '--:--';
+    final bool isPagato = partita['is_pagato'] == true;
 
     // 🟢 1. CALCOLO GIOCATORI
     final int giocaroriPrenotati =
@@ -110,6 +111,47 @@ class DettagliPrenotazioneDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 🟢 BADGE STATO PAGAMENTO
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+              decoration: BoxDecoration(
+                color: isPagato
+                    ? AppTheme.neonGreen.withOpacity(0.12)
+                    : AppTheme.statoErrore.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isPagato ? AppTheme.neonGreen : AppTheme.statoErrore,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    isPagato
+                        ? Icons.check_circle_rounded
+                        : Icons.pending_actions_rounded,
+                    color: isPagato ? AppTheme.neonGreen : AppTheme.statoErrore,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isPagato ? "PAGATO IN APP" : "DA PAGARE AL CAMPO",
+                    style: TextStyle(
+                      color: isPagato
+                          ? AppTheme.neonGreen
+                          : AppTheme.statoErrore,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(

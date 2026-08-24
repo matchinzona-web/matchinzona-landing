@@ -10,6 +10,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:app_campi/core/services/partita_service.dart';
 import 'package:app_campi/features/esplora_match/presentation/pages/esplora_match_page.dart';
 import 'package:app_campi/features/miei_match/application/partite_utente_provider.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CreazionePartitaPage extends ConsumerWidget {
   const CreazionePartitaPage({super.key});
@@ -140,6 +142,19 @@ class _BuildFaseConfigurazione extends StatelessWidget {
               ? Padding(
                   padding: const EdgeInsets.only(top: 32),
                   child: _SelettorePartecipanti(
+                    state: state,
+                    controller: controller,
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          child: state.isPartitaPrivata
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 32),
+                  child: _SelettoreMetodoPagamento(
                     state: state,
                     controller: controller,
                   ),
@@ -1252,6 +1267,44 @@ class _BuildStickyBottomBar extends ConsumerWidget {
       final utente = ref.read(utenteCorrenteProvider).value;
       if (utente == null) throw Exception('Utente non autenticato.');
 
+      // 🟢 SE L'UTENTE SCEGLIE DI PAGARE IN APP (Valido solo per Campo Intero/Privata):
+      if (state.isPartitaPrivata &&
+          state.metodoPagamentoScelto == MetodoPagamento.pagaOra) {
+        final double prezzoBase = controller.getPrezzoSportSelezionato();
+
+        // 1. Invoca Edge Function per ottenere PaymentIntent da Stripe
+        final res = await Supabase.instance.client.functions.invoke(
+          'crea-pagamento-partita',
+          body: {
+            'id_campo': state.campoSelezionato!.id,
+            'prezzo_base_euro': prezzoBase,
+          },
+        );
+
+        if (res.status != 200 ||
+            res.data == null ||
+            res.data['error'] != null) {
+          throw Exception(
+            res.data?['error'] ?? 'Impossibile inizializzare il pagamento',
+          );
+        }
+
+        final String clientSecret = res.data['paymentIntent'];
+
+        // 2. Inizializza il PaymentSheet Stripe
+        await Stripe.instance.initPaymentSheet(
+          paymentSheetParameters: SetupPaymentSheetParameters(
+            paymentIntentClientSecret: clientSecret,
+            merchantDisplayName: state.campoSelezionato!.nomeCampo,
+            style: ThemeMode.dark,
+          ),
+        );
+
+        // 3. Mostra la schermata nativa di pagamento Stripe
+        await Stripe.instance.presentPaymentSheet();
+      }
+
+      // 4. Conclusione: registra la partita a database
       final maxGiocatori = _calcolaMaxGiocatoriPerSport(
         state.sportSelezionato,
         state.campoSelezionato!.numeroDiGiocatori,
@@ -1290,6 +1343,15 @@ class _BuildStickyBottomBar extends ConsumerWidget {
       );
 
       controller.svuotaTutto();
+    } on StripeException catch (e) {
+      if (context.mounted) {
+        if (e.error.code != FailureCode.Canceled) {
+          _gestioneErroriUI(
+            context,
+            e.error.localizedMessage ?? 'Pagamento fallito',
+          );
+        }
+      }
     } catch (e) {
       if (context.mounted) _gestioneErroriUI(context, e.toString());
     }
@@ -1364,6 +1426,133 @@ class _BuildStickyBottomBar extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SelettoreMetodoPagamento extends StatelessWidget {
+  final CreazionePartitaState state;
+  final CreazionePartitaController controller;
+
+  const _SelettoreMetodoPagamento({
+    required this.state,
+    required this.controller,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final double prezzoBase = controller.getPrezzoSportSelezionato();
+    final double fee = (prezzoBase * 0.035) + 0.35;
+    final double totaleApp = prezzoBase + fee;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "METODO DI PAGAMENTO",
+          style: TextStyle(
+            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.w900,
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _OpzionePagamentoCard(
+                titolo: "PAGA AL CAMPO",
+                sottotitolo:
+                    "${prezzoBase.toStringAsFixed(2)} € in contanti/POS",
+                icona: Icons.storefront_outlined,
+                isSelected:
+                    state.metodoPagamentoScelto == MetodoPagamento.inSede,
+                onTap: () =>
+                    controller.selezionaMetodoPagamento(MetodoPagamento.inSede),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _OpzionePagamentoCard(
+                titolo: "PAGA IN APP",
+                sottotitolo: "${totaleApp.toStringAsFixed(2)} € (Stripe)",
+                icona: Icons.credit_card_rounded,
+                isSelected:
+                    state.metodoPagamentoScelto == MetodoPagamento.pagaOra,
+                onTap: () => controller.selezionaMetodoPagamento(
+                  MetodoPagamento.pagaOra,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _OpzionePagamentoCard extends StatelessWidget {
+  final String titolo;
+  final String sottotitolo;
+  final IconData icona;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _OpzionePagamentoCard({
+    required this.titolo,
+    required this.sottotitolo,
+    required this.icona,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.accent.withOpacity(0.12)
+              : AppTheme.cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? AppTheme.accent : AppTheme.cardBorder,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              icona,
+              color: isSelected ? AppTheme.accent : AppTheme.textSecondary,
+              size: 24,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              titolo,
+              style: TextStyle(
+                color: isSelected ? AppTheme.accent : AppTheme.textPrimary,
+                fontWeight: FontWeight.w900,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              sottotitolo,
+              style: TextStyle(
+                color: isSelected
+                    ? AppTheme.textPrimary
+                    : AppTheme.textSecondary,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
