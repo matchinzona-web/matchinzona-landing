@@ -289,27 +289,24 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
   void selezionaMetodoPagamento(MetodoPagamento metodo) =>
       state = state.copyWith(metodoPagamentoScelto: metodo);
 
-  Future<void> confermaMatch(Utente organizzatore) async {
+  Future<String> confermaMatch(Utente organizzatore) async {
     if (state.oraInizioSelezionata == null || state.campoSelezionato == null) {
-      return;
+      throw Exception('Dati partita incompleti.');
     }
     state = state.copyWith(isLoading: true);
 
     try {
-      // 🟢 CORRETTO: Usa getMaxGiocatori() che legge 'tennis_doppio' = 4 o 'tennis_singolo' = 2!
       final int maxGiocatoriReal = getMaxGiocatori();
 
       int ospitiFinali = state.isPartitaPrivata
-          ? (maxGiocatoriReal -
-                1) // 🟢 Per il doppio fa 4 - 1 = 3 ospiti extra (Totale 4 giocatori)
+          ? (maxGiocatoriReal - 1)
           : state.ospitiExtra;
 
-      // 🟢 isPagato è true SOLO se la partita è privata (campo intero) ed è stato scelto Paga Ora
       final bool pagatoEffettivo =
           state.isPartitaPrivata &&
           state.metodoPagamentoScelto == MetodoPagamento.pagaOra;
 
-      final errore = await _partitaService.creaNuovaPartita(
+      final esito = await _partitaService.creaNuovaPartita(
         campo: state.campoSelezionato!,
         organizzatore: organizzatore,
         dataPartita: state.dataSelezionata,
@@ -320,18 +317,19 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
         isPagato: pagatoEffettivo,
       );
 
-      if (errore != null) {
-        String msg = errore;
-        if (errore == 'SLOT_OCCUPATO_PARTITA_PROTETTA') {
+      if (!esito.isSuccesso) {
+        String msg = esito.errore ?? 'Errore imprevisto';
+        if (esito.errore == 'SLOT_OCCUPATO_PARTITA_PROTETTA') {
           msg =
               "Impossibile prenotare: è già presente una partita protetta in questo orario.";
-        } else if (errore == 'SLOT_GIA_OCCUPATO') {
+        } else if (esito.errore == 'SLOT_GIA_OCCUPATO') {
           msg = "Questo slot è già occupato da una partita completa.";
         }
         throw Exception(msg);
       }
 
       state = state.copyWith(isLoading: false);
+      return esito.idPartita!;
     } catch (e) {
       state = state.copyWith(isLoading: false);
       rethrow;

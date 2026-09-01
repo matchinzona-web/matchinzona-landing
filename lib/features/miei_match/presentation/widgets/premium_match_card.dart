@@ -9,6 +9,7 @@ import 'package:app_campi/features/miei_match/presentation/widgets/live_timer_wi
 import 'package:app_campi/core/shared_widget/status_badge.dart';
 import 'package:app_campi/core/shared_widget/urgenza_badge.dart';
 import 'package:app_campi/core/shared_widget/animated_fill_bar.dart';
+import 'package:app_campi/features/chat/match_chat_page.dart';
 
 class PremiumMatchCard extends ConsumerWidget {
   final Partita partita;
@@ -289,6 +290,55 @@ class PremiumMatchCard extends ConsumerWidget {
                       child: LiveTimerWidget(
                         dataPartita: partita.dataPartita,
                         orarioInizio: partita.orarioInizio,
+                      ),
+                    ),
+                  ],
+
+                  // 🟢 PULSANTE CHAT: Visibile solo se la partita è di matchmaking (isPublic == true)
+                  // e non è annullata (quindi sia aperta sia completata)
+                  if (partita.isPublic && statoReale != 'annullata') ...[
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: AppTheme.neonCyan.withOpacity(0.08),
+                          foregroundColor: AppTheme.neonCyan,
+                          side: BorderSide(
+                            color: AppTheme.neonCyan.withOpacity(0.4),
+                            width: 1.2,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                        ),
+                        icon: const Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          size: 18,
+                        ),
+                        label: Text(
+                          statoReale == 'completa'
+                              ? "CHAT PARTITA"
+                              : "APRI CHAT",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 13,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => MatchChatPage(
+                                matchId: partita.id,
+                                nomeCampo: partita.campo.nomeCampo,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],

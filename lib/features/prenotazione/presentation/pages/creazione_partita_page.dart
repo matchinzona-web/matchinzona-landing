@@ -1317,7 +1317,7 @@ class _BuildStickyBottomBar extends ConsumerWidget {
       final data = state.dataSelezionata;
       final ora = state.oraInizioSelezionata!;
 
-      await controller.confermaMatch(utente);
+      final String idPartitaCreata = await controller.confermaMatch(utente);
       await Future.delayed(const Duration(milliseconds: 600));
 
       ref
@@ -1333,6 +1333,7 @@ class _BuildStickyBottomBar extends ConsumerWidget {
         context,
         MaterialPageRoute(
           builder: (context) => SuccessoPrenotazionePage(
+            idPartita: idPartitaCreata,
             nomeCampo: nomeCampo,
             data: data,
             ora: ora,

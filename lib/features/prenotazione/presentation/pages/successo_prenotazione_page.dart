@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:app_campi/core/theme/app_theme.dart';
 import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:app_campi/features/chat/match_chat_page.dart';
 
 class SuccessoPrenotazionePage extends StatelessWidget {
+  final String idPartita;
   final String nomeCampo;
   final DateTime data;
   final String ora;
@@ -11,6 +13,7 @@ class SuccessoPrenotazionePage extends StatelessWidget {
 
   const SuccessoPrenotazionePage({
     super.key,
+    required this.idPartita,
     required this.nomeCampo,
     required this.data,
     required this.ora,
@@ -34,7 +37,7 @@ class SuccessoPrenotazionePage extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppTheme.neonGreen.withValues(alpha: 0.1),
+                  color: AppTheme.neonGreen.withOpacity(0.1),
                 ),
                 child: const Icon(
                   Icons.check_circle_outline,
@@ -110,9 +113,7 @@ class SuccessoPrenotazionePage extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      isPrivata
-                          ? "PRENOTAZIONE COMPLETATA"
-                          : "MATCHMAKING ATTIVO",
+                      isPrivata ? "PRENOTAZIONE PRIVATA" : "MATCHMAKING ATTIVO",
                       style: TextStyle(
                         color: isPrivata
                             ? AppTheme.neonOrange
@@ -160,9 +161,42 @@ class SuccessoPrenotazionePage extends StatelessWidget {
               ),
               const Spacer(),
 
+              // BOTTONE CHAT (Visibile solo se NON è privata)
+              if (!isPrivata) ...[
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.neonCyan,
+                    foregroundColor: Colors.black,
+                    minimumSize: const Size(double.infinity, 56),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 0,
+                  ),
+                  icon: const Icon(Icons.chat_bubble_outline_rounded),
+                  label: const Text(
+                    "APRI CHAT DI GRUPPO",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => MatchChatPage(
+                          matchId: idPartita,
+                          nomeCampo: nomeCampo,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              // BOTTONE CONDIVIDI WHATSAPP
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 60),
+                  minimumSize: const Size(double.infinity, 56),
                   side: const BorderSide(color: AppTheme.neonGreen, width: 2),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -175,9 +209,6 @@ class SuccessoPrenotazionePage extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 onPressed: () async {
-                  final dataFormattata =
-                      "${data.day}/${data.month}/${data.year}";
-
                   final String testoMessaggio = isPrivata
                       ? "Grande! Ho prenotato il campo *$nomeCampo* per il giorno *$dataFormattata* alle ore *$ora*. Ci vediamo in campo! ⚽"
                       : "Chi scende in campo? ⚽ Ho aperto un match su *$nomeCampo* il *$dataFormattata* alle *$ora*. Unisciti alla partita dall'app per bloccare lo slot!";
@@ -220,7 +251,7 @@ class SuccessoPrenotazionePage extends StatelessWidget {
                   }
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               TextButton(
                 onPressed: () =>

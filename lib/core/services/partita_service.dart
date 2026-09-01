@@ -7,6 +7,16 @@ import '../repositories/chiusura_straordinaria_repository.dart';
 
 enum MetodoPagamento { nessuno, pagaOra, inSede }
 
+class RisultatoCreazionePartita {
+  final String? idPartita;
+  final String? errore;
+
+  bool get isSuccesso => errore == null && idPartita != null;
+
+  RisultatoCreazionePartita.successo(this.idPartita) : errore = null;
+  RisultatoCreazionePartita.fallimento(this.errore) : idPartita = null;
+}
+
 class PartitaService {
   final PartitaRepository _repository;
   final OrarioSocietaRepository _orarioRepository;
@@ -140,7 +150,7 @@ class PartitaService {
     }
   }
 
-  Future<String?> creaNuovaPartita({
+  Future<RisultatoCreazionePartita> creaNuovaPartita({
     required Campo campo,
     required Utente organizzatore,
     required DateTime dataPartita,
@@ -152,18 +162,18 @@ class PartitaService {
   }) async {
     try {
       if (ospitiExtra < 0) {
-        return 'Il numero di ospiti non può essere negativo.';
+        return RisultatoCreazionePartita.fallimento(
+          'Il numero di ospiti non può essere negativo.',
+        );
       }
 
-      // Durante la creazione in creaNuovaPartita:
       int maxGiocatori = campo.numeroDiGiocatori;
 
-      // Se è Tennis ed è selezionato il doppio o ci sono 3 ospiti extra (totale 4 persone)
       if (campo.nomeCampo.toLowerCase().contains('tennis')) {
         if (ospitiExtra >= 3 || (isPartitaPrivata && ospitiExtra > 1)) {
           maxGiocatori = 4;
         } else if (ospitiExtra <= 1) {
-          maxGiocatori = 2; // Singolo fisso
+          maxGiocatori = 2;
         }
       }
 
@@ -174,30 +184,40 @@ class PartitaService {
       final adesso = DateTime.now();
 
       if (adesso.isAfter(inizioEsatto)) {
-        return 'Non puoi creare una partita in un orario già passato.';
+        return RisultatoCreazionePartita.fallimento(
+          'Non puoi creare una partita in un orario già passato.',
+        );
       }
 
       if (adesso.isAfter(
         inizioEsatto.subtract(const Duration(hours: oreMinPreavvisoCreazione)),
       )) {
-        return 'Non puoi creare una partita con meno di $oreMinPreavvisoCreazione ora di anticipo.';
+        return RisultatoCreazionePartita.fallimento(
+          'Non puoi creare una partita con meno di $oreMinPreavvisoCreazione ora di anticipo.',
+        );
       }
 
       final isPt = _isPrimeTime(orarioInizio);
 
       if (giocatoriTotaliIniziali > maxGiocatori) {
-        return 'Errore: troppi giocatori per questo campo.';
+        return RisultatoCreazionePartita.fallimento(
+          'Errore: troppi giocatori per questo campo.',
+        );
       }
 
       if (giocatoriTotaliIniziali < getMinimoApertura(maxGiocatori, isPt)) {
-        return 'Servono più giocatori per aprire una partita in questo orario.';
+        return RisultatoCreazionePartita.fallimento(
+          'Servono più giocatori per aprire una partita in questo orario.',
+        );
       }
 
       if (giocatoriTotaliIniziali < getSogliaProtezione(maxGiocatori) &&
           adesso.isAfter(
             inizioEsatto.subtract(const Duration(hours: oreLimiteScadenza)),
           )) {
-        return 'Mancano meno di $oreLimiteScadenza ore all\'inizio: impossibile aprire una partita a rischio.';
+        return RisultatoCreazionePartita.fallimento(
+          'Mancano meno di $oreLimiteScadenza ore all\'inizio: impossibile aprire una partita a rischio.',
+        );
       }
 
       if (await _repository.isSlotOccupato(
@@ -205,7 +225,9 @@ class PartitaService {
         dataPartita,
         orarioInizio,
       )) {
-        return 'Lo slot è già occupato da una partita completa o protetta.';
+        return RisultatoCreazionePartita.fallimento(
+          'Lo slot è già occupato da una partita completa o protetta.',
+        );
       }
 
       final partiteEsistenti = await _repository.getPartiteAperteNelloSlot(
@@ -218,13 +240,17 @@ class PartitaService {
         (p) => p['id_organizzatore'] == organizzatore.id,
       );
       if (giaCreatoInSlot) {
-        return 'Hai già una partita aperta in questo orario.';
+        return RisultatoCreazionePartita.fallimento(
+          'Hai già una partita aperta in questo orario.',
+        );
       }
 
       if (partiteEsistenti.any(
         (p) => p['stato_partita'] == 'aperta_protetta',
       )) {
-        return 'È già presente una partita protetta in questo orario.';
+        return RisultatoCreazionePartita.fallimento(
+          'È già presente una partita protetta in questo orario.',
+        );
       }
 
       if (!isPartitaGiaCompleta && !isPartitaPrivata) {
@@ -247,12 +273,16 @@ class PartitaService {
             final int maxGiocatoriTrovati =
                 partitaMigliore['numero_giocatori_prenotati'] as int? ?? 0;
 
-            return 'Esiste già una partita con $maxGiocatoriTrovati giocatori in cui c\'è posto per voi. Unisciti a quella per ottimizzare le presenze. UNISCITI_FORZATO';
+            return RisultatoCreazionePartita.fallimento(
+              'Esiste già una partita con $maxGiocatoriTrovati giocatori in cui c\'è posto per voi. Unisciti a quella per ottimizzare le presenze. UNISCITI_FORZATO',
+            );
           }
         }
 
         if (partiteEsistenti.length >= maxPartiteNelloSlot) {
-          return 'Raggiunto il limite massimo di $maxPartiteNelloSlot partite aperte in questo orario. Puoi solo prenotare il Campo Intero o unirti a una esistente. MAX_PARTITE_RAGGIUNTE';
+          return RisultatoCreazionePartita.fallimento(
+            'Raggiunto il limite massimo di $maxPartiteNelloSlot partite aperte in questo orario. Puoi solo prenotare il Campo Intero o unirti a una esistente. MAX_PARTITE_RAGGIUNTE',
+          );
         }
       }
 
@@ -261,7 +291,9 @@ class PartitaService {
           partiteEsistenti.any(
             (p) => p['stato_partita'] == 'aperta_protetta',
           )) {
-        return 'Non puoi creare una partita privata in uno slot con una partita protetta.';
+        return RisultatoCreazionePartita.fallimento(
+          'Non puoi creare una partita privata in uno slot con una partita protetta.',
+        );
       }
 
       if (!await _isSocietaAperta(
@@ -270,7 +302,9 @@ class PartitaService {
         orarioInizio,
         orarioFine,
       )) {
-        return 'Il centro sportivo è chiuso in questo orario.';
+        return RisultatoCreazionePartita.fallimento(
+          'Il centro sportivo è chiuso in questo orario.',
+        );
       }
 
       final int sogliaProtezione = getSogliaProtezione(maxGiocatori);
@@ -293,10 +327,16 @@ class PartitaService {
         'p_is_pagato': isPagato,
       });
 
-      if (result['status'] == 'error') return result['message'];
+      if (result['status'] == 'error') {
+        return RisultatoCreazionePartita.fallimento(
+          result['message']?.toString() ?? 'Errore creazione.',
+        );
+      }
+
+      final String idPartitaGenerata = result['id'].toString();
 
       await _repository.inserisciGiocatorePartita({
-        'id_partita': result['id'],
+        'id_partita': idPartitaGenerata,
         'id_utente': organizzatore.id,
         'ospiti_extra': ospitiExtra,
       });
@@ -306,20 +346,22 @@ class PartitaService {
           idCampo: campo.id,
           dataPartita: dataPartita,
           orarioInizio: orarioInizio,
-          idPartitaVincente: result['id'],
+          idPartitaVincente: idPartitaGenerata,
         );
       } else if (laNuovaPartitaSeraProtetta) {
         await _repository.annullaPartiteARischioNelloSlot(
           idCampo: campo.id,
           dataPartita: dataPartita,
           orarioInizio: orarioInizio,
-          idPartitaVincente: result['id'],
+          idPartitaVincente: idPartitaGenerata,
         );
       }
 
-      return null;
+      return RisultatoCreazionePartita.successo(idPartitaGenerata);
     } catch (e) {
-      return 'Errore durante la creazione: $e';
+      return RisultatoCreazionePartita.fallimento(
+        'Errore durante la creazione: $e',
+      );
     }
   }
 
