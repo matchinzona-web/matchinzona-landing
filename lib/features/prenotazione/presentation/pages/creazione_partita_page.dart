@@ -1267,6 +1267,9 @@ class _BuildStickyBottomBar extends ConsumerWidget {
       final utente = ref.read(utenteCorrenteProvider).value;
       if (utente == null) throw Exception('Utente non autenticato.');
 
+      String? stripePaymentIntentId;
+      int? importoRimborsabileCentesimi;
+
       // 🟢 SE L'UTENTE SCEGLIE DI PAGARE IN APP (Valido solo per Campo Intero/Privata):
       if (state.isPartitaPrivata &&
           state.metodoPagamentoScelto == MetodoPagamento.pagaOra) {
@@ -1290,6 +1293,12 @@ class _BuildStickyBottomBar extends ConsumerWidget {
         }
 
         final String clientSecret = res.data['paymentIntent'];
+
+        // Estraiamo l'ID univoco di Stripe e i centesimi del prezzo base
+        stripePaymentIntentId =
+            res.data['paymentIntentId'] ?? clientSecret.split('_secret_').first;
+        importoRimborsabileCentesimi =
+            res.data['prezzoBaseCentesimi'] ?? (prezzoBase * 100).round();
 
         // 2. Inizializza il PaymentSheet Stripe
         await Stripe.instance.initPaymentSheet(
@@ -1317,7 +1326,11 @@ class _BuildStickyBottomBar extends ConsumerWidget {
       final data = state.dataSelezionata;
       final ora = state.oraInizioSelezionata!;
 
-      final String idPartitaCreata = await controller.confermaMatch(utente);
+      final String idPartitaCreata = await controller.confermaMatch(
+        utente,
+        stripePaymentIntentId: stripePaymentIntentId,
+        importoRimborsabileCentesimi: importoRimborsabileCentesimi,
+      );
       await Future.delayed(const Duration(milliseconds: 600));
 
       ref

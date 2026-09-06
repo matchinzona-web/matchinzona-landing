@@ -289,7 +289,11 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
   void selezionaMetodoPagamento(MetodoPagamento metodo) =>
       state = state.copyWith(metodoPagamentoScelto: metodo);
 
-  Future<String> confermaMatch(Utente organizzatore) async {
+  Future<String> confermaMatch(
+    Utente organizzatore, {
+    String? stripePaymentIntentId,
+    int? importoRimborsabileCentesimi,
+  }) async {
     if (state.oraInizioSelezionata == null || state.campoSelezionato == null) {
       throw Exception('Dati partita incompleti.');
     }
@@ -315,6 +319,8 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
         ospitiExtra: ospitiFinali,
         isPartitaPrivata: state.isPartitaPrivata,
         isPagato: pagatoEffettivo,
+        stripePaymentIntentId: stripePaymentIntentId,
+        importoRimborsabileCentesimi: importoRimborsabileCentesimi,
       );
 
       if (!esito.isSuccesso) {

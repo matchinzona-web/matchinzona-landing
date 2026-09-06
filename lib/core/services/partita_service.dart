@@ -159,6 +159,8 @@ class PartitaService {
     int ospitiExtra = 0,
     bool isPartitaPrivata = false,
     bool isPagato = false,
+    String? stripePaymentIntentId,
+    int? importoRimborsabileCentesimi,
   }) async {
     try {
       if (ospitiExtra < 0) {
@@ -325,6 +327,8 @@ class PartitaService {
         'p_is_public': !isPartitaPrivata,
         'p_max_giocatori_custom': maxGiocatori,
         'p_is_pagato': isPagato,
+        'p_stripe_payment_intent_id': stripePaymentIntentId,
+        'p_importo_rimborsabile_centesimi': importoRimborsabileCentesimi,
       });
 
       if (result['status'] == 'error') {

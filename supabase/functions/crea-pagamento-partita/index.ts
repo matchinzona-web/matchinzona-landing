@@ -113,6 +113,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         paymentIntent: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id, // 🟢 AGGIUNTO: ID univoco del PaymentIntent
+        prezzoBaseCentesimi: prezzoBaseCentesimi, // 🟢 AGGIUNTO: importo del campo da rimborsare
         totaleEuro: (totaleUtenteCentesimi / 100).toFixed(2),
         feeEuro: (platformFee / 100).toFixed(2),
       }),

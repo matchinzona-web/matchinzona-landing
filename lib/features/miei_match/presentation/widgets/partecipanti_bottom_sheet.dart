@@ -6,6 +6,7 @@ import 'package:app_campi/core/models/utente.dart';
 import 'package:app_campi/core/theme/app_theme.dart';
 import 'package:app_campi/core/theme/app_constants.dart';
 import 'package:app_campi/core/services/location_provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app_campi/features/miei_match/application/partite_utente_provider.dart';
 
 void mostraBottomSheetPartecipanti(
@@ -207,36 +208,54 @@ void mostraBottomSheetPartecipanti(
                 ],
                 const SizedBox(height: 24),
                 if (isIscritto) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.redAccent.withOpacity(0.1),
-                        foregroundColor: Colors.redAccent,
-                        side: const BorderSide(
-                          color: Colors.redAccent,
-                          width: 1.2,
+                  Builder(
+                    builder: (context) {
+                      final bool isOrganizzatore =
+                          partita.organizzatore.id
+                              .toString()
+                              .trim()
+                              .toLowerCase() ==
+                          utenteLoggato!.id.toString().trim().toLowerCase();
+                      final bool haPagatoInApp =
+                          partita.isPagato && isOrganizzatore;
+
+                      return SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent.withOpacity(0.1),
+                            foregroundColor: Colors.redAccent,
+                            side: const BorderSide(
+                              color: Colors.redAccent,
+                              width: 1.2,
+                            ),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.tile,
+                              ),
+                            ),
+                          ),
+                          onPressed: () => _gestisciAbbandono(
+                            context,
+                            ref,
+                            partita,
+                            utenteLoggato,
+                            haPagatoInApp: haPagatoInApp,
+                          ),
+                          child: Text(
+                            haPagatoInApp
+                                ? 'Annulla Prenotazione e Rimborsa'
+                                : 'Abbandona Partita',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
                         ),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.tile),
-                        ),
-                      ),
-                      onPressed: () => _gestisciAbbandono(
-                        context,
-                        ref,
-                        partita,
-                        utenteLoggato!,
-                      ),
-                      child: const Text(
-                        'Abbandona Partita',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -275,8 +294,11 @@ void _gestisciAbbandono(
   BuildContext context,
   WidgetRef ref,
   Partita partita,
-  Utente utente,
-) {
+  Utente utente, {
+  bool haPagatoInApp = false,
+}) {
+  final double quotaCampo = partita.campo.prezzo;
+
   showDialog(
     context: context,
     builder: (ctx) => BackdropFilter(
@@ -287,19 +309,24 @@ void _gestisciAbbandono(
           borderRadius: BorderRadius.circular(AppRadius.card),
           side: const BorderSide(color: Colors.white10),
         ),
-        title: const Text(
-          'Attenzione',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        title: Text(
+          haPagatoInApp ? 'Annulla e Richiedi Rimborso' : 'Attenzione',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        content: const Text(
-          'Sei sicuro di voler abbandonare questa partita? Verranno rimossi anche i tuoi ospiti.',
-          style: TextStyle(color: AppTheme.testoSecondario, height: 1.4),
+        content: Text(
+          haPagatoInApp
+              ? 'Sei sicuro di voler annullare la prenotazione?\n\nTi verranno riaccreditati ${quotaCampo.toStringAsFixed(2)} € sulla carta utilizzata per il pagamento.\n\nNota: i costi di gestione e transazione del servizio non sono rimborsabili.'
+              : 'Sei sicuro di voler abbandonare questa partita? Verranno rimossi anche i tuoi ospiti.',
+          style: const TextStyle(color: AppTheme.testoSecondario, height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text(
-              'Annulla',
+              'Indietro',
               style: TextStyle(color: Colors.white54),
             ),
           ),
@@ -313,13 +340,47 @@ void _gestisciAbbandono(
               ),
             ),
             onPressed: () async {
-              Navigator.pop(ctx);
+              Navigator.pop(ctx); // Chiude il Dialog
 
-              final service = ref.read(partitaServiceProvider);
-              final errore = await service.abbandonaPartita(
-                partita: partita,
-                giocatoreDaRimuovere: utente,
+              // Mostra un caricamento visivo
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => const Center(
+                  child: CircularProgressIndicator(color: AppTheme.accent),
+                ),
               );
+
+              String? errore;
+
+              try {
+                if (haPagatoInApp) {
+                  // 🟢 Chiamata alla Edge Function di rimborso parziale Stripe
+                  final res = await Supabase.instance.client.functions.invoke(
+                    'rimborsa-partita',
+                    body: {'id_partita': partita.id},
+                  );
+
+                  if (res.status != 200 ||
+                      res.data == null ||
+                      res.data['error'] != null) {
+                    errore =
+                        res.data?['error'] ?? 'Errore durante il rimborso.';
+                  }
+                } else {
+                  // Flusso classico di abbandono partita
+                  final service = ref.read(partitaServiceProvider);
+                  errore = await service.abbandonaPartita(
+                    partita: partita,
+                    giocatoreDaRimuovere: utente,
+                  );
+                }
+              } catch (e) {
+                errore = e.toString();
+              }
+
+              // Chiude il caricamento
+              if (context.mounted) Navigator.pop(context);
 
               if (context.mounted) {
                 if (errore != null) {
@@ -330,10 +391,14 @@ void _gestisciAbbandono(
                     ),
                   );
                 } else {
-                  Navigator.pop(context);
+                  Navigator.pop(context); // Chiude la Bottom Sheet
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Hai abbandonato la partita.'),
+                    SnackBar(
+                      content: Text(
+                        haPagatoInApp
+                            ? 'Prenotazione annullata. Rimborso di ${quotaCampo.toStringAsFixed(2)} € inviato!'
+                            : 'Hai abbandonato la partita.',
+                      ),
                       backgroundColor: AppTheme.neonGreen,
                     ),
                   );
@@ -342,9 +407,9 @@ void _gestisciAbbandono(
                 }
               }
             },
-            child: const Text(
-              'Conferma',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            child: Text(
+              haPagatoInApp ? 'Conferma Rimborso' : 'Conferma',
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
         ],
