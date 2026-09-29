@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "48542052597",
+    "project_id": "matchly-app-2026-efd7e",
+    "storage_bucket": "matchly-app-2026-efd7e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:48542052597:android:e6e6e44dd69ab7f1d495bc",
+        "android_client_info": {
+          "package_name": "com.example.app_campi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDMVaseGGhmFghDBQ6l2jElRXAYtUFaTiY"
+        },
+        {
+          "current_key": "AIzaSyCyjH7govwW6tkQcbMlSA8Hnc-u3pPs5S4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:48542052597:android:9244dc133a4ac861d495bc",
+        "android_client_info": {
+          "package_name": "com.matchly.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDMVaseGGhmFghDBQ6l2jElRXAYtUFaTiY"
+        },
+        {
+          "current_key": "AIzaSyCyjH7govwW6tkQcbMlSA8Hnc-u3pPs5S4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

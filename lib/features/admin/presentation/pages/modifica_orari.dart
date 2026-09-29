@@ -64,7 +64,7 @@ class _ModificaOrariState extends State<ModificaOrari> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Errore caricamento orari: $e'),
+            content: Text('Errore caricamento orari'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -243,7 +243,7 @@ class _ModificaOrariState extends State<ModificaOrari> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Errore durante il salvataggio: $e'),
+            content: Text('Errore durante il salvataggio'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -363,7 +363,7 @@ class _ModificaOrariState extends State<ModificaOrari> {
                                             size: 18,
                                           ),
                                           label: const Text(
-                                            'Copia per tutti',
+                                            'Applica a tutti',
                                             style: TextStyle(
                                               color: Colors.grey,
                                               fontSize: 12,

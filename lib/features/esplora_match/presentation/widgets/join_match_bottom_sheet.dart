@@ -10,6 +10,7 @@ import '../../application/join_match_controller.dart';
 import 'package:app_campi/core/services/location_provider.dart';
 import 'auth_bottom_sheet.dart';
 import 'package:app_campi/features/miei_match/application/partite_utente_provider.dart';
+import 'package:app_campi/features/home/presentation/home_page.dart';
 
 void mostraDettagliEUnisciti(
   BuildContext context,
@@ -333,7 +334,7 @@ class _IscrizioneConOspitiSection extends ConsumerStatefulWidget {
 
 class _IscrizioneConOspitiSectionState
     extends ConsumerState<_IscrizioneConOspitiSection> {
-  int _ospitiExtra = 0;
+  int _numeroPersone = 1;
 
   @override
   Widget build(BuildContext context) {
@@ -344,7 +345,7 @@ class _IscrizioneConOspitiSectionState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Porti degli amici con te?",
+          "In quanti siete?",
           style: TextStyle(
             color: AppTheme.textPrimary,
             fontWeight: FontWeight.bold,
@@ -352,14 +353,14 @@ class _IscrizioneConOspitiSectionState
         ),
         const SizedBox(height: 10),
         _OspitiCounter(
-          valore: _ospitiExtra,
-          max: widget.maxOspitiAggiungibili,
-          onDecrementa: _ospitiExtra > 0 && !isLoading
-              ? () => setState(() => _ospitiExtra--)
+          valore: _numeroPersone,
+          max: widget.maxOspitiAggiungibili + 1,
+          onDecrementa: _numeroPersone > 1 && !isLoading
+              ? () => setState(() => _numeroPersone--)
               : null,
           onIncrementa:
-              _ospitiExtra < widget.maxOspitiAggiungibili && !isLoading
-              ? () => setState(() => _ospitiExtra++)
+              _numeroPersone < widget.maxOspitiAggiungibili + 1 && !isLoading
+              ? () => setState(() => _numeroPersone++)
               : null,
         ),
         const SizedBox(height: 24),
@@ -388,28 +389,35 @@ class _IscrizioneConOspitiSectionState
   }
 
   Future<void> _confermaIscrizione(BuildContext context) async {
+    final int nuovoTotale =
+        widget.partita.numeroGiocatoriPrenotati + _numeroPersone;
+
+    final bool diventaCompleta =
+        nuovoTotale >= widget.partita.maxGiocatoriReali;
     final errore = await ref
         .read(joinMatchControllerProvider.notifier)
-        .unisciti(widget.partita, widget.utenteLoggato, _ospitiExtra);
+        .unisciti(widget.partita, widget.utenteLoggato, _numeroPersone - 1);
 
     if (!context.mounted) return;
 
     if (errore == null) {
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Iscrizione completata",
-            style: TextStyle(
-              color: AppTheme.darkBg,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          backgroundColor: AppTheme.statoSuccesso,
-        ),
-      );
+
+      ref
+          .read(filtroPartitaProvider.notifier)
+          .impostaFiltro(
+            diventaCompleta ? FiltroPartita.complete : FiltroPartita.aperte,
+          );
+
       ref.invalidate(matchInZonaProvider);
       ref.invalidate(partiteUtenteProvider(widget.utenteLoggato.id));
+
+      if (!context.mounted) return;
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomePage(initialIndex: 2)),
+        (route) => false,
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(errore), backgroundColor: AppTheme.statoErrore),
@@ -474,7 +482,7 @@ class _OspitiCounter extends StatelessWidget {
           ),
           const Spacer(),
           Text(
-            "Tu + $valore (${valore + 1} posti)",
+            "$valore ${valore == 1 ? 'persona' : 'persone'}",
             style: const TextStyle(
               color: AppTheme.textSecondary,
               fontSize: 13,

@@ -1,14 +1,13 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import 'package:app_campi/features/admin/presentation/pages/dashboard_gestore_page.dart';
-import 'package:app_campi/features/home/presentation/home_page.dart';
 import 'package:app_campi/core/models/utente.dart';
 import 'package:app_campi/features/auth/application/auth_provider.dart';
 import 'package:app_campi/core/theme/app_theme.dart';
 import 'package:app_campi/core/utils/loading_overlay.dart';
+import 'package:app_campi/features/auth/data/auth_repository.dart';
 
 class LoginUtente extends ConsumerStatefulWidget {
   const LoginUtente({super.key});
@@ -27,11 +26,54 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
 
   bool _nascondiPassword = true;
 
+  StreamSubscription<AuthState>? _authSubscription;
+  bool _attesaLoginSocial = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
+      data,
+    ) {
+      if (!_attesaLoginSocial) return;
+
+      if (data.event == AuthChangeEvent.signedIn && data.session != null) {
+        _attesaLoginSocial = false;
+
+        if (!mounted) return;
+
+        ref.invalidate(utenteCorrenteProvider);
+
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+      }
+    });
+  }
+
   @override
   void dispose() {
+    _authSubscription?.cancel();
+
     _emailController.dispose();
     _passwordController.dispose();
+
     super.dispose();
+  }
+
+  Future<void> _accediConGoogle() async {
+    try {
+      _attesaLoginSocial = true;
+
+      final authService = AuthService();
+
+      await authService.accediConGoogle();
+    } catch (e) {
+      _attesaLoginSocial = false;
+
+      if (!mounted) return;
+
+      _mostraErrore(e.toString().replaceFirst('Exception: ', ''));
+    }
   }
 
   Future<void> _eseguiLogin() async {
@@ -81,22 +123,7 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
             ),
           );
 
-          Widget paginaDestinazione = utenteCorrente.isGestore
-              ? DashboardGestore.fromLogin(utenteLoggato: utenteCorrente)
-              : const HomePage();
-
-          Navigator.of(context).pushAndRemoveUntil(
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) =>
-                  paginaDestinazione,
-              transitionsBuilder:
-                  (context, animation, secondaryAnimation, child) {
-                    return FadeTransition(opacity: animation, child: child);
-                  },
-              transitionDuration: const Duration(milliseconds: 400),
-            ),
-            (Route<dynamic> route) => false,
-          );
+          Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
         }
       }
     } on AuthException catch (e) {
@@ -192,7 +219,7 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
               } catch (err) {
                 if (mounted) {
                   LoadingOverlay.hide(context);
-                  _mostraErrore('Errore di reinvio: $err');
+                  _mostraErrore('Errore di reinvio');
                 }
               }
             },
@@ -388,7 +415,82 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
-                                const SizedBox(height: 40),
+                                const SizedBox(height: 32),
+
+                                SizedBox(
+                                  height: 56,
+                                  width: double.infinity,
+                                  child: OutlinedButton(
+                                    onPressed: _accediConGoogle,
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppTheme.textPrimary,
+                                      backgroundColor: AppTheme.cardBg,
+                                      side: const BorderSide(
+                                        color: AppTheme.cardBorder,
+                                        width: 1.2,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          'G',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                        SizedBox(width: 12),
+                                        Text(
+                                          'CONTINUA CON GOOGLE',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.6,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(height: 24),
+
+                                Row(
+                                  children: [
+                                    const Expanded(
+                                      child: Divider(
+                                        color: AppTheme.cardBorder,
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                      ),
+                                      child: Text(
+                                        'OPPURE',
+                                        style: TextStyle(
+                                          color: AppTheme.textSecondary,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 1,
+                                        ),
+                                      ),
+                                    ),
+                                    const Expanded(
+                                      child: Divider(
+                                        color: AppTheme.cardBorder,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 24),
 
                                 // CAMPO EMAIL
                                 TextFormField(
@@ -404,11 +506,13 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
                                   keyboardType: TextInputType.emailAddress,
                                   textInputAction: TextInputAction.next,
                                   validator: (value) {
-                                    if (value == null || value.trim().isEmpty)
+                                    if (value == null || value.trim().isEmpty) {
                                       return 'Inserisci la tua email';
+                                    }
                                     if (!value.contains('@') ||
-                                        !value.contains('.'))
+                                        !value.contains('.')) {
                                       return 'Formato email non valido';
+                                    }
                                     return null;
                                   },
                                 ),
@@ -441,13 +545,14 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
                                   textInputAction: TextInputAction.done,
                                   onFieldSubmitted: (_) => _eseguiLogin(),
                                   validator: (value) {
-                                    if (value == null || value.isEmpty)
+                                    if (value == null || value.isEmpty) {
                                       return 'Inserisci la password';
+                                    }
                                     return null;
                                   },
                                 ),
 
-                                const SizedBox(height: 40),
+                                const SizedBox(height: 32),
                                 // BOTTONE DI ACCESSO
                                 SizedBox(
                                   height: 56,

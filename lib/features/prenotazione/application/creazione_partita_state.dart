@@ -13,6 +13,7 @@ class CreazionePartitaState {
   final List<String> orariChiusi;
   final List<DateTime> giorniChiusi;
   final Map<String, int> partiteApertePerSlot;
+  final Map<String, String> mieiMatchApertiPerSlot;
   final String? oraInizioSelezionata;
   final int ospitiExtra;
   final bool isPartitaPrivata;
@@ -20,6 +21,7 @@ class CreazionePartitaState {
   final String fasciaOraria;
   final Map<String, double> prezziPerSocieta;
   final MetodoPagamento metodoPagamentoScelto;
+  final bool pagamentiOnlineDisponibili;
 
   CreazionePartitaState({
     this.isLoading = false,
@@ -32,6 +34,7 @@ class CreazionePartitaState {
     this.orariChiusi = const [],
     this.giorniChiusi = const [],
     this.partiteApertePerSlot = const {},
+    this.mieiMatchApertiPerSlot = const {},
     this.oraInizioSelezionata,
     this.ospitiExtra = 0,
     this.isPartitaPrivata = false,
@@ -39,6 +42,7 @@ class CreazionePartitaState {
     this.fasciaOraria = 'tutto',
     this.prezziPerSocieta = const {},
     this.metodoPagamentoScelto = MetodoPagamento.inSede,
+    this.pagamentiOnlineDisponibili = false,
   }) : dataSelezionata = dataSelezionata ?? DateTime.now();
 
   CreazionePartitaState copyWith({
@@ -52,6 +56,7 @@ class CreazionePartitaState {
     List<String>? orariChiusi,
     List<DateTime>? giorniChiusi,
     Map<String, int>? partiteApertePerSlot,
+    Map<String, String>? mieiMatchApertiPerSlot,
     String? oraInizioSelezionata,
     int? ospitiExtra,
     bool? isPartitaPrivata,
@@ -61,6 +66,7 @@ class CreazionePartitaState {
     bool clearOrario = false,
     Map<String, double>? prezziPerSocieta,
     MetodoPagamento? metodoPagamentoScelto,
+    bool? pagamentiOnlineDisponibili,
   }) {
     return CreazionePartitaState(
       isLoading: isLoading ?? this.isLoading,
@@ -75,6 +81,8 @@ class CreazionePartitaState {
       orariChiusi: orariChiusi ?? this.orariChiusi,
       giorniChiusi: giorniChiusi ?? this.giorniChiusi,
       partiteApertePerSlot: partiteApertePerSlot ?? this.partiteApertePerSlot,
+      mieiMatchApertiPerSlot:
+          mieiMatchApertiPerSlot ?? this.mieiMatchApertiPerSlot,
       oraInizioSelezionata: clearOrario
           ? null
           : (oraInizioSelezionata ?? this.oraInizioSelezionata),
@@ -88,27 +96,10 @@ class CreazionePartitaState {
       prezziPerSocieta: prezziPerSocieta ?? this.prezziPerSocieta,
       metodoPagamentoScelto:
           metodoPagamentoScelto ?? this.metodoPagamentoScelto,
+      pagamentiOnlineDisponibili:
+          pagamentiOnlineDisponibili ?? this.pagamentiOnlineDisponibili,
     );
   }
 
   int get giocatoriTotali => 1 + ospitiExtra;
-
-  bool get isPrimeTime {
-    if (oraInizioSelezionata == null) return false;
-    int ora = int.parse(oraInizioSelezionata!.split(':')[0]);
-    return ora >= 18 && ora <= 22;
-  }
-
-  int get minRichiesti => campoSelezionato == null
-      ? 0
-      : PartitaService().getMinimoApertura(
-          campoSelezionato!.numeroDiGiocatori,
-          isPrimeTime,
-        );
-
-  int get sogliaProtetta => campoSelezionato == null
-      ? 0
-      : PartitaService().getSogliaProtezione(
-          campoSelezionato!.numeroDiGiocatori,
-        );
 }

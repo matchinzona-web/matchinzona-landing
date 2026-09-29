@@ -5,38 +5,107 @@ import 'package:app_campi/core/theme/app_theme.dart';
 import 'package:app_campi/core/theme/app_constants.dart';
 import 'package:app_campi/core/services/location_provider.dart';
 
-class GpsBanner extends ConsumerWidget {
-  final bool permessoNegatoPerSempre;
-
-  const GpsBanner({super.key, this.permessoNegatoPerSempre = false});
+class GpsBanner extends ConsumerStatefulWidget {
+  const GpsBanner({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GpsBanner> createState() => _GpsBannerState();
+}
+
+class _GpsBannerState extends ConsumerState<GpsBanner>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(gpsAttivoProvider);
+      ref.invalidate(permessoPosizioneProvider);
+      ref.invalidate(posizioneAttualeProvider);
+      ref.invalidate(matchInZonaProvider);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final gpsState = ref.watch(gpsAttivoProvider);
+    final permessoState = ref.watch(permessoPosizioneProvider);
 
     return gpsState.when(
       data: (isGpsAttivo) {
-        if (isGpsAttivo && !permessoNegatoPerSempre) {
+        final permission = permessoState.value ?? LocationPermission.denied;
+
+        final bool permessoConcesso =
+            permission == LocationPermission.whileInUse ||
+            permission == LocationPermission.always;
+
+        final bool negatoPerSempre =
+            permission == LocationPermission.deniedForever;
+
+        if (isGpsAttivo && permessoConcesso) {
           return const SizedBox.shrink();
         }
 
-        final bool problemaPermesso = isGpsAttivo && permessoNegatoPerSempre;
+        final String titolo;
+        final String sottotitolo;
+        final IconData icona;
+        final String etichettaBottone;
+        final VoidCallback azione;
 
-        final String titolo = problemaPermesso
-            ? "PERMESSO NEGATO"
-            : "GPS DISATTIVATO";
-        final String sottotitolo = problemaPermesso
-            ? "Consenti l'accesso alla posizione nelle impostazioni per vedere i centri vicino a te."
-            : "Attivalo per esplorare i match in zona.";
-        final IconData icona = problemaPermesso
-            ? Icons.gps_off_rounded
-            : Icons.location_off;
-        final String etichettaBottone = problemaPermesso
-            ? "IMPOSTAZIONI"
-            : "ATTIVA";
-        final VoidCallback azione = problemaPermesso
-            ? () => Geolocator.openAppSettings()
-            : () => Geolocator.openLocationSettings();
+        if (!isGpsAttivo) {
+          titolo = "GPS DISATTIVATO";
+          sottotitolo =
+              "Attiva la posizione per vedere centri, distanze e match vicino a te.";
+          icona = Icons.location_off;
+          etichettaBottone = "ATTIVA";
+
+          azione = () {
+            Geolocator.openLocationSettings();
+          };
+        } else if (negatoPerSempre) {
+          titolo = "POSIZIONE NON CONSENTITA";
+          sottotitolo =
+              "La posizione è facoltativa. Puoi abilitarla dalle impostazioni per usare le funzioni vicino a te.";
+          icona = Icons.gps_off_rounded;
+          etichettaBottone = "IMPOSTAZIONI";
+
+          azione = () {
+            Geolocator.openAppSettings();
+          };
+        } else {
+          titolo = "ATTIVA LE FUNZIONI VICINO A TE";
+          sottotitolo =
+              "La posizione è facoltativa. Consentila per vedere distanze, centri e match nella tua zona.";
+          icona = Icons.location_on_outlined;
+          etichettaBottone = "CONSENTI";
+
+          azione = () async {
+            final nuovoPermesso = await richiediPermessoPosizione();
+
+            ref.invalidate(permessoPosizioneProvider);
+            ref.invalidate(posizioneAttualeProvider);
+
+            if (nuovoPermesso == LocationPermission.whileInUse ||
+                nuovoPermesso == LocationPermission.always) {
+              ref.invalidate(matchInZonaProvider);
+              return;
+            }
+
+            if (nuovoPermesso == LocationPermission.deniedForever) {
+              await Geolocator.openAppSettings();
+            }
+          };
+        }
 
         return Container(
           margin: const EdgeInsets.only(
@@ -64,7 +133,6 @@ class GpsBanner extends ConsumerWidget {
                 child: Icon(icona, color: AppTheme.statoErrore, size: 22),
               ),
               const SizedBox(width: 14),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,7 +159,6 @@ class GpsBanner extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 12),
-
               ElevatedButton(
                 onPressed: azione,
                 style: ElevatedButton.styleFrom(
@@ -120,7 +187,7 @@ class GpsBanner extends ConsumerWidget {
         );
       },
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
     );
   }
 }

@@ -232,6 +232,32 @@ class ListaCampiCentroPage extends ConsumerWidget {
     );
   }
 
+  String _immagineFallbackCampo(dynamic campo) {
+    final nomeCampo = campo.nomeCampo.toString().toLowerCase();
+
+    if (nomeCampo.contains('padel')) {
+      return 'assets/images/campi/padel.jpg';
+    }
+
+    if (nomeCampo.contains('tennis')) {
+      return 'assets/images/campi/tennis.jpg';
+    }
+
+    if (nomeCampo.contains('calcio') || nomeCampo.contains('calcetto')) {
+      return 'assets/images/campi/calcio.jpg';
+    }
+
+    if (nomeCampo.contains('basket')) {
+      return 'assets/images/campi/basket.jpg';
+    }
+
+    if (nomeCampo.contains('pallavolo') || nomeCampo.contains('volley')) {
+      return 'assets/images/campi/volley.jpg';
+    }
+
+    return 'assets/images/campi/generico.jpg';
+  }
+
   Widget _buildCampoCard(
     BuildContext context,
     WidgetRef ref,
@@ -241,46 +267,37 @@ class ListaCampiCentroPage extends ConsumerWidget {
   ) {
     // 1. Estraiamo il prezzo specifico per lo sport selezionato dal campo JSONB
     double prezzoTotale = campo.prezzo;
-    if (campo.tariffeSport != null && (campo.tariffeSport as List).isNotEmpty) {
-      for (var t in campo.tariffeSport) {
-        final String? sportNome = t is Map ? t['sport'] : t.sport;
-        final double? prezzoValore = t is Map
+
+    final String sportRichiesto = sportSelezionato.trim().toLowerCase();
+
+    for (final t in campo.tariffeSport) {
+      final String sportTariffa =
+          (t is Map ? t['sport'] : t.sport)?.toString().trim().toLowerCase() ??
+          '';
+
+      if (sportTariffa == sportRichiesto) {
+        final double? prezzoTariffa = t is Map
             ? (t['prezzo'] as num?)?.toDouble()
             : (t.prezzo as num?)?.toDouble();
 
-        // Se il prezzo è per lo sport del campo o per lo sport selezionato
-        if (sportNome == sportSelezionato ||
-            sportNome == campo.nomeCampo.toLowerCase()) {
-          prezzoTotale = prezzoValore ?? campo.prezzo;
-          break;
+        if (prezzoTariffa != null) {
+          prezzoTotale = prezzoTariffa;
         }
+
+        break;
       }
     }
 
-    // 2. Calcoliamo il numero di giocatori esatto in base allo sport selezionato
-    int numGiocatori = campo.numeroDiGiocatori;
-    if (sportSelezionato == 'tennis_singolo') {
-      numGiocatori = 2;
-    } else if (sportSelezionato == 'tennis_doppio' ||
-        sportSelezionato == 'padel') {
-      numGiocatori = 4;
-    } else if (sportSelezionato == 'calcio_5' || sportSelezionato == 'basket') {
-      numGiocatori = 10;
-    } else if (sportSelezionato == 'calcio_7') {
-      numGiocatori = 14;
-    } else if (sportSelezionato == 'calcio_8') {
-      numGiocatori = 16;
-    } else if (sportSelezionato == 'calcio_11') {
-      numGiocatori = 22;
-    } else if (sportSelezionato == 'volley') {
-      numGiocatori = 12;
-    }
+    final int numGiocatori = campo.numeroDiGiocatori;
 
     final double prezzoPerGiocatore = numGiocatori > 0
         ? prezzoTotale / numGiocatori
         : prezzoTotale;
     final String copertoCampo = campo.coperto ? "Al chiuso" : "All'aperto";
     final bool hasImage = campo.fotoUrl != null && campo.fotoUrl!.isNotEmpty;
+    final fallbackImage = _immagineFallbackCampo(campo);
+
+    final String sportCampo = _sportRealeCampo(campo, sportSelezionato);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -301,6 +318,7 @@ class ListaCampiCentroPage extends ConsumerWidget {
 
               // Se l'utente è un ospite, lo fa accedere o va avanti
               if (utente == null) {
+                controller.impostaSport(sportCampo);
                 controller.selezionaCampo(campo);
                 Navigator.push(
                   context,
@@ -316,11 +334,12 @@ class ListaCampiCentroPage extends ConsumerWidget {
                 context: context,
                 userId: utente.id,
                 livelliSportAttuali: utente.livelliSport,
-                sport: sportSelezionato,
+                sport: sportCampo,
                 onCompletato: () {
                   // 🚀 AGGIUNGI QUESTA RIGA: Forza l'app a ricaricare l'utente con i nuovi livelli!
                   ref.invalidate(utenteCorrenteProvider);
 
+                  controller.impostaSport(sportCampo);
                   controller.selezionaCampo(campo);
                   Navigator.push(
                     context,
@@ -351,11 +370,23 @@ class ListaCampiCentroPage extends ConsumerWidget {
                           ? CachedNetworkImage(
                               imageUrl: campo.fotoUrl!,
                               fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: double.infinity,
+                              errorWidget: (_, _, _) => Image.asset(
+                                fallbackImage,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                              ),
                             )
-                          : const Icon(
-                              Icons.sports_tennis,
-                              color: AppTheme.accent,
-                              size: 36,
+                          : Container(
+                              color: AppTheme.darkBg,
+                              alignment: Alignment.center,
+                              child: Icon(
+                                _iconaFallbackCampo(campo),
+                                color: AppTheme.accent,
+                                size: 36,
+                              ),
                             ),
                     ),
                   ),
@@ -382,9 +413,15 @@ class ListaCampiCentroPage extends ConsumerWidget {
                           runSpacing: 8,
                           children: [
                             _buildPill(
+                              _iconaSportCampo(campo),
+                              _sportDisponibiliCampo(campo),
+                            ),
+
+                            _buildPill(
                               Icons.people_alt_rounded,
                               "$numGiocatori Gioc.",
                             ),
+
                             _buildPill(
                               campo.coperto
                                   ? Icons.roofing_rounded
@@ -441,6 +478,76 @@ class ListaCampiCentroPage extends ConsumerWidget {
     );
   }
 
+  String _sportDisponibiliCampo(dynamic campo) {
+    final Set<String> sport = {};
+
+    for (final tariffa in campo.tariffeSport) {
+      final String valore =
+          (tariffa is Map ? tariffa['sport'] : tariffa.sport)
+              ?.toString()
+              .trim()
+              .toLowerCase() ??
+          '';
+
+      if (valore == 'tennis_singolo' || valore == 'tennis_doppio') {
+        sport.add('Tennis');
+      } else if (valore == 'padel') {
+        sport.add('Padel');
+      } else if (valore == 'calcio_5') {
+        sport.add('Calcio a 5');
+      } else if (valore == 'calcio_6') {
+        sport.add('Calcio a 6');
+      } else if (valore == 'calcio_7') {
+        sport.add('Calcio a 7');
+      } else if (valore == 'calcio_8') {
+        sport.add('Calcio a 8');
+      } else if (valore == 'calcio_11') {
+        sport.add('Calcio a 11');
+      } else if (valore == 'basket') {
+        sport.add('Basket');
+      } else if (valore == 'pallavolo' || valore == 'volley') {
+        sport.add('Pallavolo');
+      }
+    }
+
+    return sport.join(' • ');
+  }
+
+  IconData _iconaSportCampo(dynamic campo) {
+    if (campo.tariffeSport.isEmpty) {
+      return Icons.stadium_rounded;
+    }
+
+    final primo = campo.tariffeSport.first;
+
+    final String sport =
+        (primo is Map ? primo['sport'] : primo.sport)
+            ?.toString()
+            .trim()
+            .toLowerCase() ??
+        '';
+
+    if (sport.startsWith('calcio_')) {
+      return Icons.sports_soccer_rounded;
+    }
+
+    if (sport == 'basket') {
+      return Icons.sports_basketball_rounded;
+    }
+
+    if (sport == 'pallavolo' || sport == 'volley') {
+      return Icons.sports_volleyball_rounded;
+    }
+
+    if (sport == 'padel' ||
+        sport == 'tennis_singolo' ||
+        sport == 'tennis_doppio') {
+      return Icons.sports_tennis_rounded;
+    }
+
+    return Icons.stadium_rounded;
+  }
+
   Widget _buildPill(IconData icon, String text) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -465,5 +572,56 @@ class ListaCampiCentroPage extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  IconData _iconaFallbackCampo(dynamic campo) {
+    return _iconaSportCampo(campo);
+  }
+
+  String _sportRealeCampo(dynamic campo, String sportAttuale) {
+    final nome = campo.nomeCampo.toString().toLowerCase();
+
+    // Il tennis mantiene singolo/doppio se era già stato scelto.
+    if (nome.contains('tennis')) {
+      if (sportAttuale == 'tennis_singolo' || sportAttuale == 'tennis_doppio') {
+        return sportAttuale;
+      }
+
+      // Se si entra su un tennis provenendo da un'altra ricerca,
+      // non riutilizziamo mai calcio/padel/basket.
+      return campo.numeroDiGiocatori == 2 ? 'tennis_singolo' : 'tennis_doppio';
+    }
+
+    if (nome.contains('padel')) return 'padel';
+
+    if (nome.contains('calcio 11') || nome.contains('calcio a 11')) {
+      return 'calcio_11';
+    }
+
+    if (nome.contains('calcio 8') || nome.contains('calcio a 8')) {
+      return 'calcio_8';
+    }
+
+    if (nome.contains('calcio 7') || nome.contains('calcio a 7')) {
+      return 'calcio_7';
+    }
+
+    if (nome.contains('calcio 6') || nome.contains('calcio a 6')) {
+      return 'calcio_6';
+    }
+
+    if (nome.contains('calcio 5') ||
+        nome.contains('calcio a 5') ||
+        nome.contains('calcetto')) {
+      return 'calcio_5';
+    }
+
+    if (nome.contains('basket')) return 'basket';
+
+    if (nome.contains('pallavolo') || nome.contains('volley')) {
+      return 'pallavolo';
+    }
+
+    return sportAttuale;
   }
 }

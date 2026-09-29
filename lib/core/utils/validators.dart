@@ -35,8 +35,9 @@ class AppValidators {
   }
 
   static String? validaPartitaIva(String? value) {
-    if (value == null || value.trim().isEmpty)
+    if (value == null || value.trim().isEmpty) {
       return 'Inserisci la Partita IVA';
+    }
 
     if (!_regexPIva.hasMatch(value.trim())) {
       return 'Deve contenere esattamente 11 numeri';

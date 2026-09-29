@@ -1,43 +1,34 @@
 class PianiConfig {
-  static const Map<int, String> stripePriceIds = {
-    0: 'price_1Th5bHFxZCOuiQIAaia7ASFn',
-    1: 'price_1TgjxqFxZCOuiQIA9CjLu34s',
-    2: 'price_1Th5c2FxZCOuiQIAM6obraB0',
-    3: 'price_1Th5cRFxZCOuiQIA4VAKya37',
-  };
-
-  static const List<Map<String, String>> piani = [
+  static const List<Map<String, dynamic>> piani = [
     {
-      'titolo': 'PROGETTO START',
-      'sottotitolo': 'per 1 campo',
-      'prezzo': '19,00',
-      'nome': 'START',
-      'limiti': '1 campo',
-      'priceId': 'price_1Th5bHFxZCOuiQIAaia7ASFn',
+      'titolo': 'BASE',
+      'sottotitolo': 'Perfetto per iniziare',
+      'prezzo': '19,99',
+      'nome': 'BASE',
+      'limiti': 'Fino a 2 campi',
+      'descrizione':
+          'Ideale per piccoli centri sportivi che vogliono partire subito con prenotazioni e gestione digitale.',
+      'priceId': 'price_1UGdGWFxZCOuiQIA42y8kWez',
     },
     {
-      'titolo': 'PROGETTO PRO',
-      'sottotitolo': 'per 2 campi',
-      'prezzo': '29,00',
+      'titolo': 'PRO',
+      'sottotitolo': 'Per strutture con più campi',
+      'prezzo': '29,99',
       'nome': 'PRO',
-      'limiti': '2 campi',
-      'priceId': 'price_1TgjxqFxZCOuiQIA9CjLu34s',
+      'limiti': 'Fino a 5 campi',
+      'descrizione':
+          'Pensato per strutture in crescita che vogliono più flessibilità e una gestione più completa.',
+      'priceId': 'price_1UGdHNFxZCOuiQIAbHY8idXK',
     },
     {
-      'titolo': 'PROGETTO ENTERPRISE',
-      'sottotitolo': 'per 3 o 4 campi',
-      'prezzo': '39,00',
-      'nome': 'ENTERPRISE',
-      'limiti': '4 campi',
-      'priceId': 'price_1Th5c2FxZCOuiQIAM6obraB0',
-    },
-    {
-      'titolo': 'PROGETTO ELITE',
-      'sottotitolo': 'per 5 campi',
-      'prezzo': '49,00',
-      'nome': 'ELITE',
-      'limiti': '5 campi',
-      'priceId': 'price_1Th5cRFxZCOuiQIA4VAKya37',
+      'titolo': 'BUSINESS',
+      'sottotitolo': 'Per centri più strutturati',
+      'prezzo': '44,99',
+      'nome': 'BUSINESS',
+      'limiti': 'Da 6 campi in su',
+      'descrizione':
+          'La soluzione per centri sportivi con più campi e operatività più ampia.',
+      'priceId': 'price_1UGdHzFxZCOuiQIARoCgLykS',
     },
   ];
 }

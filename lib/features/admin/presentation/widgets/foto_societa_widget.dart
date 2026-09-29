@@ -38,8 +38,8 @@ class _FotoSocietaWidgetState extends State<FotoSocietaWidget> {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Errore selezione foto: $e'),
+          const SnackBar(
+            content: Text('Impossibile selezionare la foto. Riprova.'),
             backgroundColor: Colors.redAccent,
           ),
         );

@@ -76,7 +76,7 @@ class ProfiloNotifier extends Notifier<ProfiloState> {
       final data = await _repository.getDatiSocieta(idUtente);
 
       if (data != null) {
-        final tel = data['telefono']?.toString() ?? '';
+        final tel = data['cellulare']?.toString() ?? '';
         state = state.copyWith(
           fotoUrl: data['foto_url']?.toString(),
           telefonoCompleto: tel,
@@ -119,6 +119,7 @@ class ProfiloNotifier extends Notifier<ProfiloState> {
     required Utente utenteLoggato,
     required String via,
     required String civico,
+    required String cap,
     required String citta,
     required String provincia,
     required String telefonoFisso,
@@ -127,10 +128,17 @@ class ProfiloNotifier extends Notifier<ProfiloState> {
   }) async {
     state = state.copyWith(isSaving: true, clearError: true);
     try {
-      final String indirizzoUnito = '$via $civico, $citta, $provincia';
+      final String indirizzoUnito =
+          '${via.trim()} ${civico.trim()}, '
+          '${cap.trim()} ${citta.trim()}, '
+          '${provincia.trim().toUpperCase()}';
 
       Map<String, double>? coord = await GeocodingService.ottieniCoordinate(
-        indirizzoUnito,
+        via: via,
+        civico: civico,
+        cap: cap,
+        citta: citta,
+        provincia: provincia,
       );
 
       if (coord == null) {
@@ -146,7 +154,13 @@ class ProfiloNotifier extends Notifier<ProfiloState> {
 
       if (lat == 0.0 || lng == 0.0) {
         Map<String, double>? coordFallback =
-            await GeocodingService.ottieniCoordinate('$citta, $provincia');
+            await GeocodingService.ottieniCoordinate(
+              via: via,
+              civico: civico,
+              cap: cap,
+              citta: citta,
+              provincia: provincia,
+            );
         lat = coordFallback?['latitudine'] ?? 0.0;
         lng = coordFallback?['longitudine'] ?? 0.0;
       }
@@ -169,10 +183,24 @@ class ProfiloNotifier extends Notifier<ProfiloState> {
       });
 
       await _repository.updateDatiSocieta(utenteLoggato.id, {
-        'nome_proprietario': '$nome $cognome',
-        'telefono': state.telefonoCompleto,
-        'cellulare': telefonoFisso,
+        'nome_proprietario': '${nome.trim()} ${cognome.trim()}'.trim(),
+
+        // telefono = fisso
+        'telefono': telefonoFisso.trim().isEmpty ? null : telefonoFisso.trim(),
+
+        // cellulare = mobile
+        'cellulare': state.telefonoCompleto.trim(),
+
+        // Manteniamo ancora l'indirizzo completo.
         'indirizzo': indirizzoUnito,
+
+        // Nuovi campi strutturati.
+        'via': via.trim(),
+        'civico': civico.trim(),
+        'cap': cap.trim(),
+        'comune': citta.trim(),
+        'provincia': provincia.trim().toUpperCase(),
+
         'latitudine': lat,
         'longitudine': lng,
         'foto_url': finalFotoUrl,

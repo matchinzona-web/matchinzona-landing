@@ -34,10 +34,14 @@ class HomeTab extends ConsumerWidget {
       loading: () => const Center(
         child: CircularProgressIndicator(color: AppTheme.accent),
       ),
-      error: (error, _) => Center(
-        child: Text(
-          'Errore: $error',
-          style: const TextStyle(color: AppTheme.statoErrore),
+      error: (_, _) => const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24),
+          child: Text(
+            'Impossibile caricare la Home. Riprova tra poco.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppTheme.textSecondary),
+          ),
         ),
       ),
       data: (utenteLoggato) => _PlayerDashboard(utenteLoggato: utenteLoggato),
@@ -63,8 +67,30 @@ class _PlayerDashboard extends ConsumerWidget {
     if (!isOspite) {
       miePartiteAsync = ref.watch(partiteUtenteProvider(utenteLoggato!.id));
 
-      // Calcoliamo quante notifiche non sono ancora state lette
       final notificheAsync = ref.watch(notificheStreamProvider);
+
+      ref.listen(notificheStreamProvider, (previous, next) {
+        if (previous == null) return;
+
+        final precedenti = previous.value ?? [];
+        final attuali = next.value ?? [];
+
+        final idsAnnullatiPrecedenti = precedenti
+            .where((n) => n.tipo == 'match_annullato')
+            .map((n) => n.id)
+            .toSet();
+
+        final nuovaNotificaAnnullamento = attuali.any(
+          (n) =>
+              n.tipo == 'match_annullato' &&
+              !idsAnnullatiPrecedenti.contains(n.id),
+        );
+
+        if (nuovaNotificaAnnullamento) {
+          ref.invalidate(partiteUtenteProvider(utenteLoggato!.id));
+        }
+      });
+
       if (notificheAsync.value != null) {
         notificheNonLette = notificheAsync.value!.where((n) => !n.letto).length;
       }
@@ -444,7 +470,7 @@ class _PlayerDashboard extends ConsumerWidget {
         height: 90,
         child: Center(child: CircularProgressIndicator(color: AppTheme.accent)),
       ),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
     );
   }
 
@@ -456,44 +482,87 @@ class _PlayerDashboard extends ConsumerWidget {
   ) {
     return matchInZonaAsync.when(
       loading: () => const SizedBox(
-        height: 190,
+        height: 215,
         child: Center(child: CircularProgressIndicator(color: AppTheme.accent)),
       ),
       error: (err, _) {
-        if (err.toString().contains('GPS_SPENTO')) {
+        final messaggio = err.toString();
+
+        if (messaggio.contains('PERMESSO_POSIZIONE_NEGATO')) {
           return const SizedBox(
-            height: 190,
+            height: 90,
             child: Center(
-              child: Text(
-                "Attiva il GPS per vedere i match",
-                style: TextStyle(color: AppTheme.textSecondary),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  "Consenti la posizione per vedere i match vicino a te.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                ),
               ),
             ),
           );
         }
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            "Errore: $err",
-            style: const TextStyle(color: AppTheme.statoErrore),
+
+        if (messaggio.contains('GPS_SPENTO')) {
+          return const SizedBox(
+            height: 90,
+            child: Center(
+              child: Text(
+                "Attiva il GPS per vedere i match vicino a te.",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+              ),
+            ),
+          );
+        }
+
+        return const SizedBox(
+          height: 90,
+          child: Center(
+            child: Text(
+              "Match in zona momentaneamente non disponibili.",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+            ),
           ),
         );
       },
       data: (partiteList) {
-        final partiteFiltrate = partiteList
-            .where(
-              (p) =>
-                  p['stato_partita'] == 'aperta_protetta' ||
-                  p['stato_partita'] == 'aperta_a_rischio',
-            )
-            .toList();
+        final partiteFiltrate = partiteList.where((p) {
+          if (p['stato_partita'] != 'aperta_a_rischio') {
+            return false;
+          }
+
+          if (isOspite) {
+            return true;
+          }
+
+          try {
+            final Map<String, dynamic> jsonNormalizzato =
+                Map<String, dynamic>.from(p);
+
+            jsonNormalizzato['campo'] =
+                jsonNormalizzato['campo'] ?? jsonNormalizzato['campi'];
+
+            final partita = Partita.fromJson(jsonNormalizzato);
+
+            final bool giaDentro = partita.listaGiocatoriIscritti.any(
+              (g) => g.idUtente == utenteLoggato!.id,
+            );
+
+            return !giaDentro;
+          } catch (_) {
+            return false;
+          }
+        }).toList();
 
         if (partiteFiltrate.isEmpty) return _buildEmptyState();
 
         final partiteDaMostrare = partiteFiltrate.take(5).toList();
 
         return SizedBox(
-          height: 190,
+          height: 215,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -507,9 +576,12 @@ class _PlayerDashboard extends ConsumerWidget {
                   jsonNormalizzato['campo'] ?? jsonNormalizzato['campi'];
 
               Partita? partitaModel;
+
               try {
                 partitaModel = Partita.fromJson(jsonNormalizzato);
               } catch (e) {
+                debugPrint('🔴 HOME Partita.fromJson FALLITA: $e');
+                debugPrint('🔴 HOME RAW: $pRaw');
                 return const SizedBox.shrink();
               }
 
@@ -518,8 +590,17 @@ class _PlayerDashboard extends ConsumerWidget {
                   partitaModel.listaGiocatoriIscritti.any(
                     (g) => g.idUtente == utenteLoggato!.id,
                   );
-              final bool isARischio =
-                  pRaw['stato_partita'] == 'aperta_a_rischio';
+
+              final societa = partitaModel.campo.societa;
+
+              final String indirizzoCentro = [
+                [societa?.viaStrutturata, societa?.civico]
+                    .where((e) => e != null && e.toString().trim().isNotEmpty)
+                    .map((e) => e.toString().trim())
+                    .join(' '),
+
+                societa?.comune?.trim() ?? '',
+              ].where((e) => e.isNotEmpty).join(', ');
 
               return FadeSlideIn(
                 delay: 260 + (index * 70),
@@ -529,14 +610,15 @@ class _PlayerDashboard extends ConsumerWidget {
                   rawPartita: pRaw,
                   dataOrario:
                       "${partitaModel.dataPartita.day}/${partitaModel.dataPartita.month} | ${partitaModel.orarioInizio.substring(0, 5)}",
-                  nomeCentroSportivo: partitaModel.campo.nomeCampo,
-                  tipoSport: isARischio ? "A Rischio" : "Protetto",
+                  nomeCentroSportivo:
+                      partitaModel.campo.societa?.nomeSocieta ??
+                      'Centro Sportivo',
+                  indirizzoCentro: indirizzoCentro,
+                  tipoSport: "Aperta",
                   distanzaKm: (pRaw['distanza_km'] as num?)?.toDouble() ?? 0.0,
                   giocatoriAttuali: partitaModel.numeroGiocatoriPrenotati,
-                  giocatoriMassimi: partitaModel.campo.numeroDiGiocatori,
-                  coloreTema: isARischio
-                      ? AppTheme.statoErrore
-                      : AppTheme.accent,
+                  giocatoriMassimi: partitaModel.maxGiocatoriReali,
+                  coloreTema: AppTheme.accent,
                   isIscritto: giaDentro,
                   nomeOrganizzatore: partitaModel.organizzatore.nomeCompleto,
                   etaOrganizzatore: partitaModel.organizzatore.eta,

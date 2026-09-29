@@ -21,39 +21,73 @@ class EsploraMatchCard extends ConsumerWidget {
 
   String _estraiLivelloOrganizzatore(
     Utente organizzatore, {
-    String sport = 'calcio',
+    required String sport,
   }) {
     final mappa = organizzatore.livelliSport;
-    if (mappa == null || mappa.isEmpty) return "Non specificato";
 
-    // Cerca lo sport ignorando maiuscole/minuscole
-    final keyTrovata = mappa.keys.firstWhere(
-      (k) => k.toString().toLowerCase().contains(sport.toLowerCase()),
-      orElse: () => '',
-    );
-
-    if (keyTrovata.isNotEmpty && mappa[keyTrovata] != null) {
-      return mappa[keyTrovata].toString();
+    if (mappa == null || mappa.isEmpty) {
+      return 'Non specificato';
     }
 
-    // Fallback: se ha un solo sport salvato, mostra quello
-    if (mappa.length == 1) {
-      return mappa.values.first.toString();
+    final sportNormalizzato = sport.trim().toLowerCase();
+
+    String sportBase = sportNormalizzato;
+
+    if (sportNormalizzato.startsWith('calcio')) {
+      sportBase = 'calcio';
+    } else if (sportNormalizzato.startsWith('tennis')) {
+      sportBase = 'tennis';
+    } else if (sportNormalizzato == 'pallavolo') {
+      sportBase = 'pallavolo';
+    } else if (sportNormalizzato == 'basket') {
+      sportBase = 'basket';
+    } else if (sportNormalizzato == 'padel') {
+      sportBase = 'padel';
     }
 
-    return "Non specificato";
+    for (final entry in mappa.entries) {
+      final chiave = entry.key.toString().trim().toLowerCase();
+
+      if (chiave == sportNormalizzato || chiave == sportBase) {
+        return entry.value.toString();
+      }
+    }
+
+    return 'Non specificato';
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final raw = item.raw;
     final partita = item.partita;
+    final Map<String, dynamic>? societaRaw =
+        raw['campo']?['societa'] as Map<String, dynamic>?;
 
-    final bool protetta = raw['stato_partita'] == 'aperta_protetta';
-    final Color coloreTema = protetta
-        ? AppTheme.textPrimary
-        : AppTheme.statoErrore;
-    final String tipoSport = protetta ? "PROTETTA" : "A RISCHIO";
+    final String via = societaRaw?['via']?.toString().trim() ?? '';
+
+    final String civico = societaRaw?['civico']?.toString().trim() ?? '';
+
+    final String comune = societaRaw?['comune']?.toString().trim() ?? '';
+
+    final String indirizzoCompleto = [
+      if (via.isNotEmpty) '$via${civico.isNotEmpty ? ' $civico' : ''}',
+      if (comune.isNotEmpty) comune,
+    ].join(', ');
+
+    final Color coloreTema = AppTheme.accent;
+    final String tipoSport = switch (partita.sportNormalizzato) {
+      'calcio_5' => 'CALCIO A 5',
+      'calcio_6' => 'CALCIO A 6',
+      'calcio_7' => 'CALCIO A 7',
+      'calcio_8' => 'CALCIO A 8',
+      'calcio_11' => 'CALCIO A 11',
+      'tennis_singolo' => 'TENNIS SINGOLO',
+      'tennis_doppio' => 'TENNIS DOPPIO',
+      'padel' => 'PADEL',
+      'basket' => 'BASKET',
+      'pallavolo' => 'PALLAVOLO',
+      _ => 'MATCH APERTO',
+    };
 
     final double distanzaKm = (raw['distanza_km'] as num?)?.toDouble() ?? 0.0;
     final int giocatoriAttuali = partita.numeroGiocatoriPrenotati;
@@ -66,10 +100,7 @@ class EsploraMatchCard extends ConsumerWidget {
     );
 
     // 🟢 Determina lo sport dal nome del campo (o fallback su 'tennis'/'calcio')
-    final String nomeCampo = partita.campo.nomeCampo.toLowerCase();
-    final String sportDellaPartita = nomeCampo.contains('tennis')
-        ? 'tennis'
-        : (nomeCampo.contains('padel') ? 'padel' : 'calcio');
+    final String sportDellaPartita = partita.sportNormalizzato;
 
     // 🟢 Estrae il livello per lo sport CORRETTO della partita!
     final String livelloOrg = _estraiLivelloOrganizzatore(
@@ -148,7 +179,7 @@ class EsploraMatchCard extends ConsumerWidget {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    partita.campo.nomeCampo,
+                    partita.campo.societa?.nomeSocieta ?? 'Centro Sportivo',
                     style: const TextStyle(
                       color: AppTheme.textPrimary,
                       fontSize: 18,
@@ -157,7 +188,36 @@ class EsploraMatchCard extends ConsumerWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 6),
+
+                  if (indirizzoCompleto.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          size: 15,
+                          color: AppTheme.textSecondary,
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            indirizzoCompleto,
+                            style: const TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  const SizedBox(height: 8),
+
                   DateTimeRow(text: dataOra),
                   const SizedBox(height: 12),
 

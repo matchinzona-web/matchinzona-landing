@@ -26,7 +26,7 @@ class AbbonamentoService {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Errore apertura portale: $e'),
+          content: Text('Errore apertura portale'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -42,11 +42,7 @@ class AbbonamentoService {
     try {
       final response = await Supabase.instance.client.functions.invoke(
         'crea-checkout-session',
-        body: {
-          'priceId': priceId,
-          'piano': piano,
-          if (customerId != null) 'customerId': customerId,
-        },
+        body: {'priceId': priceId, 'piano': piano, 'customerId': ?customerId},
       );
 
       final String? url = response.data['url'];
@@ -59,7 +55,7 @@ class AbbonamentoService {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Errore apertura checkout: $e'),
+          content: Text('Errore apertura checkout'),
           backgroundColor: Colors.redAccent,
         ),
       );

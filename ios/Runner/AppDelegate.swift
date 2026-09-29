@@ -9,7 +9,7 @@ import GoogleMaps // 1. AGGIUNGI L'IMPORTAZIONE DI GOOGLE MAPS QUI
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     
-    // 2. INIEZIONE API KEY REALE PER ARENA PRO
+    // 2. INIEZIONE API KEY REALE
     GMSServices.provideAPIKey("AIzaSyBDivilBxBjRLpV2CqvnnR0ViU-5uUYFgg")
     
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)

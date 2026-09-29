@@ -5,12 +5,14 @@ class TelefonoFormWidget extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode? focusNode;
   final String label;
+  final bool mostraErrore;
 
   const TelefonoFormWidget({
     super.key,
     required this.controller,
     this.focusNode,
     this.label = 'Cellulare *',
+    this.mostraErrore = false,
   });
 
   @override
@@ -28,6 +30,10 @@ class TelefonoFormWidget extends StatelessWidget {
         prefixIcon: const Icon(Icons.phone_android, color: AppTheme.neonOrange),
         filled: true,
         fillColor: AppTheme.cardBg,
+        errorStyle: const TextStyle(
+          color: Colors.redAccent,
+          fontWeight: FontWeight.bold,
+        ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
           borderSide: BorderSide(color: Colors.grey.shade700, width: 1),
@@ -36,12 +42,28 @@ class TelefonoFormWidget extends StatelessWidget {
           borderRadius: BorderRadius.circular(15),
           borderSide: const BorderSide(color: AppTheme.neonOrange, width: 2),
         ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 2.5),
+        ),
       ),
       validator: (val) {
-        if (val == null || val.trim().isEmpty) return 'Inserisci il numero';
+        if (!mostraErrore) {
+          return null;
+        }
+
+        if (val == null || val.trim().isEmpty) {
+          return 'Inserisci il numero';
+        }
+
         if (!RegExp(r'^\d{10}$').hasMatch(val.trim())) {
           return 'Inserisci esattamente 10 cifre';
         }
+
         return null;
       },
     );

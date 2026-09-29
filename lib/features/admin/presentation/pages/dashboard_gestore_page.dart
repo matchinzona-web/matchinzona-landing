@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app_campi/core/theme/app_theme.dart';
+import 'package:app_campi/features/notifiche/presentation/pages/notifiche_page.dart';
+import 'package:app_campi/features/notifiche/application/notifiche_provider.dart';
+import 'package:app_campi/core/services/push_notification_service.dart';
 import 'package:app_campi/core/models/utente.dart';
 import 'package:app_campi/core/services/campi_service.dart';
 import 'package:app_campi/features/admin/application/dashboard_provider.dart';
@@ -14,6 +17,9 @@ import 'package:app_campi/features/profilo/presentation/pages/profilo_gestore.da
 import 'package:app_campi/features/admin/presentation/pages/statistiche_guadagni.dart';
 import 'package:app_campi/features/admin/presentation/pages/modifica_orari.dart';
 import 'package:app_campi/features/admin/presentation/pages/schermata_abbonamento.dart';
+import 'package:app_campi/features/admin/presentation/pages/attivazione_pagamenti_page.dart';
+import 'package:app_campi/features/admin/presentation/pages/prenotazione_manuale_page.dart';
+import 'package:app_campi/features/admin/presentation/pages/privacy_assistenza_gestore.dart';
 
 class DashboardGestore extends ConsumerStatefulWidget {
   final Utente? utenteLoggato;
@@ -40,20 +46,24 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
   @override
   void initState() {
     super.initState();
+
+    // Salviamo il notifier mentre il widget è sicuramente attivo.
     _dashboardNotifier = ref.read(dashboardProvider.notifier);
-    Future.microtask(() {
-      ref
-          .read(dashboardProvider.notifier)
-          .inizializza(
-            idSocieta: widget.idSocieta,
-            utenteLoggato: widget.utenteLoggato,
-          );
-      ref
-          .read(dashboardProvider.notifier)
-          .avviaRealtimePartite(
-            idSocieta: widget.idSocieta,
-            utenteLoggato: widget.utenteLoggato,
-          );
+
+    Future.microtask(() async {
+      if (!mounted) return;
+
+      await _dashboardNotifier.inizializza(
+        idSocieta: widget.idSocieta,
+        utenteLoggato: widget.utenteLoggato,
+      );
+
+      if (!mounted) return;
+
+      _dashboardNotifier.avviaRealtimePartite(
+        idSocieta: widget.idSocieta,
+        utenteLoggato: widget.utenteLoggato,
+      );
     });
   }
 
@@ -111,12 +121,13 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
         builder: (context) => AggiungiCampo(idSocieta: actualIdSocieta!),
       ),
     );
-    ref
-        .read(dashboardProvider.notifier)
-        .inizializza(
-          idSocieta: widget.idSocieta,
-          utenteLoggato: widget.utenteLoggato,
-        );
+
+    if (!mounted) return;
+
+    await _dashboardNotifier.inizializza(
+      idSocieta: widget.idSocieta,
+      utenteLoggato: widget.utenteLoggato,
+    );
   }
 
   void _mostraDialogUpsell() {
@@ -172,14 +183,14 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                     builder: (context) =>
                         SchermataAbbonamento(idSocieta: state.actualIdSocieta!),
                   ),
-                ).then(
-                  (_) => ref
-                      .read(dashboardProvider.notifier)
-                      .inizializza(
-                        idSocieta: widget.idSocieta,
-                        utenteLoggato: widget.utenteLoggato,
-                      ),
-                );
+                ).then((_) async {
+                  if (!mounted) return;
+
+                  await _dashboardNotifier.inizializza(
+                    idSocieta: widget.idSocieta,
+                    utenteLoggato: widget.utenteLoggato,
+                  );
+                });
               }
             },
             child: const Text(
@@ -245,14 +256,14 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                     builder: (context) =>
                         SchermataAbbonamento(idSocieta: state.actualIdSocieta!),
                   ),
-                ).then(
-                  (_) => ref
-                      .read(dashboardProvider.notifier)
-                      .inizializza(
-                        idSocieta: widget.idSocieta,
-                        utenteLoggato: widget.utenteLoggato,
-                      ),
-                );
+                ).then((_) async {
+                  if (!mounted) return;
+
+                  await _dashboardNotifier.inizializza(
+                    idSocieta: widget.idSocieta,
+                    utenteLoggato: widget.utenteLoggato,
+                  );
+                });
               }
             },
             child: const Text(
@@ -270,17 +281,92 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
       context,
       MaterialPageRoute(builder: (context) => pagina),
     );
-    ref
-        .read(dashboardProvider.notifier)
-        .inizializza(
-          idSocieta: widget.idSocieta,
-          utenteLoggato: widget.utenteLoggato,
-        );
+
+    if (!mounted) return;
+
+    await _dashboardNotifier.inizializza(
+      idSocieta: widget.idSocieta,
+      utenteLoggato: widget.utenteLoggato,
+    );
+  }
+
+  Future<void> _apriPrenotazioneManuale() async {
+    final state = ref.read(dashboardProvider);
+
+    final idSocieta = state.actualIdSocieta;
+
+    if (idSocieta == null) {
+      return;
+    }
+
+    final creata = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PrenotazioneManualePage(
+          idSocieta: idSocieta,
+          idCampoIniziale: state.idCampoSelezionato,
+        ),
+      ),
+    );
+
+    if (creata == true && mounted) {
+      await _dashboardNotifier.inizializza(
+        idSocieta: widget.idSocieta,
+        utenteLoggato: widget.utenteLoggato,
+      );
+    }
+  }
+
+  IconData _iconaCampo(Map<String, dynamic> campo) {
+    final nome = (campo['nome_campo'] ?? '').toString().toLowerCase();
+
+    final tariffe = campo['tariffe_sport'];
+
+    String sport = '';
+
+    if (tariffe is List && tariffe.isNotEmpty) {
+      final primo = tariffe.first;
+
+      if (primo is Map) {
+        sport = (primo['sport'] ?? '').toString().toLowerCase();
+      }
+    }
+
+    final testo = '$sport $nome';
+
+    if (testo.contains('padel')) {
+      return Icons.sports_tennis_rounded;
+    }
+
+    if (testo.contains('tennis')) {
+      return Icons.sports_tennis_rounded;
+    }
+
+    if (testo.contains('basket') || testo.contains('pallacanestro')) {
+      return Icons.sports_basketball_rounded;
+    }
+
+    if (testo.contains('volley') || testo.contains('pallavolo')) {
+      return Icons.sports_volleyball_rounded;
+    }
+
+    if (testo.contains('calcio') || testo.contains('calcetto')) {
+      return Icons.sports_soccer_rounded;
+    }
+
+    return Icons.stadium_rounded;
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(dashboardProvider);
+
+    final notificheAsync = ref.watch(notificheStreamProvider);
+
+    final numeroNonLette = notificheAsync.maybeWhen(
+      data: (notifiche) => notifiche.where((n) => !n.letto).length,
+      orElse: () => 0,
+    );
 
     return Scaffold(
       backgroundColor: AppTheme.darkBg,
@@ -304,6 +390,55 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
           ),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Notifiche',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NotifichePage()),
+              );
+            },
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(
+                  Icons.notifications_none_rounded,
+                  color: AppTheme.neonOrange,
+                  size: 29,
+                ),
+
+                if (numeroNonLette > 0)
+                  Positioned(
+                    right: -5,
+                    top: -6,
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.statoErrore,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppTheme.darkBg, width: 2),
+                      ),
+                      child: Text(
+                        numeroNonLette > 99 ? '99+' : numeroNonLette.toString(),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 8.0),
             child: PopupMenuButton<String>(
@@ -381,14 +516,43 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                       ),
                     );
                   }
+                } else if (value == 'pagamenti') {
+                  if (state.actualIdSocieta != null) {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AttivazionePagamentiPage(
+                          idSocieta: state.actualIdSocieta!,
+                        ),
+                      ),
+                    );
+
+                    if (context.mounted) {
+                      ref
+                          .read(dashboardProvider.notifier)
+                          .inizializza(
+                            idSocieta: widget.idSocieta,
+                            utenteLoggato: widget.utenteLoggato,
+                          );
+                    }
+                  }
                 } else if (value == 'gestione_piano') {
                   if (state.actualIdSocieta != null) {
                     _navigaConAggiornamento(
                       SchermataAbbonamento(idSocieta: state.actualIdSocieta!),
                     );
                   }
+                } else if (value == 'privacy_assistenza') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PrivacyAssistenzaGestore(),
+                    ),
+                  );
                 } else if (value == 'logout') {
                   try {
+                    await PushNotificationService.rimuoviTokenCorrente();
+
                     await Supabase.instance.client.auth.signOut(
                       scope: SignOutScope.local,
                     );
@@ -443,6 +607,22 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                     ),
                   ),
                 ),
+                const PopupMenuItem(
+                  value: 'pagamenti',
+                  child: ListTile(
+                    leading: Icon(
+                      Icons.account_balance_wallet_outlined,
+                      color: AppTheme.neonOrange,
+                    ),
+                    title: Text(
+                      'Pagamenti',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
                 const PopupMenuDivider(color: Colors.grey),
                 const PopupMenuItem(
                   value: 'gestione_piano',
@@ -454,6 +634,21 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                     ),
                   ),
                 ),
+                const PopupMenuItem(
+                  value: 'privacy_assistenza',
+                  child: ListTile(
+                    leading: Icon(
+                      Icons.help_outline_rounded,
+                      color: Colors.white,
+                    ),
+                    title: Text(
+                      'Privacy e Assistenza',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+
+                const PopupMenuDivider(color: Colors.grey),
                 const PopupMenuDivider(color: Colors.grey),
                 const PopupMenuItem(
                   value: 'logout',
@@ -666,8 +861,7 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                                               Icon(
                                                 isCampoBloccato
                                                     ? Icons.lock_outline_rounded
-                                                    : Icons
-                                                          .sports_soccer_rounded,
+                                                    : _iconaCampo(campo),
                                                 color: isCampoBloccato
                                                     ? Colors.grey.shade600
                                                     : (isSelezionato
@@ -887,6 +1081,54 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                           fontWeight: FontWeight.bold,
                           color: AppTheme.neonOrange,
                         ),
+                      ),
+
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final compatto =
+                              MediaQuery.sizeOf(context).width < 430;
+
+                          return ElevatedButton.icon(
+                            onPressed:
+                                state.actualIdSocieta == null ||
+                                    state.campi.isEmpty
+                                ? null
+                                : () {
+                                    if (!state.isCentroAttivo) {
+                                      _mostraDialogCampoBloccato();
+                                      return;
+                                    }
+
+                                    _apriPrenotazioneManuale();
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.neonOrange.withOpacity(
+                                0.12,
+                              ),
+                              foregroundColor: AppTheme.neonOrange,
+                              elevation: 0,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: compatto ? 11 : 15,
+                                vertical: 10,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                side: BorderSide(
+                                  color: AppTheme.neonOrange.withOpacity(0.45),
+                                ),
+                              ),
+                            ),
+                            icon: const Icon(Icons.add_rounded, size: 20),
+                            label: Text(
+                              compatto ? 'PRENOTA' : 'PRENOTAZIONE MANUALE',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),

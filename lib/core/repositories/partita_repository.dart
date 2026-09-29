@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/foundation.dart';
 
 class PartitaRepository {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -30,6 +31,11 @@ class PartitaRepository {
         },
       );
 
+      debugPrint('🟡 MATCH VICINI RPC: ${(responseRpc as List).length}');
+      debugPrint(
+        '🟡 USER ATTUALE: ${_supabase.auth.currentUser?.id ?? "OSPITE"}',
+      );
+
       final List<dynamic> risultatiRaggio = responseRpc;
       if (risultatiRaggio.isEmpty) return [];
 
@@ -55,6 +61,10 @@ class PartitaRepository {
           ''')
           .inFilter('id', idPartite);
 
+      debugPrint(
+        '🟠 MATCH COMPLETI SELECT: ${(responseCompleta as List).length}',
+      );
+
       final datiFinali = List<Map<String, dynamic>>.from(responseCompleta);
 
       for (var partita in datiFinali) {
@@ -68,8 +78,11 @@ class PartitaRepository {
       );
 
       return datiFinali;
-    } catch (e) {
-      throw Exception('Impossibile recuperare i match pubblici in zona.');
+    } catch (e, stackTrace) {
+      debugPrint('🔴 getMatchPubbliciApertiGeolocalizzati ERRORE: $e');
+      debugPrint('$stackTrace');
+
+      rethrow;
     }
   }
 
@@ -127,7 +140,7 @@ class PartitaRepository {
             'orario_inizio': orarioInizio,
           })
           .eq('is_public', true)
-          .inFilter('stato_partita', ['aperta_a_rischio', 'aperta_protetta']);
+          .eq('stato_partita', 'aperta_a_rischio');
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
@@ -152,7 +165,7 @@ class PartitaRepository {
           'data_partita': dataStr,
           'orario_inizio': orario,
         })
-        .inFilter('stato_partita', ['completa', 'aperta_protetta'])
+        .eq('stato_partita', 'completa')
         .maybeSingle();
 
     return response != null;
@@ -174,7 +187,7 @@ class PartitaRepository {
     } on PostgrestException catch (e) {
       throw Exception('Errore database: ${e.message}');
     } catch (e) {
-      throw Exception('Errore imprevisto durante la creazione: $e');
+      throw Exception('Impossibile completare la creazione in questo momento.');
     }
   }
 
@@ -199,6 +212,20 @@ class PartitaRepository {
           .eq('id', idPartita);
     } catch (e) {
       throw Exception('Impossibile aggiornare i posti occupati.');
+    }
+  }
+
+  Future<void> aggiornaImportoTotalePartita(
+    String idPartita,
+    double importoTotale,
+  ) async {
+    try {
+      await _supabase
+          .from('partite')
+          .update({'importo_totale': importoTotale})
+          .eq('id', idPartita);
+    } catch (e) {
+      throw Exception('Impossibile salvare l\'importo della partita.');
     }
   }
 
@@ -230,7 +257,7 @@ class PartitaRepository {
     } on PostgrestException catch (e) {
       throw Exception('Errore database aggiornamento atomico: ${e.message}');
     } catch (e) {
-      throw Exception('Errore aggiornamento atomico: $e');
+      throw Exception('Errore aggiornamento');
     }
   }
 
@@ -262,7 +289,7 @@ class PartitaRepository {
         'Errore nel completamento atomico dello slot: ${e.message}',
       );
     } catch (e) {
-      throw Exception('Errore imprevisto nel completamento slot: $e');
+      throw Exception('Errore imprevisto nel completamento slot');
     }
   }
 
@@ -284,35 +311,9 @@ class PartitaRepository {
             'orario_inizio': orarioInizio,
           })
           .neq('id', idPartitaVincente)
-          .inFilter('stato_partita', ['aperta_a_rischio', 'aperta_protetta']);
-    } catch (e) {
-      throw Exception('Impossibile annullare le altre partite concorrenti.');
-    }
-  }
-
-  Future<void> annullaPartiteARischioNelloSlot({
-    required String idCampo,
-    required DateTime dataPartita,
-    required String orarioInizio,
-    required String idPartitaVincente,
-  }) async {
-    try {
-      final dataStr = _formatData(dataPartita);
-
-      await _supabase
-          .from('partite')
-          .update({'stato_partita': 'annullata'})
-          .match({
-            'id_campo': idCampo,
-            'data_partita': dataStr,
-            'orario_inizio': orarioInizio,
-          })
-          .neq('id', idPartitaVincente)
           .eq('stato_partita', 'aperta_a_rischio');
     } catch (e) {
-      throw Exception(
-        'Impossibile annullare le partite a rischio concorrenti.',
-      );
+      throw Exception('Impossibile annullare le altre partite concorrenti.');
     }
   }
 
@@ -368,10 +369,11 @@ class PartitaRepository {
     DateTime data,
   ) async {
     final dataStr = _formatData(data);
+    final idUtenteCorrente = _supabase.auth.currentUser?.id;
 
     final response = await _supabase
         .from('partite')
-        .select('orario_inizio, stato_partita')
+        .select('id, orario_inizio, stato_partita, id_organizzatore')
         .eq('id_campo', idCampo)
         .eq('data_partita', dataStr)
         .neq('stato_partita', 'annullata');
@@ -387,12 +389,23 @@ class PartitaRepository {
 
       if (!mappaStati.containsKey(ora)) {
         mappaStati[ora] = {'occupato_fisso': false, 'aperte': 0};
+        mappaStati[ora] = {
+          'occupato_fisso': false,
+          'aperte': 0,
+          'mio_match_aperto_id': null,
+        };
       }
 
-      if (stato == 'completa' || stato == 'aperta_protetta') {
+      if (stato == 'completa') {
         mappaStati[ora]!['occupato_fisso'] = true;
       } else if (stato == 'aperta_a_rischio') {
         mappaStati[ora]!['aperte'] = (mappaStati[ora]!['aperte'] as int) + 1;
+
+        final idOrganizzatore = p['id_organizzatore']?.toString();
+
+        if (idUtenteCorrente != null && idOrganizzatore == idUtenteCorrente) {
+          mappaStati[ora]!['mio_match_aperto_id'] = p['id']?.toString();
+        }
       }
     }
 
@@ -410,6 +423,7 @@ class PartitaRepository {
             giocatori_partita!inner(ospiti_extra, utenti(*))
           ''')
           .eq('giocatori_partita.id_utente', idUtente)
+          .neq('stato_partita', 'annullata')
           .order('data_partita', ascending: true)
           .order('orario_inizio', ascending: true);
 
@@ -442,11 +456,115 @@ class PartitaRepository {
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      throw Exception('Errore nel calcolo dei guadagni: $e');
+      throw Exception('Errore nel calcolo dei guadagni');
+    }
+  }
+
+  Future<String> creaPrenotazioneManuale({
+    required String idCampo,
+    required String idGestore,
+    required DateTime dataPartita,
+    required String orarioInizio,
+    required String orarioFine,
+    required int maxGiocatori,
+    String? nomeCliente,
+    String? telefonoCliente,
+    String? notaGestore,
+  }) async {
+    try {
+      final dataStr = _formatData(dataPartita);
+
+      final response = await _supabase
+          .from('partite')
+          .insert({
+            'id_campo': idCampo,
+            'id_organizzatore': idGestore,
+            'data_partita': dataStr,
+            'orario_inizio': orarioInizio,
+            'orario_fine': orarioFine,
+
+            // Prenotazione manuale = campo intero occupato.
+            'numero_giocatori_prenotati': maxGiocatori,
+            'max_giocatori': maxGiocatori,
+            'stato_partita': 'completa',
+            'is_public': false,
+
+            'origine_prenotazione': 'gestore',
+            'nome_cliente_manual': nomeCliente?.trim().isEmpty == true
+                ? null
+                : nomeCliente?.trim(),
+            'telefono_cliente_manual': telefonoCliente?.trim().isEmpty == true
+                ? null
+                : telefonoCliente?.trim(),
+            'nota_gestore': notaGestore?.trim().isEmpty == true
+                ? null
+                : notaGestore?.trim(),
+          })
+          .select('id')
+          .single();
+
+      return response['id'].toString();
+    } on PostgrestException catch (e) {
+      throw Exception(
+        'Errore database durante la prenotazione manuale: ${e.message}',
+      );
+    } catch (e) {
+      throw Exception('Impossibile creare la prenotazione manuale');
+    }
+  }
+
+  Future<bool> isSlotDisponibilePerPrenotazioneManuale({
+    required String idCampo,
+    required DateTime dataPartita,
+    required String orarioInizio,
+  }) async {
+    try {
+      final dataStr = _formatData(dataPartita);
+
+      final response = await _supabase
+          .from('partite')
+          .select('id')
+          .match({
+            'id_campo': idCampo,
+            'data_partita': dataStr,
+            'orario_inizio': orarioInizio,
+          })
+          .eq('stato_partita', 'completa')
+          .limit(1);
+
+      return response.isEmpty;
+    } catch (e) {
+      throw Exception('Impossibile verificare la disponibilità dello slot.');
     }
   }
 
   String _formatData(DateTime data) {
     return "${data.year}-${data.month.toString().padLeft(2, '0')}-${data.day.toString().padLeft(2, '0')}";
+  }
+
+  Future<Set<String>> getSlotCompletiGiorno({
+    required String idCampo,
+    required DateTime dataPartita,
+  }) async {
+    try {
+      final dataStr = _formatData(dataPartita);
+
+      final response = await _supabase
+          .from('partite')
+          .select('orario_inizio')
+          .eq('id_campo', idCampo)
+          .eq('data_partita', dataStr)
+          .eq('stato_partita', 'completa');
+
+      final partite = List<Map<String, dynamic>>.from(response);
+
+      return partite.map((p) {
+        final orario = p['orario_inizio'].toString();
+
+        return orario.length >= 5 ? orario.substring(0, 5) : orario;
+      }).toSet();
+    } catch (e) {
+      throw Exception('Impossibile verificare gli slot già prenotati.');
+    }
   }
 }

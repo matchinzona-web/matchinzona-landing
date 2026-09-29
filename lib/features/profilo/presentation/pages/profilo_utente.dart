@@ -11,6 +11,7 @@ import 'package:app_campi/core/theme/app_theme.dart';
 
 import 'package:app_campi/features/auth/application/auth_provider.dart';
 import 'package:app_campi/features/profilo/application/auth_controller.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProfiloUtente extends ConsumerWidget {
   const ProfiloUtente({super.key});
@@ -50,11 +51,11 @@ class ProfiloUtente extends ConsumerWidget {
                     snapshot.data?.session ?? supabase.auth.currentSession;
                 final isLogged = session != null;
 
-                if (isLogged && session.user != null) {
+                if (isLogged) {
                   return _buildProfiloLoggato(
                     context,
                     ref,
-                    session.user!,
+                    session.user,
                     utenteLoggato,
                   );
                 } else {
@@ -66,6 +67,69 @@ class ProfiloUtente extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _apriUrl(BuildContext context, String url) async {
+    final uri = Uri.parse(url);
+
+    try {
+      final aperto = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+      if (!aperto && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Impossibile aprire il collegamento.'),
+            backgroundColor: AppTheme.statoErrore,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossibile aprire il collegamento.'),
+          backgroundColor: AppTheme.statoErrore,
+        ),
+      );
+    }
+  }
+
+  Future<void> _contattaAssistenza(
+    BuildContext context, {
+    bool segnalaProblema = false,
+  }) async {
+    final subject = segnalaProblema
+        ? 'Segnalazione problema Matchly'
+        : 'Assistenza Matchly';
+
+    final uri = Uri(
+      scheme: 'mailto',
+      path: 'matchly.assistenza@gmail.com',
+      queryParameters: {'subject': subject},
+    );
+
+    try {
+      final aperto = await launchUrl(uri);
+
+      if (!aperto && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Non è stato possibile aprire l’app email.'),
+            backgroundColor: AppTheme.statoErrore,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Non è stato possibile aprire l’app email.'),
+          backgroundColor: AppTheme.statoErrore,
+        ),
+      );
+    }
   }
 
   Widget _buildProfiloOspite(BuildContext context) {
@@ -84,7 +148,7 @@ class ProfiloUtente extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
             const Text(
-              'Benvenuto in Arena',
+              'Benvenuto in Matchly',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 26,
@@ -166,6 +230,55 @@ class ProfiloUtente extends ConsumerWidget {
                 ),
               ],
             ),
+
+            const SizedBox(height: 24),
+
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 4,
+              runSpacing: 0,
+              children: [
+                TextButton(
+                  onPressed: () => _apriUrl(
+                    context,
+                    'https://matchlyassistenza-web.github.io/matchly-privacy/',
+                  ),
+                  child: const Text(
+                    'Privacy Policy',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _apriUrl(
+                    context,
+                    'https://matchlyassistenza-web.github.io/matchly-privacy/termini.html',
+                  ),
+                  child: const Text(
+                    'Termini e Condizioni',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _contattaAssistenza(context),
+                  child: const Text(
+                    'Assistenza',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _apriUrl(
+                    context,
+                    'https://matchlyassistenza-web.github.io/matchly-privacy/elimina-account.html',
+                  ),
+                  child: const Text(
+                    'Eliminazione account',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 32),
 
             const SizedBox(height: 50),
           ],
@@ -329,6 +442,128 @@ class ProfiloUtente extends ConsumerWidget {
                     }
                   },
                 ),
+                const SizedBox(height: 20),
+
+                const Padding(
+                  padding: EdgeInsets.only(left: 8, bottom: 12),
+                  child: Text(
+                    'PRIVACY E LEGALE',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                ),
+
+                _buildMenuTile(
+                  icon: Icons.privacy_tip_outlined,
+                  iconColor: AppTheme.neonGreen,
+                  title: 'Privacy Policy',
+                  subtitle: 'Come vengono trattati i tuoi dati',
+                  onTap: () => _apriUrl(
+                    context,
+                    'https://matchlyassistenza-web.github.io/matchly-privacy/',
+                  ),
+                ),
+
+                _buildMenuTile(
+                  icon: Icons.description_outlined,
+                  iconColor: AppTheme.neonPurple,
+                  title: 'Termini e Condizioni',
+                  subtitle: 'Consulta le condizioni di utilizzo',
+                  onTap: () => _apriUrl(
+                    context,
+                    'https://matchlyassistenza-web.github.io/matchly-privacy/termini.html',
+                  ),
+                ),
+
+                _buildMenuTile(
+                  icon: Icons.delete_outline_rounded,
+                  iconColor: AppTheme.statoErrore,
+                  title: 'Eliminazione account e dati',
+                  subtitle: 'Informazioni sulla cancellazione dei dati',
+                  onTap: () => _apriUrl(
+                    context,
+                    'https://matchlyassistenza-web.github.io/matchly-privacy/elimina-account.html',
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                const Padding(
+                  padding: EdgeInsets.only(left: 8, bottom: 12),
+                  child: Text(
+                    'ASSISTENZA',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                ),
+
+                _buildMenuTile(
+                  icon: Icons.support_agent_rounded,
+                  iconColor: AppTheme.accent,
+                  title: 'Contatta assistenza',
+                  subtitle: 'Scrivici per domande o richieste',
+                  onTap: () => _contattaAssistenza(context),
+                ),
+
+                _buildMenuTile(
+                  icon: Icons.bug_report_outlined,
+                  iconColor: Colors.amber,
+                  title: 'Segnala un problema',
+                  subtitle: 'Aiutaci a migliorare Matchly',
+                  onTap: () =>
+                      _contattaAssistenza(context, segnalaProblema: true),
+                ),
+
+                const SizedBox(height: 20),
+
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: AppTheme.cardBg,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.cardBorder),
+                  ),
+                  child: const Column(
+                    children: [
+                      Text(
+                        'MATCHLY',
+                        style: TextStyle(
+                          color: AppTheme.accent,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                      SizedBox(height: 5),
+                      Text(
+                        'Trova. Prenota. Gioca.',
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                      SizedBox(height: 5),
+                      Text(
+                        'Assistenza: matchly.assistenza@gmail.com',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -513,7 +748,7 @@ class ProfiloUtente extends ConsumerWidget {
           behavior: SnackBarBehavior.floating,
           backgroundColor: AppTheme.statoErrore,
           content: Text(
-            'Errore durante la disconnessione: $e',
+            'Errore durante la disconnessione',
             style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,

@@ -1,4 +1,4 @@
-package com.example.app_campi
+package com.matchly.app
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

@@ -37,7 +37,7 @@ IconData _getIconaSport(String sport) {
   if (sport.contains('tennis')) return Icons.sports_tennis;
   if (sport.contains('padel')) return Icons.sports_tennis;
   if (sport.contains('basket')) return Icons.sports_basketball;
-  if (sport.contains('volley')) return Icons.sports_volleyball;
+  if (sport.contains('pallavolo')) return Icons.sports_volleyball;
   return Icons.sports_score;
 }
 
@@ -46,6 +46,8 @@ String _getTitoloSportPulito(String sportChiave) {
   switch (sportChiave) {
     case 'calcio_5':
       return 'Calcio a 5';
+    case 'calcio_6':
+      return 'Calcio a 6';
     case 'calcio_7':
       return 'Calcio a 7';
     case 'calcio_8':
@@ -157,7 +159,7 @@ Future<void> verificaESelezionaLivello({
                   shrinkWrap: true,
                   physics: const BouncingScrollPhysics(),
                   itemCount: livelliDisponibili.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
                     final item = livelliDisponibili[index];
                     return InkWell(
@@ -187,7 +189,7 @@ Future<void> verificaESelezionaLivello({
                           );
                         } catch (e) {
                           debugPrint(
-                            "❌ Errore durante il salvataggio su Supabase: $e",
+                            "❌ Errore durante il salvataggio su Supabase",
                           );
                         }
 

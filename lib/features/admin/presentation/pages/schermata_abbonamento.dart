@@ -15,20 +15,25 @@ class SchermataAbbonamento extends ConsumerStatefulWidget {
 }
 
 class _SchermataAbbonamentoState extends ConsumerState<SchermataAbbonamento> {
+  bool _stoAggiornandoDopoStripe = false;
   @override
   void initState() {
     super.initState();
-    Future.microtask(
-      () => ref.read(abbonamentoProvider.notifier).caricaDati(widget.idSocieta),
-    );
+
+    Future.microtask(() async {
+      if (!mounted) return;
+
+      await _ricaricaAbbonamento();
+    });
   }
 
   void _mostraDialogSceltaPiano(String? stripeCustomerId) {
+    final pageContext = context;
     final piani = PianiConfig.piani;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: AppTheme.cardBg,
         shape: RoundedRectangleBorder(
           side: const BorderSide(color: AppTheme.neonOrange, width: 1.5),
@@ -49,13 +54,17 @@ class _SchermataAbbonamentoState extends ConsumerState<SchermataAbbonamento> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: InkWell(
                     onTap: () {
-                      Navigator.pop(context);
-                      AbbonamentoService().apriCheckout(
-                        context,
-                        priceId: piano['priceId']!,
-                        piano: piano['nome']!,
-                        customerId: stripeCustomerId,
-                      );
+                      Navigator.pop(dialogContext);
+
+                      Future.microtask(() {
+                        if (!mounted) return;
+
+                        AbbonamentoService().apriCheckout(
+                          pageContext,
+                          idSocieta: widget.idSocieta,
+                          piano: piano['nome']!,
+                        );
+                      });
                     },
                     child: Container(
                       width: double.infinity,
@@ -105,7 +114,7 @@ class _SchermataAbbonamentoState extends ConsumerState<SchermataAbbonamento> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Annulla', style: TextStyle(color: Colors.grey)),
           ),
         ],
@@ -116,6 +125,25 @@ class _SchermataAbbonamentoState extends ConsumerState<SchermataAbbonamento> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(abbonamentoProvider);
+
+    if (_stoAggiornandoDopoStripe) {
+      return const Scaffold(
+        backgroundColor: AppTheme.darkBg,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: AppTheme.neonOrange),
+              SizedBox(height: 16),
+              Text(
+                'Aggiornamento abbonamento in corso...',
+                style: TextStyle(color: Colors.white70, fontSize: 15),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppTheme.darkBg,
@@ -207,7 +235,10 @@ class _SchermataAbbonamentoState extends ConsumerState<SchermataAbbonamento> {
                   ),
                   const SizedBox(height: 30),
                   Text(
-                    state.piano == 'NESSUNO'
+                    state.stripeCustomerId == null ||
+                            state.stripeCustomerId!.isEmpty
+                        ? 'Attiva il tuo abbonamento'
+                        : state.piano == 'NESSUNO'
                         ? 'Nessun abbonamento attivo'
                         : 'Modifica o Rinnova',
                     style: const TextStyle(
@@ -218,9 +249,16 @@ class _SchermataAbbonamentoState extends ConsumerState<SchermataAbbonamento> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    state.piano == 'NESSUNO'
-                        ? 'Il tuo abbonamento è scaduto o è stato annullato. Acquista un nuovo piano per continuare a gestire i tuoi campi.'
-                        : 'Vuoi fare l\'upgrade, cambiare metodo di pagamento o scaricare le fatture? Premi il pulsante sotto per accedere al portale Stripe.',
+                    state.stripeCustomerId == null ||
+                            state.stripeCustomerId!.isEmpty
+                        ? 'Stai utilizzando Matchly con un accesso gratuito. '
+                              'Puoi attivare in qualsiasi momento un abbonamento per continuare '
+                              'a utilizzare il servizio anche dopo la fine del periodo gratuito.'
+                        : state.piano == 'NESSUNO'
+                        ? 'Il tuo abbonamento è scaduto o è stato annullato. '
+                              'Acquista un nuovo piano per continuare a gestire i tuoi campi.'
+                        : 'Vuoi fare l\'upgrade, cambiare metodo di pagamento o scaricare '
+                              'le fatture? Premi il pulsante sotto per accedere al portale Stripe.',
                     style: TextStyle(
                       color: Colors.grey.shade400,
                       fontSize: 14,
@@ -240,34 +278,49 @@ class _SchermataAbbonamentoState extends ConsumerState<SchermataAbbonamento> {
                         ),
                       ),
                       onPressed: () {
+                        final bool haStripeCustomer =
+                            state.stripeCustomerId != null &&
+                            state.stripeCustomerId!.trim().isNotEmpty;
+
+                        // CASO 1:
+                        // Prova gratuita manuale oppure nessun abbonamento Stripe.
+                        // Non avendo ancora un Customer Stripe, permettiamo
+                        // l'acquisto di un vero abbonamento.
+                        if (!haStripeCustomer) {
+                          _mostraDialogSceltaPiano(null);
+                          return;
+                        }
+
+                        // CASO 2:
+                        // Ha già avuto Stripe, ma al momento non ha un piano attivo.
+                        // Può acquistare nuovamente un piano riutilizzando
+                        // il Customer Stripe esistente.
                         if (state.piano == 'NESSUNO') {
                           _mostraDialogSceltaPiano(state.stripeCustomerId);
-                        } else if (state.stripeCustomerId != null &&
-                            state.stripeCustomerId!.isNotEmpty) {
-                          AbbonamentoService().apriPortaleStripe(
-                            context,
-                            state.stripeCustomerId!,
-                          );
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Nessun ID Cliente Stripe trovato. Contatta il supporto.',
-                              ),
-                              backgroundColor: Colors.orange,
-                            ),
-                          );
+                          return;
                         }
+
+                        // CASO 3:
+                        // Abbonamento Stripe attivo.
+                        // Può modificare/cancellare/gestire dal portale Stripe.
+                        AbbonamentoService().apriPortaleStripe(
+                          context,
+                          state.stripeCustomerId!,
+                        );
                       },
                       icon: Icon(
-                        state.piano == 'NESSUNO'
+                        state.stripeCustomerId == null ||
+                                state.stripeCustomerId!.isEmpty ||
+                                state.piano == 'NESSUNO'
                             ? Icons.shopping_cart
                             : Icons.open_in_new,
                         size: 20,
                       ),
                       label: Text(
-                        state.piano == 'NESSUNO'
-                            ? 'Acquista un Piano'
+                        state.stripeCustomerId == null ||
+                                state.stripeCustomerId!.isEmpty ||
+                                state.piano == 'NESSUNO'
+                            ? 'Attiva Abbonamento'
                             : 'Apri Portale Clienti Stripe',
                         style: const TextStyle(
                           fontSize: 16,
@@ -281,5 +334,15 @@ class _SchermataAbbonamentoState extends ConsumerState<SchermataAbbonamento> {
               ),
             ),
     );
+  }
+
+  Future<void> _ricaricaAbbonamento() async {
+    // Piccola attesa per dare tempo al webhook Stripe
+    // di aggiornare la società su Supabase.
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (!mounted) return;
+
+    await ref.read(abbonamentoProvider.notifier).caricaDati(widget.idSocieta);
   }
 }

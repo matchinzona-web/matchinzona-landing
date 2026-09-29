@@ -8,7 +8,7 @@ import 'package:app_campi/core/theme/app_theme.dart';
 import 'package:app_campi/core/utils/loading_overlay.dart';
 import 'package:app_campi/core/shared_widget/freccia_back.dart';
 import 'package:app_campi/core/theme/app_styles.dart';
-
+import 'package:app_campi/core/services/push_notification_service.dart';
 import 'package:app_campi/features/profilo/application/profilo_controller.dart';
 
 class ModificaProfiloScreen extends ConsumerStatefulWidget {
@@ -89,16 +89,6 @@ class _ModificaProfiloScreenState extends ConsumerState<ModificaProfiloScreen> {
   }
 
   Future<void> _salvaDati() async {
-    if (_dataNascitaSelezionata == null) {
-      setState(() => _erroreDataNascita = 'La data di nascita è obbligatoria');
-      return;
-    }
-    if (!_isMaggiorenne(_dataNascitaSelezionata)) {
-      setState(() => _erroreDataNascita = 'Devi avere almeno 18 anni 🔞');
-      return;
-    }
-    if (!_formKey.currentState!.validate()) return;
-
     FocusScope.of(context).unfocus();
     LoadingOverlay.show(context, testo: "Salvataggio in corso...");
 
@@ -151,7 +141,7 @@ class _ModificaProfiloScreenState extends ConsumerState<ModificaProfiloScreen> {
         LoadingOverlay.hide(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Errore durante il salvataggio: $e'),
+            content: Text('Errore durante il salvataggio'),
             backgroundColor: AppTheme.statoErrore,
           ),
         );
@@ -169,7 +159,7 @@ class _ModificaProfiloScreenState extends ConsumerState<ModificaProfiloScreen> {
         elevation: 0,
         centerTitle: true,
         title: const Text(
-          'MODIFICA PROFILO',
+          'ACCOUNT E SICUREZZA',
           style: TextStyle(
             color: AppTheme.textPrimary,
             fontWeight: FontWeight.w900,
@@ -239,31 +229,29 @@ class _ModificaProfiloScreenState extends ConsumerState<ModificaProfiloScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    InkWell(
-                      onTap: () async {
-                        setState(() => _dataNascitaFocused = true);
-                        await _selezionaData();
-                        if (_dataNascitaSelezionata != null) {
-                          setState(() => _erroreDataNascita = null);
-                        }
-                        setState(() => _dataNascitaFocused = false);
-                      },
-                      borderRadius: BorderRadius.circular(15.0),
-                      child: InputDecorator(
-                        isFocused: _dataNascitaFocused,
-                        isEmpty: _dataNascitaSelezionata == null,
-                        decoration: AppStyles.capsuleDecoration(
-                          'Data di Nascita',
-                          Icons.calendar_today_rounded,
-                          coloreTema: AppTheme.accent,
-                        ).copyWith(errorText: _erroreDataNascita),
-                        child: Text(
-                          _formattaData(_dataNascitaSelezionata),
-                          style: const TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontSize: 15,
+                    InputDecorator(
+                      decoration: AppStyles.capsuleDecoration(
+                        'Data di Nascita',
+                        Icons.calendar_today_rounded,
+                        coloreTema: AppTheme.textDisabled,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _formattaData(_dataNascitaSelezionata),
+                              style: const TextStyle(
+                                color: AppTheme.textPrimary,
+                                fontSize: 15,
+                              ),
+                            ),
                           ),
-                        ),
+                          const Icon(
+                            Icons.lock_outline_rounded,
+                            color: AppTheme.textDisabled,
+                            size: 18,
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -328,10 +316,12 @@ class _ModificaProfiloScreenState extends ConsumerState<ModificaProfiloScreen> {
                       autovalidateMode: AutovalidateMode.onUnfocus,
                       validator: (val) {
                         if (_passwordController.text.isNotEmpty) {
-                          if (val == null || val.isEmpty)
+                          if (val == null || val.isEmpty) {
                             return 'Conferma la password';
-                          if (val != _passwordController.text)
+                          }
+                          if (val != _passwordController.text) {
                             return 'Le password non coincidono';
+                          }
                         }
                         return null;
                       },
@@ -364,6 +354,36 @@ class _ModificaProfiloScreenState extends ConsumerState<ModificaProfiloScreen> {
                         ),
                       ),
                     ),
+                    const Divider(color: AppTheme.cardBorder),
+                    const SizedBox(height: 16),
+
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'ZONA PERICOLO',
+                        style: TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    const Text(
+                      'Eliminando l’account perderai definitivamente il profilo, '
+                      'le preferenze, le partecipazioni e gli altri dati associati. '
+                      'L’operazione non può essere annullata.',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+
+                    const SizedBox(height: 18),
                     const SizedBox(height: 30),
                     SizedBox(
                       width: double.infinity,
@@ -407,17 +427,6 @@ class _ModificaProfiloScreenState extends ConsumerState<ModificaProfiloScreen> {
     return null;
   }
 
-  bool _isMaggiorenne(DateTime? dataNascita) {
-    if (dataNascita == null) return false;
-    final oggi = DateTime.now();
-    int eta = oggi.year - dataNascita.year;
-    if (oggi.month < dataNascita.month ||
-        (oggi.month == dataNascita.month && oggi.day < dataNascita.day)) {
-      eta--;
-    }
-    return eta >= 18;
-  }
-
   Future<void> _eliminaAccount(BuildContext context, WidgetRef ref) async {
     final conferma = await showDialog<bool>(
       context: context,
@@ -435,7 +444,11 @@ class _ModificaProfiloScreenState extends ConsumerState<ModificaProfiloScreen> {
           ),
         ),
         content: const Text(
-          'Sei sicuro di voler eliminare il tuo account? Questa azione è irreversibile e cancellerà tutti i tuoi dati.',
+          'Sei sicuro di voler eliminare definitivamente il tuo account?\n\n'
+          'Verranno rimossi il profilo, le preferenze, le partecipazioni '
+          'alle partite, le notifiche e gli altri dati associati, salvo '
+          'eventuali dati che devono essere conservati per obblighi di legge.\n\n'
+          'Questa azione è irreversibile.',
           style: TextStyle(color: Colors.white70, height: 1.5),
         ),
         actions: [
@@ -464,7 +477,10 @@ class _ModificaProfiloScreenState extends ConsumerState<ModificaProfiloScreen> {
     if (conferma != true) return;
 
     try {
+      await PushNotificationService.rimuoviTokenCorrente();
+
       await Supabase.instance.client.functions.invoke('elimina-utente');
+
       await Supabase.instance.client.auth.signOut();
       if (context.mounted) {
         Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
@@ -473,7 +489,7 @@ class _ModificaProfiloScreenState extends ConsumerState<ModificaProfiloScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Errore eliminazione: $e'),
+            content: Text('Errore eliminazione'),
             backgroundColor: Colors.redAccent,
           ),
         );

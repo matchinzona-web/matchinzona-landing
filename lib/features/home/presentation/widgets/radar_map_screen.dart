@@ -1,16 +1,16 @@
-import 'dart:math' as math;
+import 'dart:async';
 
-import 'package:flutter/foundation.dart' show Factory;
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart' as latlng;
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:app_campi/core/theme/app_theme.dart';
-import 'package:app_campi/features/admin/presentation/pages/lista_campi_screen.dart';
+
 import 'package:app_campi/core/services/location_provider.dart';
 import 'package:app_campi/core/shared_widget/gps_banner.dart';
+import 'package:app_campi/core/theme/app_theme.dart';
+import 'package:app_campi/features/admin/presentation/pages/lista_campi_screen.dart';
 
 class RadarMapScreen extends ConsumerStatefulWidget {
   const RadarMapScreen({super.key});
@@ -21,28 +21,37 @@ class RadarMapScreen extends ConsumerStatefulWidget {
 
 class _RadarMapScreenState extends ConsumerState<RadarMapScreen>
     with WidgetsBindingObserver {
-  GoogleMapController? mapController;
-  bool _isMapReady = false;
+  final MapController _mapController = MapController();
 
-  LatLng _currentPosition = const LatLng(41.9028, 12.4964);
+  latlng.LatLng _posizioneUtente = const latlng.LatLng(41.9028, 12.4964);
+
+  latlng.LatLng _centroRadar = const latlng.LatLng(41.9028, 12.4964);
+
+  bool _mappaPronta = false;
   bool _isLoadingLocation = true;
-  bool _permessoNegatoPerSempre = false;
-  Set<Marker> _markers = {};
+  bool _permessoPosizioneConcesso = false;
 
-  Offset _circleCenterPx = Offset.zero;
-  double _circleRadiusPx = 0;
+  double _raggioKm = 5;
+
+  List<Map<String, dynamic>> _centri = [];
+
+  Timer? _cameraDebounce;
 
   @override
   void initState() {
     super.initState();
+
     WidgetsBinding.instance.addObserver(this);
+
     _ottieniPosizioneAttuale();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    mapController?.dispose();
+    _cameraDebounce?.cancel();
+    _mapController.dispose();
+
     super.dispose();
   }
 
@@ -53,225 +62,323 @@ class _RadarMapScreenState extends ConsumerState<RadarMapScreen>
     }
   }
 
+  double _zoomPerRaggio() {
+    if (_raggioKm <= 2) {
+      return 13.2;
+    }
+
+    if (_raggioKm <= 5) {
+      return 12.0;
+    }
+
+    return 11.0;
+  }
+
   Future<void> _ottieniPosizioneAttuale() async {
     if (!mounted) return;
 
-    bool serviceEnabled;
-    try {
-      serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    } catch (e) {
-      debugPrint("Errore controllo servizio GPS: $e");
-      _disabilitaCaricamentoEApriMappa();
-      return;
-    }
+    setState(() {
+      _isLoadingLocation = true;
+    });
 
-    if (!serviceEnabled) {
-      if (mounted) setState(() => _permessoNegatoPerSempre = false);
-      _disabilitaCaricamentoEApriMappa();
-      return;
-    }
-
-    LocationPermission permission;
     try {
-      permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+      final gpsAttivo = await Geolocator.isLocationServiceEnabled();
+
+      if (!gpsAttivo) {
+        if (mounted) {
+          setState(() {
+            _permessoPosizioneConcesso = false;
+            _isLoadingLocation = false;
+          });
+        }
+
+        return;
       }
-    } catch (e) {
-      debugPrint("Errore controllo permessi GPS: $e");
-      _disabilitaCaricamentoEApriMappa();
-      return;
-    }
 
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
+      final permission = await Geolocator.checkPermission();
+
+      final concesso =
+          permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always;
+
+      if (!concesso) {
+        if (mounted) {
+          setState(() {
+            _permessoPosizioneConcesso = false;
+            _isLoadingLocation = false;
+          });
+        }
+
+        return;
+      }
+
       if (mounted) {
         setState(() {
-          _permessoNegatoPerSempre =
-              permission == LocationPermission.deniedForever;
+          _permessoPosizioneConcesso = true;
         });
       }
-      _disabilitaCaricamentoEApriMappa();
-      return;
-    }
 
-    if (mounted) setState(() => _permessoNegatoPerSempre = false);
+      Position? posizione;
 
-    try {
-      Position? position;
       try {
-        position = await Geolocator.getCurrentPosition(
+        posizione = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high,
         ).timeout(const Duration(seconds: 5));
-      } catch (e) {
-        debugPrint("Timeout GPS: fallback su ultima posizione nota.");
-        try {
-          position = await Geolocator.getLastKnownPosition();
-        } catch (e2) {
-          debugPrint("Errore ultima posizione nota: $e2");
-          position = null;
-        }
+      } catch (_) {
+        posizione = await Geolocator.getLastKnownPosition();
       }
 
-      if (position != null && mounted) {
+      if (posizione == null || !mounted) {
         setState(() {
-          _currentPosition = LatLng(position!.latitude, position.longitude);
           _isLoadingLocation = false;
         });
 
-        if (_isMapReady) {
-          _spostaTelecameraEScarica();
-        }
-      } else {
-        _disabilitaCaricamentoEApriMappa();
+        return;
       }
-    } catch (e) {
-      debugPrint("Errore critico GPS: $e");
-      _disabilitaCaricamentoEApriMappa();
-    }
-  }
 
-  void _disabilitaCaricamentoEApriMappa() {
-    if (mounted) {
-      setState(() => _isLoadingLocation = false);
-      if (_isMapReady) {
-        _caricaCentriSportiviVicini();
+      final nuovaPosizione = latlng.LatLng(
+        posizione.latitude,
+        posizione.longitude,
+      );
+
+      setState(() {
+        _posizioneUtente = nuovaPosizione;
+        _centroRadar = nuovaPosizione;
+      });
+
+      if (_mappaPronta) {
+        _mapController.move(nuovaPosizione, _zoomPerRaggio());
       }
-    }
-  }
 
-  void _spostaTelecameraEScarica() {
-    if (!_isMapReady || mapController == null) return;
-    mapController!.animateCamera(
-      CameraUpdate.newLatLngZoom(_currentPosition, 13.5),
-    );
-    _caricaCentriSportiviVicini();
-  }
-
-  void _centraSuDiMe() async {
-    if (!mounted) return;
-    setState(() => _isLoadingLocation = true);
-    await _ottieniPosizioneAttuale();
-  }
-
-  Future<double> _calcolaRaggioCerchioInMetri() async {
-    if (mapController == null || _circleRadiusPx <= 0) {
-      return 1000;
-    }
-    try {
-      final centroLatLng = await mapController!.getLatLng(
-        ScreenCoordinate(
-          x: _circleCenterPx.dx.round(),
-          y: _circleCenterPx.dy.round(),
-        ),
-      );
-      final bordoLatLng = await mapController!.getLatLng(
-        ScreenCoordinate(
-          x: _circleCenterPx.dx.round(),
-          y: (_circleCenterPx.dy - _circleRadiusPx).round(),
-        ),
-      );
-      return Geolocator.distanceBetween(
-        centroLatLng.latitude,
-        centroLatLng.longitude,
-        bordoLatLng.latitude,
-        bordoLatLng.longitude,
-      );
+      await _caricaCentriSportiviVicini();
     } catch (e) {
-      debugPrint("Errore calcolo raggio cerchio: $e");
-      return 1000;
+      debugPrint('Errore posizione Radar: $e');
+
+      if (mounted) {
+        setState(() {
+          _isLoadingLocation = false;
+        });
+      }
     }
   }
 
   Future<void> _caricaCentriSportiviVicini() async {
-    if (!mounted) return;
-    setState(() => _isLoadingLocation = true);
+    if (!mounted || !_permessoPosizioneConcesso) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingLocation = true;
+    });
 
     try {
-      final raggioMetri = await _calcolaRaggioCerchioInMetri();
-      final raggioKm = (raggioMetri / 1000.0).clamp(0.05, 50.0);
-
-      final List<dynamic> data = await Supabase.instance.client.rpc(
+      final List<dynamic> response = await Supabase.instance.client.rpc(
         'get_centri_vicini',
         params: {
-          'lat_utente': _currentPosition.latitude,
-          'lon_utente': _currentPosition.longitude,
-          'raggio_km': raggioKm,
+          'lat_utente': _centroRadar.latitude,
+          'lon_utente': _centroRadar.longitude,
+          'raggio_km': _raggioKm,
         },
       );
 
-      final Set<Marker> nuoviMarkers = {};
-      for (final societa in data) {
+      final risultati = <Map<String, dynamic>>[];
+
+      for (final elemento in response) {
         try {
+          final societa = Map<String, dynamic>.from(elemento as Map);
+
           final lat = (societa['latitudine'] as num).toDouble();
+
           final lng = (societa['longitudine'] as num).toDouble();
 
-          final distanzaCentro = Geolocator.distanceBetween(
-            _currentPosition.latitude,
-            _currentPosition.longitude,
+          final distanzaMetri = Geolocator.distanceBetween(
+            _centroRadar.latitude,
+            _centroRadar.longitude,
             lat,
             lng,
           );
-          if (distanzaCentro > raggioMetri) continue;
 
-          nuoviMarkers.add(
-            Marker(
-              markerId: MarkerId(societa['id'].toString()),
-              position: LatLng(lat, lng),
-              icon: BitmapDescriptor.defaultMarkerWithHue(100),
-              onTap: () => _mostraDettaglioCentro(context, societa),
-            ),
-          );
+          if (distanzaMetri > _raggioKm * 1000) {
+            continue;
+          }
+
+          societa['_distanza_metri'] = distanzaMetri;
+
+          risultati.add(societa);
         } catch (e) {
-          debugPrint("Centro sportivo con dati non validi, salto: $e");
+          debugPrint('Centro Radar non valido: $e');
         }
       }
 
+      risultati.sort((a, b) {
+        final distanzaA =
+            (a['_distanza_metri'] as num?)?.toDouble() ?? double.infinity;
+
+        final distanzaB =
+            (b['_distanza_metri'] as num?)?.toDouble() ?? double.infinity;
+
+        return distanzaA.compareTo(distanzaB);
+      });
+
+      if (!mounted) return;
+
+      setState(() {
+        _centri = risultati;
+        _isLoadingLocation = false;
+      });
+    } catch (e) {
+      debugPrint('Errore caricamento centri Radar: $e');
+
       if (mounted) {
         setState(() {
-          _markers = nuoviMarkers;
+          _centri = [];
           _isLoadingLocation = false;
         });
       }
-    } catch (e) {
-      debugPrint("Errore caricamento centri: $e");
-      if (mounted) setState(() => _isLoadingLocation = false);
     }
   }
 
-  Future<void> _forzaRicaricamento() async {
-    if (!_isMapReady || mapController == null || !mounted) return;
-    try {
-      final size = MediaQuery.of(context).size;
-      final centroMappa = await mapController!.getLatLng(
-        ScreenCoordinate(
-          x: (size.width / 2).round(),
-          y: (size.height / 2).round(),
+  void _onPositionChanged(MapCamera camera, bool hasGesture) {
+    _centroRadar = camera.center;
+
+    if (!hasGesture) {
+      return;
+    }
+
+    _cameraDebounce?.cancel();
+
+    _cameraDebounce = Timer(const Duration(milliseconds: 650), () {
+      if (mounted) {
+        _caricaCentriSportiviVicini();
+      }
+    });
+  }
+
+  Future<void> _centraSuDiMe() async {
+    if (!_permessoPosizioneConcesso) {
+      await _ottieniPosizioneAttuale();
+      return;
+    }
+
+    _centroRadar = _posizioneUtente;
+
+    _mapController.move(_posizioneUtente, _zoomPerRaggio());
+
+    await _caricaCentriSportiviVicini();
+  }
+
+  Future<void> _impostaRaggio(double nuovoRaggio) async {
+    if (_raggioKm == nuovoRaggio) {
+      return;
+    }
+
+    setState(() {
+      _raggioKm = nuovoRaggio;
+    });
+
+    _mapController.move(_centroRadar, _zoomPerRaggio());
+
+    await _caricaCentriSportiviVicini();
+  }
+
+  String _testoDistanza(Map<String, dynamic> societa) {
+    final metri = (societa['_distanza_metri'] as num?)?.toDouble();
+
+    if (metri == null) {
+      return '';
+    }
+
+    if (metri < 1000) {
+      return '${metri.round()} m';
+    }
+
+    return '${(metri / 1000).toStringAsFixed(1)} km';
+  }
+
+  List<Marker> _buildMarkers() {
+    final markers = <Marker>[];
+
+    if (_permessoPosizioneConcesso) {
+      markers.add(
+        Marker(
+          point: _posizioneUtente,
+          width: 46,
+          height: 46,
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppTheme.accent.withOpacity(0.18),
+              shape: BoxShape.circle,
+              border: Border.all(color: AppTheme.accent, width: 2.5),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.accent.withOpacity(0.35),
+                  blurRadius: 14,
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.person_pin_circle_rounded,
+              color: AppTheme.accent,
+              size: 30,
+            ),
+          ),
         ),
       );
-      if (!mounted) return;
-      setState(() => _currentPosition = centroMappa);
-      await _caricaCentriSportiviVicini();
-    } catch (e) {
-      debugPrint("Errore ricaricamento manuale: $e");
     }
-  }
 
-  void _onMapCreated(GoogleMapController controller) {
-    mapController = controller;
-    _isMapReady = true;
+    for (final societa in _centri) {
+      try {
+        final lat = (societa['latitudine'] as num).toDouble();
 
-    if (!_isLoadingLocation) {
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted) _spostaTelecameraEScarica();
-      });
+        final lng = (societa['longitudine'] as num).toDouble();
+
+        markers.add(
+          Marker(
+            point: latlng.LatLng(lat, lng),
+            width: 48,
+            height: 48,
+            child: GestureDetector(
+              onTap: () {
+                _mostraDettaglioCentro(context, societa);
+              },
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.cardBg,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppTheme.accent, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.accent.withOpacity(0.25),
+                      blurRadius: 12,
+                    ),
+                    const BoxShadow(
+                      color: Colors.black38,
+                      blurRadius: 6,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.stadium_rounded,
+                  color: AppTheme.accent,
+                  size: 24,
+                ),
+              ),
+            ),
+          ),
+        );
+      } catch (_) {}
     }
+
+    return markers;
   }
 
   void _mostraDettaglioCentro(
     BuildContext context,
     Map<String, dynamic> societa,
   ) {
+    final distanza = _testoDistanza(societa);
+
     showModalBottomSheet(
       context: context,
       backgroundColor: AppTheme.darkBg,
@@ -280,109 +387,143 @@ class _RadarMapScreenState extends ConsumerState<RadarMapScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 30,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  height: 5,
-                  width: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade700,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 18,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 28,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 5,
                     decoration: BoxDecoration(
-                      color: AppTheme.accent.withOpacity(0.15),
-                      shape: BoxShape.circle,
+                      color: Colors.grey.shade700,
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Icon(
-                      Icons.stadium_rounded,
-                      color: AppTheme.accent,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      societa['nome_societa'] ?? "Centro Sportivo",
-                      style: const TextStyle(
-                        color: AppTheme.textPrimary,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.location_on_rounded,
-                    color: AppTheme.textSecondary,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      societa['indirizzo'] ?? "Indirizzo non disponibile",
-                      style: const TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 14,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ListaCampiScreen(societa: societa),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.accent,
-                    foregroundColor: AppTheme.darkBg,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  icon: const Icon(Icons.arrow_forward_rounded),
-                  label: const Text(
-                    "ESPLORA QUESTO CENTRO",
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
                   ),
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 24),
+
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(13),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accent.withOpacity(0.14),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.stadium_rounded,
+                        color: AppTheme.accent,
+                        size: 28,
+                      ),
+                    ),
+
+                    const SizedBox(width: 16),
+
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            societa['nome_societa'] ?? 'Centro Sportivo',
+                            style: const TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontSize: 21,
+                              fontWeight: FontWeight.w900,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+
+                          if (distanza.isNotEmpty) ...[
+                            const SizedBox(height: 5),
+                            Text(
+                              distanza,
+                              style: const TextStyle(
+                                color: AppTheme.accent,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 18),
+
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.location_on_rounded,
+                      color: AppTheme.textSecondary,
+                      size: 18,
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    Expanded(
+                      child: Text(
+                        societa['indirizzo'] ?? 'Indirizzo non disponibile',
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 14,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 28),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ListaCampiScreen(societa: societa),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.accent,
+                      foregroundColor: AppTheme.darkBg,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    icon: const Icon(Icons.arrow_forward_rounded),
+                    label: const Text(
+                      'ESPLORA QUESTO CENTRO',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -392,293 +533,363 @@ class _RadarMapScreenState extends ConsumerState<RadarMapScreen>
   @override
   Widget build(BuildContext context) {
     ref.listen<AsyncValue<bool>>(gpsAttivoProvider, (previous, next) {
-      final eraSpento = previous?.value == false;
+      final primaSpento = previous?.value == false;
+
       final oraAcceso = next.value == true;
-      if (oraAcceso && eraSpento && mounted) {
-        setState(() => _isLoadingLocation = true);
+
+      if (primaSpento && oraAcceso && mounted) {
+        _ottieniPosizioneAttuale();
+      }
+    });
+
+    ref.listen<AsyncValue<LocationPermission>>(permessoPosizioneProvider, (
+      previous,
+      next,
+    ) {
+      final permission = next.value;
+
+      final concesso =
+          permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always;
+
+      if (concesso && mounted) {
         _ottieniPosizioneAttuale();
       }
     });
 
     final gpsAttivo = ref.watch(gpsAttivoProvider).value ?? false;
-    final mostraLocalizzazioneUtente = gpsAttivo && !_permessoNegatoPerSempre;
 
-    final size = MediaQuery.of(context).size;
-    final circleRadius = math.min(size.width, size.height) * 0.34;
-    final center = Offset(size.width / 2, size.height / 2);
+    final permission =
+        ref.watch(permessoPosizioneProvider).value ?? LocationPermission.denied;
+
+    final permessoConcesso =
+        permission == LocationPermission.whileInUse ||
+        permission == LocationPermission.always;
 
     return Scaffold(
       backgroundColor: AppTheme.darkBg,
       body: Stack(
         children: [
           Positioned.fill(
-            child: GoogleMap(
-              onMapCreated: _onMapCreated,
-              initialCameraPosition: CameraPosition(
-                target: _currentPosition,
-                zoom: 12.0,
+            child: FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: _centroRadar,
+                initialZoom: _zoomPerRaggio(),
+                minZoom: 5,
+                maxZoom: 18,
+                onMapReady: () {
+                  _mappaPronta = true;
+
+                  if (_permessoPosizioneConcesso) {
+                    _mapController.move(_centroRadar, _zoomPerRaggio());
+                  }
+                },
+                onPositionChanged: _onPositionChanged,
               ),
-              markers: _markers,
-              myLocationEnabled: mostraLocalizzazioneUtente,
-              myLocationButtonEnabled: false,
-              zoomControlsEnabled: false,
-              mapToolbarEnabled: false,
-              compassEnabled: false,
-              gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-                Factory<OneSequenceGestureRecognizer>(
-                  () => EagerGestureRecognizer(),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.matchly.app',
+                  maxZoom: 19,
                 ),
-              },
-              onCameraIdle: () async {
-                if (!_isMapReady || mapController == null || !mounted) return;
-                try {
-                  final centroMappa = await mapController!.getLatLng(
-                    ScreenCoordinate(
-                      x: center.dx.round(),
-                      y: center.dy.round(),
+
+                CircleLayer(
+                  circles: [
+                    CircleMarker(
+                      point: _centroRadar,
+                      radius: _raggioKm * 1000,
+                      useRadiusInMeter: true,
+                      color: AppTheme.accent.withOpacity(0.08),
+                      borderColor: AppTheme.accent.withOpacity(0.9),
+                      borderStrokeWidth: 2.5,
                     ),
-                  );
-                  if (!mounted) return;
-                  setState(() => _currentPosition = centroMappa);
-                  _caricaCentriSportiviVicini();
-                } catch (e) {
-                  debugPrint("Errore lettura centro mappa: $e");
-                }
-              },
+                  ],
+                ),
+
+                MarkerLayer(markers: _buildMarkers()),
+              ],
             ),
           ),
 
           Positioned.fill(
             child: IgnorePointer(
-              child: ClipPath(
-                clipper: _HoleClipper(center: center, radius: circleRadius),
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: Alignment.center,
-                      radius: 1.1,
-                      colors: [
-                        AppTheme.darkBg.withOpacity(0.55),
-                        AppTheme.darkBg.withOpacity(0.72),
+              child: Container(color: AppTheme.darkBg.withOpacity(0.12)),
+            ),
+          ),
+
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 14, 18, 8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 13,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.darkBg.withOpacity(0.88),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: AppTheme.cardBorder),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black38,
+                          blurRadius: 12,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.radar_rounded,
+                          color: AppTheme.accent,
+                          size: 24,
+                        ),
+
+                        const SizedBox(width: 10),
+
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'RADAR CENTRI',
+                                style: TextStyle(
+                                  color: AppTheme.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Sposta la mappa per esplorare',
+                                style: TextStyle(
+                                  color: AppTheme.textSecondary,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        if (_isLoadingLocation)
+                          const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppTheme.accent,
+                            ),
+                          ),
                       ],
                     ),
                   ),
                 ),
-              ),
+
+                if (!gpsAttivo || !permessoConcesso)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: GpsBanner(),
+                  ),
+
+                const Spacer(),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  child: Row(
+                    children: [
+                      _RaggioButton(
+                        label: '2 km',
+                        selected: _raggioKm == 2,
+                        onTap: () => _impostaRaggio(2),
+                      ),
+
+                      const SizedBox(width: 8),
+
+                      _RaggioButton(
+                        label: '5 km',
+                        selected: _raggioKm == 5,
+                        onTap: () => _impostaRaggio(5),
+                      ),
+
+                      const SizedBox(width: 8),
+
+                      _RaggioButton(
+                        label: '10 km',
+                        selected: _raggioKm == 10,
+                        onTap: () => _impostaRaggio(10),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.darkBg.withOpacity(0.92),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: AppTheme.cardBorder),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black45,
+                          blurRadius: 14,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            _isLoadingLocation
+                                ? 'Scansione in corso...'
+                                : _centri.isEmpty
+                                ? 'Nessun centro entro ${_raggioKm.toStringAsFixed(0)} km'
+                                : '${_centri.length} ${_centri.length == 1 ? 'centro trovato' : 'centri trovati'}',
+                            style: TextStyle(
+                              color: _isLoadingLocation
+                                  ? AppTheme.accent
+                                  : AppTheme.textPrimary,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(width: 12),
+
+                        GestureDetector(
+                          onTap: _isLoadingLocation
+                              ? null
+                              : _caricaCentriSportiviVicini,
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: AppTheme.accent.withOpacity(0.12),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppTheme.accent.withOpacity(0.45),
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.refresh_rounded,
+                              color: AppTheme.accent,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
 
-          Positioned.fill(
-            child: IgnorePointer(
-              child: CustomPaint(
-                painter: _RingPainter(
-                  center: center,
-                  radius: circleRadius,
-                  color: AppTheme.accent,
+          Positioned(
+            right: 18,
+            bottom: 185,
+            child: SafeArea(
+              child: GestureDetector(
+                onTap: _centraSuDiMe,
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: AppTheme.darkBg.withOpacity(0.92),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppTheme.accent.withOpacity(0.6)),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black45,
+                        blurRadius: 10,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.my_location_rounded,
+                    color: AppTheme.accent,
+                    size: 24,
+                  ),
                 ),
               ),
             ),
           ),
 
           Positioned(
-            left: center.dx - 16,
-            top: center.dy - 34,
-            child: const IgnorePointer(
-              child: Icon(
-                Icons.location_on_rounded,
-                color: AppTheme.accent,
-                size: 34,
-                shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
-              ),
-            ),
-          ),
-
-          Positioned.fill(
-            child: SafeArea(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      left: 20,
-                      right: 20,
-                      top: 12,
-                      bottom: 12,
-                    ),
-                    child: Row(
-                      children: [
-                        Text(
-                          "RADAR CENTRI",
-                          style: TextStyle(
-                            color: AppTheme.textSecondary.withOpacity(0.8),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 2.0,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  if (!gpsAttivo || _permessoNegatoPerSempre)
-                    GpsBanner(
-                      permessoNegatoPerSempre: _permessoNegatoPerSempre,
-                    ),
-
-                  const Spacer(),
-
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 20,
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          _isLoadingLocation
-                              ? "Scansione radar in corso..."
-                              : "${_markers.length} Centri rilevati in quest'area",
-                          style: TextStyle(
-                            color: _isLoadingLocation
-                                ? AppTheme.accent
-                                : AppTheme.textPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: ElevatedButton.icon(
-                            onPressed: _isLoadingLocation
-                                ? null
-                                : _forzaRicaricamento,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.cardBg,
-                              foregroundColor: AppTheme.accent,
-                              side: BorderSide(
-                                color: AppTheme.accent.withOpacity(0.5),
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            icon: _isLoadingLocation
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      color: AppTheme.accent,
-                                      strokeWidth: 2.5,
-                                    ),
-                                  )
-                                : const Icon(Icons.radar_rounded),
-                            label: const Text(
-                              "SCANSIONA L'AREA",
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          if (gpsAttivo)
-            Positioned(
-              right: 20,
-              bottom: 160,
-              child: SafeArea(
-                child: GestureDetector(
-                  onTap: _centraSuDiMe,
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.cardBg,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppTheme.accent.withOpacity(0.5),
-                      ),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black54,
-                          blurRadius: 10,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.my_location_rounded,
-                      color: AppTheme.accent,
-                      size: 24,
-                    ),
+            right: 10,
+            bottom: 4,
+            child: IgnorePointer(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                color: Colors.white.withOpacity(0.78),
+                child: const Text(
+                  '© OpenStreetMap contributors',
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _HoleClipper extends CustomClipper<Path> {
-  final Offset center;
-  final double radius;
+class _RaggioButton extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
 
-  _HoleClipper({required this.center, required this.radius});
-
-  @override
-  Path getClip(Size size) {
-    final full = Path()..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
-    final hole = Path()
-      ..addOval(Rect.fromCircle(center: center, radius: radius));
-    return Path.combine(PathOperation.difference, full, hole);
-  }
-
-  @override
-  bool shouldReclip(covariant _HoleClipper oldClipper) {
-    return oldClipper.center != center || oldClipper.radius != radius;
-  }
-}
-
-class _RingPainter extends CustomPainter {
-  final Offset center;
-  final double radius;
-  final Color color;
-
-  _RingPainter({
-    required this.center,
-    required this.radius,
-    required this.color,
+  const _RaggioButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
   });
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final glow = Paint()
-      ..color = color.withOpacity(0.35)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 18
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 20);
-    canvas.drawCircle(center, radius, glow);
-
-    final ring = Paint()
-      ..color = color.withOpacity(0.9)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5;
-    canvas.drawCircle(center, radius, ring);
-  }
-
-  @override
-  bool shouldRepaint(covariant _RingPainter oldDelegate) {
-    return oldDelegate.center != center ||
-        oldDelegate.radius != radius ||
-        oldDelegate.color != color;
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected
+                ? AppTheme.accent
+                : AppTheme.darkBg.withOpacity(0.9),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(
+              color: selected ? AppTheme.accent : AppTheme.cardBorder,
+            ),
+            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
+          ),
+          child: Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              color: selected ? AppTheme.darkBg : AppTheme.textPrimary,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

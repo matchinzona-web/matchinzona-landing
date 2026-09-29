@@ -364,11 +364,14 @@ class _ChiusureStraordinarieState extends State<ChiusureStraordinarie> {
                         Navigator.pop(context);
                       }
                     } catch (e) {
-                      debugPrint("Errore salvataggio: $e");
+                      debugPrint("Errore salvataggio chiusura straordinaria");
+
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Errore: $e'),
+                          const SnackBar(
+                            content: Text(
+                              'Impossibile salvare la chiusura straordinaria. Riprova tra poco.',
+                            ),
                             backgroundColor: Colors.redAccent,
                           ),
                         );

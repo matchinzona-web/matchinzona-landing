@@ -61,7 +61,8 @@ void mostraLeggendaDialog(BuildContext context) {
               const _LeggendaItem(
                 titolo: "COMPLETA",
                 descrizione:
-                    "Il campo è bloccato ed è pronto per giocare. Siete al completo.",
+                    "La partita ha raggiunto il numero massimo di giocatori. "
+                    "Il campo è occupato e lo slot è bloccato.",
                 colore: AppTheme.statoSuccesso,
                 icona: Icons.check_circle_rounded,
               ),
@@ -70,22 +71,13 @@ void mostraLeggendaDialog(BuildContext context) {
                 child: Divider(color: AppTheme.cardBorder, height: 1),
               ),
               const _LeggendaItem(
-                titolo: "PROTETTA",
+                titolo: "APERTA",
                 descrizione:
-                    "Siete abbastanza giocatori. Lo slot scade se non vi completate in tempo.",
-                colore: AppTheme.textPrimary,
-                icona: Icons.shield_rounded,
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Divider(color: AppTheme.cardBorder, height: 1),
-              ),
-              const _LeggendaItem(
-                titolo: "A RISCHIO",
-                descrizione:
-                    "Mancano troppi giocatori. Rischio annullamento o sostituzione automatica.",
-                colore: AppTheme.statoErrore,
-                icona: Icons.warning_rounded,
+                    "La partita è ancora incompleta e altri giocatori possono unirsi. "
+                    "Finché non è completa, lo slot può essere assegnato a una prenotazione "
+                    "completa del campo.",
+                colore: AppTheme.accent,
+                icona: Icons.groups_rounded,
               ),
               const SizedBox(height: 32),
 

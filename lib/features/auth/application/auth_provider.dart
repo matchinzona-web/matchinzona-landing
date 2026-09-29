@@ -7,8 +7,10 @@ final authStateProvider = StreamProvider<AuthState>((ref) {
 });
 
 final utenteCorrenteProvider = FutureProvider<Utente?>((ref) async {
-  final authState = await ref.watch(authStateProvider.future);
-  final session = authState.session;
+  // Mantiene il provider aggiornato quando cambia lo stato auth.
+  ref.watch(authStateProvider);
+
+  final session = Supabase.instance.client.auth.currentSession;
 
   if (session == null) {
     return null;
@@ -18,7 +20,11 @@ final utenteCorrenteProvider = FutureProvider<Utente?>((ref) async {
       .from('utenti')
       .select()
       .eq('id', session.user.id)
-      .single();
+      .maybeSingle();
+
+  if (response == null) {
+    return null;
+  }
 
   return Utente.fromJson(response);
 });

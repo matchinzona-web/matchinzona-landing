@@ -26,6 +26,11 @@ class StatisticheState {
 
   // ricavo di una singola partita dinamico
   double calcolaRicavoPartita(Map<String, dynamic> partita) {
+    final importoStorico = partita['importo_totale'];
+
+    if (importoStorico != null) {
+      return (importoStorico as num).toDouble();
+    }
     final campo = partita['campo'] ?? {};
     final String nomeCampo = (campo['nome_campo'] ?? '')
         .toString()

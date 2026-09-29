@@ -215,7 +215,7 @@ void mostraBottomSheetPartecipanti(
                               .toString()
                               .trim()
                               .toLowerCase() ==
-                          utenteLoggato!.id.toString().trim().toLowerCase();
+                          utenteLoggato.id.toString().trim().toLowerCase();
                       final bool haPagatoInApp =
                           partita.isPagato && isOrganizzatore;
 
@@ -297,7 +297,9 @@ void _gestisciAbbandono(
   Utente utente, {
   bool haPagatoInApp = false,
 }) {
-  final double quotaCampo = partita.campo.prezzo;
+  final double quotaCampo = partita.importoRimborsabileCentesimi != null
+      ? partita.importoRimborsabileCentesimi! / 100.0
+      : partita.campo.prezzo;
 
   showDialog(
     context: context,

@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:app_campi/features/auth/application/auth_provider.dart';
 import 'package:app_campi/features/prenotazione/application/creazione_partita_controller.dart';
 import 'package:app_campi/features/prenotazione/application/creazione_partita_state.dart';
 import 'package:app_campi/core/theme/app_theme.dart';
@@ -12,6 +11,7 @@ import 'package:app_campi/features/esplora_match/presentation/pages/esplora_matc
 import 'package:app_campi/features/miei_match/application/partite_utente_provider.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:app_campi/features/auth/application/auth_provider.dart';
 
 class CreazionePartitaPage extends ConsumerWidget {
   const CreazionePartitaPage({super.key});
@@ -112,9 +112,19 @@ class _BuildFaseConfigurazione extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       children: [
         _RiepilogoCampoCard(state: state, controller: controller),
+
+        if ((state.campoSelezionato?.tariffeSport.length ?? 0) > 1) ...[
+          const SizedBox(height: 32),
+
+          _SelettoreSportCampo(state: state, controller: controller),
+        ],
+
         const SizedBox(height: 32),
+
         _SelettoreData(state: state, controller: controller),
+
         const SizedBox(height: 32),
+
         _SelettoreOrario(state: state, controller: controller),
         AnimatedSize(
           duration: const Duration(milliseconds: 350),
@@ -129,6 +139,9 @@ class _BuildFaseConfigurazione extends StatelessWidget {
                   child: _SlotCompetitionBanner(
                     partiteAperte:
                         state.partiteApertePerSlot[state.oraInizioSelezionata]!,
+                    isMioMatch: state.mieiMatchApertiPerSlot.containsKey(
+                      state.oraInizioSelezionata,
+                    ),
                   ),
                 )
               : const SizedBox.shrink(),
@@ -192,6 +205,56 @@ class _RiepilogoCampoCard extends StatelessWidget {
 
   const _RiepilogoCampoCard({required this.state, required this.controller});
 
+  String _nomeSport(String sport) {
+    switch (sport.toLowerCase()) {
+      case 'tennis_singolo':
+        return 'Tennis singolo';
+      case 'tennis_doppio':
+        return 'Tennis doppio';
+      case 'padel':
+        return 'Padel';
+      case 'calcio_5':
+        return 'Calcio a 5';
+      case 'calcio_6':
+        return 'Calcio a 6';
+      case 'calcio_7':
+        return 'Calcio a 7';
+      case 'calcio_8':
+        return 'Calcio a 8';
+      case 'calcio_11':
+        return 'Calcio a 11';
+      case 'basket':
+        return 'Basket';
+      case 'pallavolo':
+      case 'volley':
+        return 'Pallavolo';
+      default:
+        return sport;
+    }
+  }
+
+  IconData _iconaSport(String sport) {
+    final value = sport.toLowerCase();
+
+    if (value.startsWith('calcio_')) {
+      return Icons.sports_soccer_rounded;
+    }
+
+    if (value == 'basket') {
+      return Icons.sports_basketball_rounded;
+    }
+
+    if (value == 'pallavolo' || value == 'volley') {
+      return Icons.sports_volleyball_rounded;
+    }
+
+    if (value == 'padel' || value.startsWith('tennis_')) {
+      return Icons.sports_tennis_rounded;
+    }
+
+    return Icons.sports_rounded;
+  }
+
   @override
   Widget build(BuildContext context) {
     final campo = state.campoSelezionato!;
@@ -229,8 +292,8 @@ class _RiepilogoCampoCard extends StatelessWidget {
                           imageUrl: campo.fotoUrl!,
                           fit: BoxFit.cover,
                         )
-                      : const Icon(
-                          Icons.sports_tennis,
+                      : Icon(
+                          _iconaSport(state.sportSelezionato),
                           color: AppTheme.accent,
                           size: 28,
                         ),
@@ -257,6 +320,37 @@ class _RiepilogoCampoCard extends StatelessWidget {
                         color: AppTheme.textPrimary,
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accent.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _iconaSport(state.sportSelezionato),
+                            color: AppTheme.accent,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            _nomeSport(state.sportSelezionato),
+                            style: const TextStyle(
+                              color: AppTheme.accent,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -314,6 +408,149 @@ class _RiepilogoCampoCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SelettoreSportCampo extends StatelessWidget {
+  final CreazionePartitaState state;
+  final CreazionePartitaController controller;
+
+  const _SelettoreSportCampo({required this.state, required this.controller});
+
+  String _nomeSport(String sport) {
+    switch (sport.trim().toLowerCase()) {
+      case 'tennis_singolo':
+        return 'Tennis singolo';
+      case 'tennis_doppio':
+        return 'Tennis doppio';
+      case 'padel':
+        return 'Padel';
+      case 'calcio_5':
+        return 'Calcio a 5';
+      case 'calcio_6':
+        return 'Calcio a 6';
+      case 'calcio_7':
+        return 'Calcio a 7';
+      case 'calcio_8':
+        return 'Calcio a 8';
+      case 'calcio_11':
+        return 'Calcio a 11';
+      case 'basket':
+        return 'Basket';
+      case 'pallavolo':
+      case 'volley':
+        return 'Pallavolo';
+      default:
+        return sport;
+    }
+  }
+
+  IconData _iconaSport(String sport) {
+    final value = sport.trim().toLowerCase();
+
+    if (value.startsWith('calcio_')) {
+      return Icons.sports_soccer_rounded;
+    }
+
+    if (value == 'basket') {
+      return Icons.sports_basketball_rounded;
+    }
+
+    if (value == 'pallavolo' || value == 'volley') {
+      return Icons.sports_volleyball_rounded;
+    }
+
+    if (value == 'padel' || value.startsWith('tennis_')) {
+      return Icons.sports_tennis_rounded;
+    }
+
+    return Icons.sports_rounded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final campo = state.campoSelezionato!;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'SELEZIONA SPORT',
+          style: TextStyle(
+            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.w900,
+            fontSize: 14,
+          ),
+        ),
+
+        const SizedBox(height: 6),
+
+        const Text(
+          'Scegli come vuoi utilizzare questo campo.',
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+        ),
+
+        const SizedBox(height: 14),
+
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: campo.tariffeSport.map((tariffa) {
+            final sport = tariffa.sport.trim().toLowerCase();
+
+            final bool selezionato =
+                state.sportSelezionato.trim().toLowerCase() == sport;
+
+            return InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () {
+                controller.cambiaSportCampo(sport);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: selezionato
+                      ? AppTheme.accent.withOpacity(0.14)
+                      : AppTheme.cardBg,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: selezionato ? AppTheme.accent : AppTheme.cardBorder,
+                    width: selezionato ? 1.5 : 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _iconaSport(sport),
+                      size: 18,
+                      color: selezionato
+                          ? AppTheme.accent
+                          : AppTheme.textSecondary,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _nomeSport(sport),
+                      style: TextStyle(
+                        color: selezionato
+                            ? AppTheme.accent
+                            : AppTheme.textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 }
@@ -590,25 +827,7 @@ class _SelettoreOrario extends StatelessWidget {
                                   ),
                                 )
                               else
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: List.generate(
-                                    3,
-                                    (i) => Container(
-                                      width: 6,
-                                      height: 3,
-                                      margin: const EdgeInsets.symmetric(
-                                        horizontal: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: isSelected
-                                            ? AppTheme.accent.withOpacity(0.5)
-                                            : Colors.white24,
-                                        borderRadius: BorderRadius.circular(2),
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                                const SizedBox.shrink(),
                             ],
                           ],
                         ),
@@ -978,24 +1197,26 @@ class _LegendaItem extends StatelessWidget {
 
 class _SlotCompetitionBanner extends StatelessWidget {
   final int partiteAperte;
+  final bool isMioMatch;
 
-  const _SlotCompetitionBanner({required this.partiteAperte});
+  const _SlotCompetitionBanner({
+    required this.partiteAperte,
+    required this.isMioMatch,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final isMaxRaggiunto = partiteAperte >= PartitaService.maxPartiteNelloSlot;
-    final int rimanenti = PartitaService.maxPartiteNelloSlot - partiteAperte;
+    final String titolo = isMioMatch
+        ? "Hai già un match aperto in questo orario"
+        : partiteAperte == 1
+        ? "C'è già 1 gruppo in questo slot"
+        : "Ci sono già $partiteAperte gruppi in questo slot";
 
-    final String titolo = isMaxRaggiunto
-        ? "Limite match aperti raggiunto!"
-        : (partiteAperte == 1
-              ? "C'è già 1 gruppo in questo slot"
-              : "Ci sono già $partiteAperte gruppi in questo slot");
-    final String corpo = isMaxRaggiunto
-        ? "Non puoi aprire nuove ricerche giocatori qui. Puoi prenotare il CAMPO INTERO sovrascrivendo i gruppi esistenti, oppure unirti a uno di loro."
-        : (rimanenti > 0
-              ? "Puoi aprire la tua partita. Tieni presente che se un altro gruppo raggiunge il numero minimo prima di te, il campo andrà a loro."
-              : "Ultimo slot! Se un altro gruppo raggiunge il numero minimo prima di te, la tua partita verrà annullata.");
+    final String corpo = isMioMatch
+        ? "Hai già creato un match per questo campo e questo orario. "
+              "Non puoi aprirne un altro finché quello esistente è ancora attivo."
+        : "Puoi comunque aprire il tuo match oppure unirti a uno di quelli già esistenti. "
+              "Lo slot verrà assegnato al primo match che raggiunge il numero completo di giocatori.";
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -1014,7 +1235,7 @@ class _SlotCompetitionBanner extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: const Icon(
-              Icons.bolt,
+              Icons.groups_rounded,
               color: AppTheme.statoAttenzione,
               size: 22,
             ),
@@ -1042,46 +1263,30 @@ class _SlotCompetitionBanner extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: List.generate(
-                    PartitaService.maxPartiteNelloSlot,
-                    (i) => Expanded(
-                      child: Container(
-                        height: 5,
-                        margin: const EdgeInsets.only(right: 6),
-                        decoration: BoxDecoration(
-                          color: i < partiteAperte
-                              ? AppTheme.statoAttenzione
-                              : Colors.white12,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
                 Text(
-                  "$partiteAperte su ${PartitaService.maxPartiteNelloSlot} slot occupati",
+                  "$partiteAperte match aperti in questo orario",
                   style: const TextStyle(
                     color: AppTheme.statoAttenzione,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const EsploraMatchPage(),
+                if (!isMioMatch) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const EsploraMatchPage(),
+                        ),
                       ),
+                      icon: const Icon(Icons.search, size: 18),
+                      label: const Text("Esplora Match Esistenti"),
                     ),
-                    icon: const Icon(Icons.search, size: 18),
-                    label: const Text("Esplora Match Esistenti"),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -1098,15 +1303,19 @@ class _BannerInformativo extends StatelessWidget {
   const _BannerInformativo({required this.statoInfo, required this.colore});
 
   String _getSpiegazioneStato(String stato) {
-    if (stato.contains("PRIVATA"))
-      return "Hai prenotato l'intero campo solo per il tuo gruppo. Nessun altro potrà unirsi.";
-    if (stato == "PARTITA AL COMPLETO")
-      return "Siete al completo! Il campo è vostro, esattamente come una prenotazione privata.";
-    if (stato == "PARTITA PROTETTA")
-      return "Slot bloccato. Hai una protezione temporanea per completare il team prima che altri possano scavalcarvi.";
-    if (stato == "PARTITA A RISCHIO")
-      return "Numero di giocatori minimo. Il vostro slot può essere scavalvato e rubato da un gruppo completo fino a 4 ore prima del match.";
-    return "Aggiungi altri ospiti per raggiungere il numero minimo e aprire il match.";
+    if (stato.contains("PRIVATA")) {
+      return "Hai prenotato l'intero campo per il tuo gruppo. Nessun altro potrà unirsi.";
+    }
+
+    if (stato == "PARTITA AL COMPLETO") {
+      return "Siete al completo. Il campo è assegnato al vostro match e lo slot è bloccato.";
+    }
+
+    if (stato == "PARTITA APERTA") {
+      return "Il match è aperto e altri giocatori possono unirsi. Finché non è completo, lo slot può essere assegnato a una prenotazione completa.";
+    }
+
+    return "Configura il match e aprilo alla ricerca di giocatori.";
   }
 
   @override
@@ -1171,20 +1380,17 @@ class _BuildStickyBottomBar extends ConsumerWidget {
       state.sportSelezionato,
       state.campoSelezionato?.numeroDiGiocatori ?? 0,
     );
+
     final isVirtualmenteCompleta =
         state.isPartitaPrivata || ((state.ospitiExtra + 1) >= maxGiocatori);
-    final int aperteNelloSlot = state.oraInizioSelezionata != null
-        ? (state.partiteApertePerSlot[state.oraInizioSelezionata] ?? 0)
-        : 0;
-    final bool isMaxAperteRaggiunto =
-        aperteNelloSlot >= PartitaService.maxPartiteNelloSlot;
-    final bool forzaUniscitiUI =
-        isMaxAperteRaggiunto && !isVirtualmenteCompleta;
+    final bool haGiaUnMatchNelloSlot =
+        state.oraInizioSelezionata != null &&
+        state.mieiMatchApertiPerSlot.containsKey(state.oraInizioSelezionata);
 
     final isValido =
         controller.isNumeroGiocatoriValido() &&
         state.oraInizioSelezionata != null &&
-        !forzaUniscitiUI;
+        !haGiaUnMatchNelloSlot;
 
     String buttonText = "APRI MATCHMAKING";
     IconData buttonIcon = Icons.check_circle_outline;
@@ -1192,9 +1398,12 @@ class _BuildStickyBottomBar extends ConsumerWidget {
 
     if (isVirtualmenteCompleta) {
       buttonText = "PRENOTA CAMPO";
-    } else if (forzaUniscitiUI) {
-      buttonText = "UNISCITI A UN MATCH";
-      buttonIcon = Icons.group_add;
+    }
+    if (haGiaUnMatchNelloSlot && !isVirtualmenteCompleta) {
+      buttonText = "MATCH GIÀ APERTO";
+      buttonIcon = Icons.lock_outline_rounded;
+    } else if (isVirtualmenteCompleta) {
+      buttonText = "PRENOTA CAMPO";
     }
 
     return Container(
@@ -1206,28 +1415,17 @@ class _BuildStickyBottomBar extends ConsumerWidget {
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           minimumSize: const Size(double.infinity, 60),
-          backgroundColor: isValido || forzaUniscitiUI
-              ? buttonColor
-              : AppTheme.cardBg,
-          foregroundColor: isValido || forzaUniscitiUI
-              ? AppTheme.darkBg
-              : Colors.white54,
+          backgroundColor: isValido ? buttonColor : AppTheme.cardBg,
+          foregroundColor: isValido ? AppTheme.darkBg : Colors.white54,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          elevation: isValido || forzaUniscitiUI ? 8 : 0,
+          elevation: isValido ? 8 : 0,
         ),
-        onPressed: state.isLoading || (!isValido && !forzaUniscitiUI)
+        onPressed: state.isLoading || !isValido
             ? null
             : () {
-                if (forzaUniscitiUI) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const EsploraMatchPage()),
-                  );
-                } else {
-                  _gestisciConferma(context, ref, state, controller);
-                }
+                _gestisciConferma(context, ref, state, controller);
               },
         child: state.isLoading
             ? const SizedBox(
@@ -1266,6 +1464,7 @@ class _BuildStickyBottomBar extends ConsumerWidget {
     try {
       final utente = ref.read(utenteCorrenteProvider).value;
       if (utente == null) throw Exception('Utente non autenticato.');
+      final bool isMaggiorenne = utente.eta != null && utente.eta! >= 18;
 
       String? stripePaymentIntentId;
       int? importoRimborsabileCentesimi;
@@ -1273,6 +1472,16 @@ class _BuildStickyBottomBar extends ConsumerWidget {
       // 🟢 SE L'UTENTE SCEGLIE DI PAGARE IN APP (Valido solo per Campo Intero/Privata):
       if (state.isPartitaPrivata &&
           state.metodoPagamentoScelto == MetodoPagamento.pagaOra) {
+        if (!isMaggiorenne) {
+          throw Exception(
+            'Il pagamento online è disponibile solo per utenti maggiorenni. '
+            'Puoi pagare direttamente al centro sportivo.',
+          );
+        }
+        if (!state.pagamentiOnlineDisponibili) {
+          throw Exception('Il centro sportivo non accetta pagamenti online.');
+        }
+
         final double prezzoBase = controller.getPrezzoSportSelezionato();
 
         // 1. Invoca Edge Function per ottenere PaymentIntent da Stripe
@@ -1342,12 +1551,22 @@ class _BuildStickyBottomBar extends ConsumerWidget {
 
       if (!context.mounted) return;
 
+      final nomeSocieta =
+          ref
+              .read(creazionePartitaProvider)
+              .campoSelezionato
+              ?.societa
+              ?.nomeSocieta ??
+          'Centro Sportivo';
+
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
           builder: (context) => SuccessoPrenotazionePage(
             idPartita: idPartitaCreata,
             nomeCampo: nomeCampo,
+            nomeSocieta: nomeSocieta,
+            sport: ref.read(creazionePartitaProvider).sportSelezionato,
             data: data,
             ora: ora,
             isPrivata: isPrivata,
@@ -1372,26 +1591,13 @@ class _BuildStickyBottomBar extends ConsumerWidget {
   }
 
   void _gestioneErroriUI(BuildContext context, String erroreStr) {
-    String titolo = "Errore Generico";
+    String titolo = "Errore";
     String descrizione = erroreStr.replaceAll('Exception: ', '');
-    bool mostraBottoneEsplora = false;
 
-    if (erroreStr.contains('SLOT_OCCUPATO_PARTITA_PROTETTA')) {
-      titolo = "Slot Protetto";
-      descrizione =
-          "In questo orario c'è già una partita protetta. Non è possibile scavalcarli.";
-    } else if (erroreStr.contains('SLOT_GIA_OCCUPATO')) {
+    if (erroreStr.contains('SLOT_GIA_OCCUPATO')) {
       titolo = "Orario Occupato";
       descrizione =
           "Il campo è già stato prenotato per intero in questo orario.";
-    } else if (erroreStr.contains('UNISCITI_FORZATO')) {
-      titolo = "Ottimizza il campo!";
-      descrizione = descrizione.replaceAll(' UNISCITI_FORZATO', '');
-      mostraBottoneEsplora = true;
-    } else if (erroreStr.contains('MAX_PARTITE_RAGGIUNTE')) {
-      titolo = "Limite Raggiunto";
-      descrizione = descrizione.replaceAll(' MAX_PARTITE_RAGGIUNTE', '');
-      mostraBottoneEsplora = true;
     }
 
     showDialog(
@@ -1411,24 +1617,6 @@ class _BuildStickyBottomBar extends ConsumerWidget {
           style: const TextStyle(color: AppTheme.textSecondary, height: 1.4),
         ),
         actions: [
-          if (mostraBottoneEsplora)
-            TextButton.icon(
-              onPressed: () {
-                Navigator.pop(ctx);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const EsploraMatchPage()),
-                );
-              },
-              icon: const Icon(Icons.search, color: AppTheme.accent),
-              label: const Text(
-                "Esplora Match",
-                style: TextStyle(
-                  color: AppTheme.accent,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text(
@@ -1445,7 +1633,7 @@ class _BuildStickyBottomBar extends ConsumerWidget {
   }
 }
 
-class _SelettoreMetodoPagamento extends StatelessWidget {
+class _SelettoreMetodoPagamento extends ConsumerWidget {
   final CreazionePartitaState state;
   final CreazionePartitaController controller;
 
@@ -1455,7 +1643,13 @@ class _SelettoreMetodoPagamento extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final utente = ref.watch(utenteCorrenteProvider).value;
+
+    final bool isMaggiorenne = utente?.eta != null && utente!.eta! >= 18;
+
+    final bool pagamentoOnlineConsentito =
+        state.pagamentiOnlineDisponibili && isMaggiorenne;
     final double prezzoBase = controller.getPrezzoSportSelezionato();
     final double fee = (prezzoBase * 0.035) + 0.35;
     final double totaleApp = prezzoBase + fee;
@@ -1486,14 +1680,28 @@ class _SelettoreMetodoPagamento extends StatelessWidget {
                     controller.selezionaMetodoPagamento(MetodoPagamento.inSede),
               ),
             ),
+
             const SizedBox(width: 12),
+
             Expanded(
               child: _OpzionePagamentoCard(
-                titolo: "PAGA IN APP",
-                sottotitolo: "${totaleApp.toStringAsFixed(2)} € (Stripe)",
-                icona: Icons.credit_card_rounded,
+                titolo: !isMaggiorenne
+                    ? "ONLINE DAI 18 ANNI"
+                    : pagamentoOnlineConsentito
+                    ? "PAGA IN APP"
+                    : "ONLINE NON DISPONIBILE",
+                sottotitolo: !isMaggiorenne
+                    ? "Pagamento online disponibile dai 18 anni"
+                    : pagamentoOnlineConsentito
+                    ? "${totaleApp.toStringAsFixed(2)} € (Stripe)"
+                    : "Pagamento disponibile al centro",
+                icona: pagamentoOnlineConsentito
+                    ? Icons.credit_card_rounded
+                    : Icons.lock_outline_rounded,
                 isSelected:
+                    pagamentoOnlineConsentito &&
                     state.metodoPagamentoScelto == MetodoPagamento.pagaOra,
+                enabled: pagamentoOnlineConsentito,
                 onTap: () => controller.selezionaMetodoPagamento(
                   MetodoPagamento.pagaOra,
                 ),
@@ -1512,6 +1720,7 @@ class _OpzionePagamentoCard extends StatelessWidget {
   final IconData icona;
   final bool isSelected;
   final VoidCallback onTap;
+  final bool enabled;
 
   const _OpzionePagamentoCard({
     required this.titolo,
@@ -1519,12 +1728,13 @@ class _OpzionePagamentoCard extends StatelessWidget {
     required this.icona,
     required this.isSelected,
     required this.onTap,
+    this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: enabled ? onTap : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(14),
@@ -1543,14 +1753,22 @@ class _OpzionePagamentoCard extends StatelessWidget {
           children: [
             Icon(
               icona,
-              color: isSelected ? AppTheme.accent : AppTheme.textSecondary,
+              color: !enabled
+                  ? Colors.white30
+                  : isSelected
+                  ? AppTheme.accent
+                  : AppTheme.textSecondary,
               size: 24,
             ),
             const SizedBox(height: 12),
             Text(
               titolo,
               style: TextStyle(
-                color: isSelected ? AppTheme.accent : AppTheme.textPrimary,
+                color: !enabled
+                    ? Colors.white38
+                    : isSelected
+                    ? AppTheme.accent
+                    : AppTheme.textPrimary,
                 fontWeight: FontWeight.w900,
                 fontSize: 13,
               ),
@@ -1573,13 +1791,25 @@ class _OpzionePagamentoCard extends StatelessWidget {
 }
 
 int _calcolaMaxGiocatoriPerSport(String sport, int defaultCampo) {
-  // Applichiamo la variazione dinamica SOLO ed ESCLUSIVAMENTE al Tennis
-  if (sport == 'tennis_singolo') {
-    return 2;
-  } else if (sport == 'tennis_doppio') {
-    return 4;
-  }
+  final value = sport.trim().toLowerCase();
 
-  // Per tutti gli altri campi/sport, usa SEMPRE il valore reale del campo!
+  if (value == 'tennis_singolo') return 2;
+
+  if (value == 'tennis_doppio' || value == 'padel') return 4;
+
+  if (value == 'calcio_5') return 10;
+
+  if (value == 'calcio_6') return 12;
+
+  if (value == 'calcio_7') return 14;
+
+  if (value == 'calcio_8') return 16;
+
+  if (value == 'calcio_11') return 22;
+
+  if (value == 'basket') return 10;
+
+  if (value == 'pallavolo' || value == 'volley') return 12;
+
   return defaultCampo;
 }

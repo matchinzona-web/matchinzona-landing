@@ -95,42 +95,46 @@ class DashboardNotifier extends Notifier<DashboardState> {
       String? actualIdSocieta;
       int limiteCampiConsentiti = 1;
 
-      final String idDaUsare = idSocieta ?? state.actualIdSocieta ?? '';
+      bool centroAttivo = false;
 
-      if (idDaUsare.isNotEmpty) {
-        final res = await Supabase.instance.client
-            .from('societa')
-            .select('piano_attuale')
-            .eq('id', idDaUsare)
-            .single();
-
-        final String piano =
-            res['piano_attuale']?.toString().toLowerCase() ?? 'nessuno';
-        final bool attivo = piano != 'nessuno';
-
-        state = state.copyWith(isCentroAttivo: attivo);
-      }
       if (idSocieta != null) {
-        actualIdSocieta = idSocieta;
         final societaData = await Supabase.instance.client
             .from('societa')
-            .select('limite_campi')
+            .select('id, limite_campi, piano_attuale')
             .eq('id', idSocieta)
             .single();
-        limiteCampiConsentiti = societaData['limite_campi'] as int? ?? 1;
+
+        actualIdSocieta = societaData['id'] as String;
+
+        limiteCampiConsentiti = societaData['limite_campi'] as int? ?? 0;
+
+        final String piano =
+            societaData['piano_attuale']?.toString().trim().toLowerCase() ??
+            'nessuno';
+
+        centroAttivo = piano != 'nessuno';
       } else if (utenteLoggato != null) {
         final societaData = await Supabase.instance.client
             .from('societa')
-            .select('id, limite_campi')
+            .select('id, limite_campi, piano_attuale')
             .eq('id_utente', utenteLoggato.id)
             .single();
+
         actualIdSocieta = societaData['id'] as String;
-        limiteCampiConsentiti = societaData['limite_campi'] as int? ?? 1;
+
+        limiteCampiConsentiti = societaData['limite_campi'] as int? ?? 0;
+
+        final String piano =
+            societaData['piano_attuale']?.toString().trim().toLowerCase() ??
+            'nessuno';
+
+        centroAttivo = piano != 'nessuno';
       }
 
       state = state.copyWith(
         actualIdSocieta: actualIdSocieta,
         limiteCampiConsentiti: limiteCampiConsentiti,
+        isCentroAttivo: centroAttivo,
       );
 
       if (actualIdSocieta != null) {
@@ -243,9 +247,15 @@ class DashboardNotifier extends Notifier<DashboardState> {
 
     void aggiungiFascia(String? apertura, String? chiusura) {
       final double? start = parseHour(apertura);
-      final double? end = parseHour(chiusura);
+      double? end = parseHour(chiusura);
 
       if (start == null || end == null) return;
+
+      // 00:00 come orario di CHIUSURA significa fine giornata,
+      // quindi deve essere trattato come 24:00 e non come 0:00.
+      if (end == 0.0 && start > 0.0) {
+        end = 24.0;
+      }
 
       if (minH == null || start < minH!) {
         minH = start;
@@ -308,16 +318,32 @@ class DashboardNotifier extends Notifier<DashboardState> {
           p['orario_fine'].toString(),
         );
         final String nomeCampo = p['campo']?['nome_campo'] ?? 'Campo';
-        final String nomeOrg = p['organizzatore'] != null
-            ? '${p['organizzatore']['nome']} ${p['organizzatore']['cognome']}'
-            : 'Utente Sconosciuto';
+        final bool isPrenotazioneManuale =
+            p['origine_prenotazione'] == 'gestore';
+
+        final String nomeClienteManuale = (p['nome_cliente_manual'] ?? '')
+            .toString()
+            .trim();
+
+        String nomeVisualizzato;
+
+        if (isPrenotazioneManuale) {
+          nomeVisualizzato = nomeClienteManuale.isNotEmpty
+              ? '📞 $nomeClienteManuale'
+              : '📞 Prenotazione manuale';
+        } else {
+          nomeVisualizzato = p['organizzatore'] != null
+              ? '${p['organizzatore']['nome']} '
+                    '${p['organizzatore']['cognome']}'
+              : 'Utente Sconosciuto';
+        }
         final String idPartita = p['id']?.toString() ?? '';
         tempAppointments.add(
           Appointment(
             id: idPartita,
             startTime: start,
             endTime: end,
-            subject: '$nomeOrg\n⚽ $nomeCampo',
+            subject: '$nomeVisualizzato\n⚽ $nomeCampo',
             notes:
                 idPartita, // 🟢 Memorizziamo l'ID esatto della partita per il match immediato
             color: AppTheme.neonOrange,

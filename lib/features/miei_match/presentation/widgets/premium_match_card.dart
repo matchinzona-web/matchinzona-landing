@@ -21,6 +21,56 @@ class PremiumMatchCard extends ConsumerWidget {
     required this.onTap,
   });
 
+  String _nomeSport(String sport) {
+    switch (sport.trim().toLowerCase()) {
+      case 'tennis_singolo':
+        return 'Tennis singolo';
+      case 'tennis_doppio':
+        return 'Tennis doppio';
+      case 'padel':
+        return 'Padel';
+      case 'calcio_5':
+        return 'Calcio a 5';
+      case 'calcio_6':
+        return 'Calcio a 6';
+      case 'calcio_7':
+        return 'Calcio a 7';
+      case 'calcio_8':
+        return 'Calcio a 8';
+      case 'calcio_11':
+        return 'Calcio a 11';
+      case 'basket':
+        return 'Basket';
+      case 'pallavolo':
+      case 'volley':
+        return 'Pallavolo';
+      default:
+        return sport;
+    }
+  }
+
+  IconData _iconaSport(String sport) {
+    final value = sport.trim().toLowerCase();
+
+    if (value.startsWith('calcio_')) {
+      return Icons.sports_soccer_rounded;
+    }
+
+    if (value == 'basket') {
+      return Icons.sports_basketball_rounded;
+    }
+
+    if (value == 'pallavolo' || value == 'volley') {
+      return Icons.sports_volleyball_rounded;
+    }
+
+    if (value == 'padel' || value.startsWith('tennis_')) {
+      return Icons.sports_tennis_rounded;
+    }
+
+    return Icons.sports_rounded;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final service = ref.watch(partitaServiceProvider);
@@ -34,18 +84,20 @@ class PremiumMatchCard extends ConsumerWidget {
         coloreTema = AppTheme.statoSuccesso;
         badgeLabel = "COMPLETA";
         break;
+
       case 'aperta_a_rischio':
-        coloreTema = AppTheme.statoErrore;
-        badgeLabel = "A RISCHIO";
+        coloreTema = AppTheme.accent;
+        badgeLabel = "APERTA";
         break;
+
       case 'annullata':
         coloreTema = AppTheme.textDisabled;
         badgeLabel = "ANNULLATA";
         break;
-      case 'aperta_protetta':
+
       default:
         coloreTema = AppTheme.textPrimary;
-        badgeLabel = "PROTETTA";
+        badgeLabel = "APERTA";
         break;
     }
 
@@ -111,36 +163,6 @@ class PremiumMatchCard extends ConsumerWidget {
                           ],
                         ],
                       ),
-                      if (statoReale == 'aperta_protetta')
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: coloreTema.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.shield_outlined,
-                                size: 12,
-                                color: coloreTema,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                "Scade: ${service.tempoRimanenteProtezione(partita)}",
-                                style: TextStyle(
-                                  color: coloreTema,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                     ],
                   ),
                   const SizedBox(height: 14),
@@ -166,6 +188,7 @@ class PremiumMatchCard extends ConsumerWidget {
                             ),
                             const SizedBox(height: 2),
                             Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Icon(
                                   Icons.location_on_outlined,
@@ -175,17 +198,89 @@ class PremiumMatchCard extends ConsumerWidget {
                                 const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
-                                    partita.campo.nomeCampo,
+                                    [
+                                          [
+                                                partita
+                                                    .campo
+                                                    .societa
+                                                    ?.viaStrutturata,
+                                                partita.campo.societa?.civico,
+                                              ]
+                                              .where(
+                                                (e) =>
+                                                    e != null &&
+                                                    e
+                                                        .toString()
+                                                        .trim()
+                                                        .isNotEmpty,
+                                              )
+                                              .map((e) => e.toString().trim())
+                                              .join(' '),
+
+                                          [
+                                                partita.campo.societa?.comune,
+                                                partita
+                                                    .campo
+                                                    .societa
+                                                    ?.provincia,
+                                              ]
+                                              .where(
+                                                (e) =>
+                                                    e != null &&
+                                                    e
+                                                        .toString()
+                                                        .trim()
+                                                        .isNotEmpty,
+                                              )
+                                              .map((e) => e.toString().trim())
+                                              .join(' '),
+                                        ]
+                                        .where((e) => e.trim().isNotEmpty)
+                                        .join(', '),
                                     style: const TextStyle(
                                       color: AppTheme.textSecondary,
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
                                     ),
-                                    maxLines: 1,
+                                    maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],
+                            ),
+                            const SizedBox(height: 8),
+
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.accent.withOpacity(0.10),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: AppTheme.accent.withOpacity(0.20),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _iconaSport(partita.sport ?? ''),
+                                    color: AppTheme.accent,
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    _nomeSport(partita.sport ?? ''),
+                                    style: const TextStyle(
+                                      color: AppTheme.accent,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -334,7 +429,9 @@ class PremiumMatchCard extends ConsumerWidget {
                             MaterialPageRoute(
                               builder: (context) => MatchChatPage(
                                 matchId: partita.id,
-                                nomeCampo: partita.campo.nomeCampo,
+                                nomeSocieta:
+                                    partita.campo.societa?.nomeSocieta ??
+                                    'Centro Sportivo',
                               ),
                             ),
                           );

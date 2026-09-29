@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:app_campi/features/prenotazione/application/creazione_partita_controller.dart';
@@ -31,10 +30,14 @@ class _RicercaCentriPageState extends ConsumerState<RicercaCentriPage> {
 
   final List<Map<String, dynamic>> _sports = [
     {'id': 'calcio_5', 'label': 'Calcio 5', 'icon': Icons.sports_soccer},
+    {'id': 'calcio_6', 'label': 'Calcio 6', 'icon': Icons.sports_soccer},
+    {'id': 'calcio_7', 'label': 'Calcio 7', 'icon': Icons.sports_soccer},
+    {'id': 'calcio_8', 'label': 'Calcio 8', 'icon': Icons.sports_soccer},
+    {'id': 'calcio_11', 'label': 'Calcio 11', 'icon': Icons.sports_soccer},
     {'id': 'padel', 'label': 'Padel', 'icon': Icons.sports_tennis},
     {'id': 'tennis', 'label': 'Tennis', 'icon': Icons.sports_tennis},
     {'id': 'basket', 'label': 'Basket', 'icon': Icons.sports_basketball},
-    {'id': 'volley', 'label': 'Volley', 'icon': Icons.sports_volleyball},
+    {'id': 'pallavolo', 'label': 'Pallavolo', 'icon': Icons.sports_volleyball},
   ];
 
   @override
@@ -119,6 +122,7 @@ class _RicercaCentriPageState extends ConsumerState<RicercaCentriPage> {
     // Mappa di visualizzazione con le etichette per l'interfaccia
     final List<Map<String, dynamic>> tuttiGliSport = [
       {'id': 'calcio_5', 'label': 'Calcio a 5', 'icon': Icons.sports_soccer},
+      {'id': 'calcio_6', 'label': 'Calcio 6', 'icon': Icons.sports_soccer},
       {'id': 'calcio_7', 'label': 'Calcio a 7', 'icon': Icons.sports_soccer},
       {'id': 'calcio_8', 'label': 'Calcio a 8', 'icon': Icons.sports_soccer},
       {'id': 'calcio_11', 'label': 'Calcio a 11', 'icon': Icons.sports_soccer},
@@ -129,7 +133,11 @@ class _RicercaCentriPageState extends ConsumerState<RicercaCentriPage> {
         'icon': Icons.sports_tennis,
       }, // Apre sotto-scelta Singolo/Doppio
       {'id': 'basket', 'label': 'Basket', 'icon': Icons.sports_basketball},
-      {'id': 'volley', 'label': 'Pallavolo', 'icon': Icons.sports_volleyball},
+      {
+        'id': 'pallavolo',
+        'label': 'Pallavolo',
+        'icon': Icons.sports_volleyball,
+      },
     ];
 
     showModalBottomSheet(
@@ -231,6 +239,8 @@ class _RicercaCentriPageState extends ConsumerState<RicercaCentriPage> {
     switch (sportId) {
       case 'calcio_5':
         return 'Calcio 5';
+      case 'calcio_6':
+        return 'Calcio 6';
       case 'calcio_7':
         return 'Calcio 7';
       case 'calcio_8':
@@ -245,8 +255,8 @@ class _RicercaCentriPageState extends ConsumerState<RicercaCentriPage> {
         return 'Tennis (Doppio)';
       case 'basket':
         return 'Basket';
-      case 'volley':
-        return 'Volley';
+      case 'pallavolo':
+        return 'Pallavolo';
       default:
         return 'Calcio 5';
     }

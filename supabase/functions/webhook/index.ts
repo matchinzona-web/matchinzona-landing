@@ -12,14 +12,15 @@ function ottieniSpecifichePiano(priceId: string): {
   limite: number;
 } {
   switch (priceId) {
-    case "price_1Th5bHFxZCOuiQIAaia7ASFn":
-      return { nome: "START", limite: 1 };
-    case "price_1TgjxqFxZCOuiQIA9CjLu34s":
-      return { nome: "PRO", limite: 2 };
-    case "price_1Th5c2FxZCOuiQIAM6obraB0":
-      return { nome: "ENTERPRISE", limite: 4 };
-    case "price_1Th5cRFxZCOuiQIA4VAKya37":
-      return { nome: "ELITE", limite: 5 };
+    case "price_1UGdGWFxZCOuiQIA42y8kWez":
+      return { nome: "BASE", limite: 2 };
+
+    case "price_1UGdHNFxZCOuiQIAbHY8idXK":
+      return { nome: "PRO", limite: 5 };
+
+    case "price_1UGdHzFxZCOuiQIARoCgLykS":
+      return { nome: "BUSINESS", limite: 999 };
+
     default:
       return { nome: "NESSUNO", limite: 0 };
   }
@@ -67,6 +68,12 @@ serve(async (req) => {
           piano_attuale: specifiche.nome,
           limite_campi: specifiche.limite,
           stripe_customer_id: session.customer,
+          status_abbonamento: "active",
+
+          // La prova gratuita manuale termina definitivamente
+          // nel momento in cui viene acquistato un abbonamento Stripe.
+          prova_inizio: null,
+          prova_fine: null,
         })
         .eq("id_utente", session.client_reference_id);
     }
@@ -88,6 +95,7 @@ serve(async (req) => {
           .update({
             piano_attuale: specifiche.nome,
             limite_campi: specifiche.limite,
+            status_abbonamento: "active",
           })
           .eq("stripe_customer_id", subscription.customer);
       }
@@ -104,6 +112,7 @@ serve(async (req) => {
         .update({
           piano_attuale: "NESSUNO",
           limite_campi: 0,
+          status_abbonamento: "inactive",
         })
         .eq("stripe_customer_id", subscription.customer);
     }

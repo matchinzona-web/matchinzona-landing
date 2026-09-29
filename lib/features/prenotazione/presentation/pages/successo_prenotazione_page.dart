@@ -7,6 +7,8 @@ import 'package:app_campi/features/chat/match_chat_page.dart';
 class SuccessoPrenotazionePage extends StatelessWidget {
   final String idPartita;
   final String nomeCampo;
+  final String nomeSocieta;
+  final String sport;
   final DateTime data;
   final String ora;
   final bool isPrivata;
@@ -15,10 +17,24 @@ class SuccessoPrenotazionePage extends StatelessWidget {
     super.key,
     required this.idPartita,
     required this.nomeCampo,
+    required this.nomeSocieta,
+    required this.sport,
     required this.data,
     required this.ora,
     required this.isPrivata,
   });
+
+  String _emojiSport(String sport) {
+    final valore = sport.trim().toLowerCase();
+
+    if (valore.startsWith('calcio_')) return '⚽';
+    if (valore == 'basket') return '🏀';
+    if (valore == 'pallavolo' || valore == 'volley') return '🏐';
+    if (valore == 'tennis_singolo' || valore == 'tennis_doppio') return '🎾';
+    if (valore == 'padel') return '🎾';
+
+    return '🏟️';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,12 +43,11 @@ class SuccessoPrenotazionePage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppTheme.darkBg,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.all(20),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Spacer(),
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -57,7 +72,9 @@ class SuccessoPrenotazionePage extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                "Hai prenotato $nomeCampo\nil $dataFormattata alle $ora.",
+                isPrivata
+                    ? "Hai prenotato $nomeCampo\npresso $nomeSocieta\nil $dataFormattata alle $ora."
+                    : "Hai aperto un match presso\n$nomeSocieta\nil $dataFormattata alle $ora.",
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: AppTheme.testoSecondario,
@@ -128,7 +145,7 @@ class SuccessoPrenotazionePage extends StatelessWidget {
                         ? Text.rich(
                             const TextSpan(
                               text:
-                                  "Il campo è riservato esclusivamente a te e ai tuoi amici. Buona partita bomber ",
+                                  "Il campo è riservato esclusivamente a te e ai tuoi amici. Potrai disdire la prenotazione fino a 30 minuti prima dell'inizio della partita. Buona partita bomber ",
                               children: [
                                 WidgetSpan(
                                   alignment: PlaceholderAlignment.middle,
@@ -148,7 +165,7 @@ class SuccessoPrenotazionePage extends StatelessWidget {
                             ),
                           )
                         : Text(
-                            "La partita è visibile nella bacheca pubblica! Chiunque potrà iscriversi per aiutarti a raggiungere il numero minimo.",
+                            "La partita è visibile nella bacheca pubblica e altri giocatori potranno iscriversi. Se il match non raggiunge il numero necessario entro 2 ore dall'inizio, verrà annullato. Inoltre, se nel frattempo il campo viene prenotato per intero da un altro utente, il match verrà annullato automaticamente.",
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.grey.shade400,
@@ -159,7 +176,9 @@ class SuccessoPrenotazionePage extends StatelessWidget {
                   ],
                 ),
               ),
-              const Spacer(),
+              const SizedBox(height: 28),
+
+              // BOTTONE CHAT
 
               // BOTTONE CHAT (Visibile solo se NON è privata)
               if (!isPrivata) ...[
@@ -184,7 +203,7 @@ class SuccessoPrenotazionePage extends StatelessWidget {
                       MaterialPageRoute(
                         builder: (context) => MatchChatPage(
                           matchId: idPartita,
-                          nomeCampo: nomeCampo,
+                          nomeSocieta: nomeSocieta,
                         ),
                       ),
                     );
@@ -209,9 +228,16 @@ class SuccessoPrenotazionePage extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 onPressed: () async {
+                  final emoji = _emojiSport(sport);
                   final String testoMessaggio = isPrivata
-                      ? "Grande! Ho prenotato il campo *$nomeCampo* per il giorno *$dataFormattata* alle ore *$ora*. Ci vediamo in campo! ⚽"
-                      : "Chi scende in campo? ⚽ Ho aperto un match su *$nomeCampo* il *$dataFormattata* alle *$ora*. Unisciti alla partita dall'app per bloccare lo slot!";
+                      ? "$emoji Ho prenotato *$nomeCampo* presso *$nomeSocieta*\n"
+                            "📅 $dataFormattata alle $ora\n\n"
+                            "Ci vediamo in campo!"
+                      : "$emoji *CERCHIAMO GIOCATORI!*\n\n"
+                            "Ho aperto un match su Matchly presso:\n"
+                            "🏟️ *$nomeSocieta*\n"
+                            "📅 $dataFormattata alle $ora\n\n"
+                            "Unisciti alla partita su Matchly!";
 
                   final urlAndroid =
                       "whatsapp://send?text=${Uri.encodeComponent(testoMessaggio)}";

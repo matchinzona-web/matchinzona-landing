@@ -24,7 +24,23 @@ class _ListaCampiScreenState extends ConsumerState<ListaCampiScreen> {
     super.initState();
     final String idSocieta = widget.societa['id'].toString();
 
-    _futureCampi = _campiRepository.getCampiSocieta(idSocieta);
+    _futureCampi = _campiRepository.getCampiSocietaVisibili(idSocieta);
+  }
+
+  int _giocatoriPerSport(String sport, int defaultCampo) {
+    final value = sport.trim().toLowerCase();
+
+    if (value == 'tennis_singolo') return 2;
+    if (value == 'tennis_doppio' || value == 'padel') return 4;
+    if (value == 'calcio_5') return 10;
+    if (value == 'calcio_6') return 12;
+    if (value == 'calcio_7') return 14;
+    if (value == 'calcio_8') return 16;
+    if (value == 'calcio_11') return 22;
+    if (value == 'basket') return 10;
+    if (value == 'pallavolo') return 12;
+
+    return defaultCampo;
   }
 
   @override
@@ -108,32 +124,110 @@ class _ListaCampiScreenState extends ConsumerState<ListaCampiScreen> {
                   ),
                   subtitle: Padding(
                     padding: const EdgeInsets.only(top: 8.0),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          campo.coperto ? Icons.roofing : Icons.wb_sunny,
-                          size: 16,
-                          color: Colors.white70,
+                        Row(
+                          children: [
+                            Icon(
+                              campo.coperto ? Icons.roofing : Icons.wb_sunny,
+                              size: 16,
+                              color: Colors.white70,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              campo.coperto ? "Coperto" : "All'aperto",
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                            const SizedBox(width: 16),
+                            const Icon(
+                              Icons.groups,
+                              size: 16,
+                              color: AppTheme.neonOrange,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              campo.tariffeSport.length > 1
+                                  ? "da ${campo.tariffeSport.map((t) => _giocatoriPerSport(t.sport, campo.numeroDiGiocatori)).reduce((a, b) => a < b ? a : b)} Giocatori"
+                                  : "${_giocatoriPerSport(campo.tariffeSport.isNotEmpty ? campo.tariffeSport.first.sport : '', campo.numeroDiGiocatori)} Giocatori",
+                              style: const TextStyle(
+                                color: AppTheme.neonOrange,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          campo.coperto ? "Coperto" : "All'aperto",
-                          style: const TextStyle(color: Colors.white70),
-                        ),
-                        const SizedBox(width: 16),
-                        const Icon(
-                          Icons.groups,
-                          size: 16,
-                          color: AppTheme.neonOrange,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          "${campo.numeroDiGiocatori} Giocatori",
-                          style: const TextStyle(
-                            color: AppTheme.neonOrange,
-                            fontWeight: FontWeight.bold,
+
+                        if (campo.tariffeSport.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: campo.tariffeSport.map((tariffa) {
+                              final sport = tariffa.sport.trim().toLowerCase();
+
+                              String nomeSport;
+
+                              switch (sport) {
+                                case 'tennis_singolo':
+                                  nomeSport = 'Tennis singolo';
+                                  break;
+                                case 'tennis_doppio':
+                                  nomeSport = 'Tennis doppio';
+                                  break;
+                                case 'padel':
+                                  nomeSport = 'Padel';
+                                  break;
+                                case 'calcio_5':
+                                  nomeSport = 'Calcio a 5';
+                                  break;
+                                case 'calcio_6':
+                                  nomeSport = 'Calcio a 6';
+                                  break;
+                                case 'calcio_7':
+                                  nomeSport = 'Calcio a 7';
+                                  break;
+                                case 'calcio_8':
+                                  nomeSport = 'Calcio a 8';
+                                  break;
+                                case 'calcio_11':
+                                  nomeSport = 'Calcio a 11';
+                                  break;
+                                case 'basket':
+                                  nomeSport = 'Basket';
+                                  break;
+                                case 'pallavolo':
+                                  nomeSport = 'Pallavolo';
+                                  break;
+                                default:
+                                  nomeSport = sport;
+                              }
+
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 9,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.neonCyan.withOpacity(0.10),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: AppTheme.neonCyan.withOpacity(0.25),
+                                  ),
+                                ),
+                                child: Text(
+                                  nomeSport,
+                                  style: const TextStyle(
+                                    color: AppTheme.neonCyan,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
@@ -145,7 +239,11 @@ class _ListaCampiScreenState extends ConsumerState<ListaCampiScreen> {
                         style: TextStyle(color: Colors.white54, fontSize: 12),
                       ),
                       Text(
-                        "€${campo.prezzo.toStringAsFixed(2)}",
+                        campo.tariffeSport.isNotEmpty
+                            ? campo.tariffeSport.length > 1
+                                  ? "da €${campo.tariffeSport.map((t) => t.prezzo).reduce((a, b) => a < b ? a : b).toStringAsFixed(2)}"
+                                  : "€${campo.tariffeSport.first.prezzo.toStringAsFixed(2)}"
+                            : "€${campo.prezzo.toStringAsFixed(2)}",
                         style: const TextStyle(
                           color: AppTheme.neonCyan,
                           fontWeight: FontWeight.w900,

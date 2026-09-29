@@ -12,6 +12,7 @@ import 'package:app_campi/core/theme/app_theme.dart';
 import 'package:app_campi/core/repositories/chiusura_straordinaria_repository.dart';
 import 'package:app_campi/core/models/orario_societa.dart';
 import 'package:app_campi/core/repositories/societa_repository.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 enum TipoRicerca { tutti, societa, citta }
 
@@ -29,9 +30,12 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
   final _chiusuraRepo = ChiusuraStraordinariaRepository();
 
   TipoRicerca filtroCorrente = TipoRicerca.tutti;
+  static const _chiaveUltimoSport = 'ultimo_sport_prenotazione';
 
   @override
   CreazionePartitaState build() {
+    _caricaUltimoSport();
+
     return CreazionePartitaState(dataSelezionata: DateTime.now());
   }
 
@@ -78,50 +82,43 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
       // FILTRAGGIO CAMPI PER LO SPORT SELEZIONATO
       final sportSelezionato = state.sportSelezionato;
 
-      final campiFiltratiPerSport = campiAttivi.where((campo) {
-        // 1. Controlliamo se la lista tariffeSport del campo contiene lo sport selezionato
-        if (campo.tariffeSport != null && campo.tariffeSport!.isNotEmpty) {
-          for (final t in campo.tariffeSport!) {
-            // Accesso sicuro alle proprietà di TariffaSport
-            final String sportNome = t.sport;
-            if (sportNome == sportSelezionato ||
-                (sportSelezionato.contains('tennis') &&
-                    sportNome.contains('tennis'))) {
-              return true;
-            }
+      bool supportaSport(Campo campo) {
+        final sportRichiesto = sportSelezionato.trim().toLowerCase();
+
+        return campo.tariffeSport.any((tariffa) {
+          final sportCampo = tariffa.sport.trim().toLowerCase();
+
+          if (sportCampo == sportRichiesto) {
+            return true;
           }
-        }
 
-        // 2. Controllo sul nome del campo come fallback
-        final nomeCampo = campo.nomeCampo.toLowerCase();
-        if (sportSelezionato == 'calcio_5' &&
-            (nomeCampo.contains('calcio') || nomeCampo.contains('5'))) {
-          return true;
-        }
-        if (sportSelezionato.contains('tennis') &&
-            nomeCampo.contains('tennis')) {
-          return true;
-        }
-        if (sportSelezionato == 'padel' && nomeCampo.contains('padel')) {
-          return true;
-        }
-        if (sportSelezionato == 'basket' && nomeCampo.contains('basket')) {
-          return true;
-        }
-        if (sportSelezionato == 'volley' &&
-            (nomeCampo.contains('volley') || nomeCampo.contains('pallavolo'))) {
-          return true;
-        }
+          // "Tutto il calcio"
+          if (sportRichiesto == 'calcio') {
+            return sportCampo.startsWith('calcio_');
+          }
 
-        return false;
-      }).toList();
+          // "Tutto il tennis"
+          if (sportRichiesto == 'tennis') {
+            return sportCampo.startsWith('tennis_');
+          }
 
-      // Se per qualsiasi motivo la lista filtrata è vuota, mostra i campi attivi di fallback
-      final campiFinali = campiFiltratiPerSport.isNotEmpty
-          ? campiFiltratiPerSport
-          : campiAttivi;
+          return false;
+        });
+      }
 
-      state = state.copyWith(isLoading: false, campiTrovati: campiFinali);
+      final campiOrdinati = [...campiAttivi];
+
+      campiOrdinati.sort((a, b) {
+        final aCompatibile = supportaSport(a);
+        final bCompatibile = supportaSport(b);
+
+        if (aCompatibile && !bCompatibile) return -1;
+        if (!aCompatibile && bCompatibile) return 1;
+
+        return 0;
+      });
+
+      state = state.copyWith(isLoading: false, campiTrovati: campiOrdinati);
     } catch (e) {
       state = state.copyWith(isLoading: false);
       debugPrint("Errore caricamento campi: $e");
@@ -129,16 +126,75 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
   }
 
   void selezionaCampo(Campo? campo) {
+    String? sportDaUsare;
+
+    if (campo != null && campo.tariffeSport.isNotEmpty) {
+      final String sportAttuale = state.sportSelezionato.trim().toLowerCase();
+
+      final bool campoSupportaSportAttuale = campo.tariffeSport.any(
+        (t) => t.sport.trim().toLowerCase() == sportAttuale,
+      );
+
+      if (campoSupportaSportAttuale) {
+        // Se il campo supporta lo sport che l'utente ha cercato,
+        // manteniamo quello.
+        sportDaUsare = sportAttuale;
+      } else {
+        // Altrimenti selezioniamo il primo sport realmente
+        // disponibile su questo campo.
+        sportDaUsare = campo.tariffeSport.first.sport.trim().toLowerCase();
+      }
+    }
+
     state = state.copyWith(
       campoSelezionato: campo,
       clearCampo: campo == null,
+      sportSelezionato: sportDaUsare,
       ospitiExtra: 0,
       clearOrario: true,
       giorniChiusi: [],
+      pagamentiOnlineDisponibili: false,
+      metodoPagamentoScelto: MetodoPagamento.inSede,
     );
+
     if (campo != null) {
+      _caricaDisponibilitaPagamenti(campo.idSocieta);
+
       _inizializzaCalendario(campo.idSocieta);
+
       caricaOrari(state.dataSelezionata);
+    }
+  }
+
+  Future<void> _caricaDisponibilitaPagamenti(String idSocieta) async {
+    try {
+      final societa = await _societaRepo.getSocietaById(idSocieta);
+
+      if (societa == null) {
+        state = state.copyWith(
+          pagamentiOnlineDisponibili: false,
+          metodoPagamentoScelto: MetodoPagamento.inSede,
+        );
+
+        return;
+      }
+
+      final disponibile =
+          societa.stripeChargesEnabled && societa.stripePayoutsEnabled;
+
+      state = state.copyWith(
+        pagamentiOnlineDisponibili: disponibile,
+        metodoPagamentoScelto: disponibile
+            ? state.metodoPagamentoScelto
+            : MetodoPagamento.inSede,
+      );
+    } catch (e) {
+      debugPrint('Errore verifica pagamenti online: $e');
+
+      state = state.copyWith(
+        pagamentiOnlineDisponibili: false,
+        metodoPagamentoScelto: MetodoPagamento.inSede,
+      );
     }
   }
 
@@ -210,6 +266,7 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
         List<String> slotChiusi = [];
         List<String> slotOccupati = [];
         Map<String, int> apertePerSlot = {};
+        Map<String, String> mieiMatchPerSlot = {};
 
         for (var slot in slots) {
           int minSlot = _orarioInMinuti(slot);
@@ -231,11 +288,16 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
             if (info != null) {
               bool fisso = info['occupato_fisso'] as bool;
               int aperte = info['aperte'] as int;
+              final String? mioMatchId = info['mio_match_aperto_id'] as String?;
 
               if (fisso) {
                 slotOccupati.add(slot);
               } else if (aperte > 0) {
                 apertePerSlot[slot] = aperte;
+
+                if (mioMatchId != null && mioMatchId.isNotEmpty) {
+                  mieiMatchPerSlot[slot] = mioMatchId;
+                }
               }
             }
           }
@@ -251,6 +313,7 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
           orariOccupati: slotOccupati,
           orariChiusi: slotChiusi,
           partiteApertePerSlot: apertePerSlot,
+          mieiMatchApertiPerSlot: mieiMatchPerSlot,
           oraInizioSelezionata: firstAvailable.isNotEmpty
               ? firstAvailable
               : null,
@@ -286,8 +349,14 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
     );
   }
 
-  void selezionaMetodoPagamento(MetodoPagamento metodo) =>
-      state = state.copyWith(metodoPagamentoScelto: metodo);
+  void selezionaMetodoPagamento(MetodoPagamento metodo) {
+    if (metodo == MetodoPagamento.pagaOra &&
+        !state.pagamentiOnlineDisponibili) {
+      return;
+    }
+
+    state = state.copyWith(metodoPagamentoScelto: metodo);
+  }
 
   Future<String> confermaMatch(
     Utente organizzatore, {
@@ -306,6 +375,17 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
           ? (maxGiocatoriReal - 1)
           : state.ospitiExtra;
 
+      final bool isMaggiorenne =
+          organizzatore.eta != null && organizzatore.eta! >= 18;
+
+      if (state.isPartitaPrivata &&
+          state.metodoPagamentoScelto == MetodoPagamento.pagaOra &&
+          !isMaggiorenne) {
+        throw Exception(
+          'Il pagamento online è disponibile solo per utenti maggiorenni.',
+        );
+      }
+
       final bool pagatoEffettivo =
           state.isPartitaPrivata &&
           state.metodoPagamentoScelto == MetodoPagamento.pagaOra;
@@ -313,6 +393,7 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
       final esito = await _partitaService.creaNuovaPartita(
         campo: state.campoSelezionato!,
         organizzatore: organizzatore,
+        sport: state.sportSelezionato,
         dataPartita: state.dataSelezionata,
         orarioInizio: "${state.oraInizioSelezionata}:00",
         orarioFine: _calcolaOrarioFine(state.oraInizioSelezionata!),
@@ -325,12 +406,11 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
 
       if (!esito.isSuccesso) {
         String msg = esito.errore ?? 'Errore imprevisto';
-        if (esito.errore == 'SLOT_OCCUPATO_PARTITA_PROTETTA') {
-          msg =
-              "Impossibile prenotare: è già presente una partita protetta in questo orario.";
-        } else if (esito.errore == 'SLOT_GIA_OCCUPATO') {
+
+        if (esito.errore == 'SLOT_GIA_OCCUPATO') {
           msg = "Questo slot è già occupato da una partita completa.";
         }
+
         throw Exception(msg);
       }
 
@@ -342,72 +422,43 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
     }
   }
 
-  bool isMenoDi24h() {
-    if (state.oraInizioSelezionata == null) return false;
-
-    final parti = state.oraInizioSelezionata!.split(':');
-    final inizioPartita = DateTime(
-      state.dataSelezionata.year,
-      state.dataSelezionata.month,
-      state.dataSelezionata.day,
-      int.parse(parti[0]),
-      int.parse(parti[1]),
-    );
-
-    return DateTime.now().isAfter(
-      inizioPartita.subtract(
-        const Duration(hours: PartitaService.orePerditaProtezioneFissa),
-      ),
-    );
-  }
-
   bool isNumeroGiocatoriValido() {
-    if (state.isPartitaPrivata) return true;
-    final max = state.campoSelezionato?.numeroDiGiocatori ?? 0;
-    final attuali = state.ospitiExtra + 1;
-    final oraInizio =
-        int.tryParse(state.oraInizioSelezionata?.split(':').first ?? '0') ?? 0;
-    bool isPrimeTime =
-        oraInizio >= PartitaService.primeTimeInizio &&
-        oraInizio <= PartitaService.primeTimeFine;
-    return attuali >= _partitaService.getMinimoApertura(max, isPrimeTime);
+    if (state.campoSelezionato == null) return false;
+
+    final maxGiocatori = getMaxGiocatori();
+    final giocatoriTotali = state.ospitiExtra + 1;
+
+    return giocatoriTotali >= 1 && giocatoriTotali <= maxGiocatori;
   }
 
   String getInfoStatoPartita() {
-    final maxGiocatori =
-        getMaxGiocatori(); // 🔴 Usa getMaxGiocatori() invece di campo.numeroDiGiocatori!
-    final ospitiAttuali = state.ospitiExtra + 1;
+    final maxGiocatori = getMaxGiocatori();
+    final giocatoriAttuali = state.ospitiExtra + 1;
 
-    if (state.isPartitaPrivata) return "PARTITA PRIVATA";
-    if (ospitiAttuali >= maxGiocatori) return "PARTITA AL COMPLETO";
+    if (state.isPartitaPrivata) {
+      return "PARTITA PRIVATA";
+    }
 
-    // Logica normale
-    if (ospitiAttuali >= (maxGiocatori * 0.8).floor())
-      return "PARTITA PROTETTA";
-    return "PARTITA A RISCHIO";
+    if (giocatoriAttuali >= maxGiocatori) {
+      return "PARTITA AL COMPLETO";
+    }
+
+    return "PARTITA APERTA";
   }
 
   Color getColoreStato() {
-    if (state.isPartitaPrivata) return AppTheme.neonOrange;
+    if (state.isPartitaPrivata) {
+      return AppTheme.neonOrange;
+    }
 
-    final max = state.campoSelezionato?.numeroDiGiocatori ?? 0;
-    final attuali = state.ospitiExtra + 1;
+    final maxGiocatori = getMaxGiocatori();
+    final giocatoriAttuali = state.ospitiExtra + 1;
 
-    if (attuali >= max) return AppTheme.neonOrange;
+    if (giocatoriAttuali >= maxGiocatori) {
+      return AppTheme.statoSuccesso;
+    }
 
-    final minRichiesti = _partitaService.getMinimoApertura(max, _isPrimeTime());
-    final sogliaProtezione = _partitaService.getSogliaProtezione(max);
-
-    if (attuali < minRichiesti) return Colors.orange;
-    if (attuali < sogliaProtezione || isMenoDi24h()) return Colors.redAccent;
-    return AppTheme.neonGreen;
-  }
-
-  bool _isPrimeTime() {
-    final oraInizio =
-        int.tryParse(state.oraInizioSelezionata?.split(':').first ?? '0') ?? 0;
-    return oraInizio >= PartitaService.primeTimeInizio &&
-        oraInizio <= PartitaService.primeTimeFine;
+    return AppTheme.accent;
   }
 
   List<String> _generaSlotDoppioTurno(OrarioSocieta orari) {
@@ -416,6 +467,10 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
     if (orari.orarioApertura != null && orari.orarioChiusura != null) {
       int minAttuale = _orarioInMinuti(orari.orarioApertura!);
       int minLimite = _orarioInMinuti(orari.orarioChiusura!);
+
+      if (minLimite == 0 && minAttuale > 0) {
+        minLimite = 24 * 60;
+      }
 
       while (minAttuale + 60 <= minLimite) {
         slotsValidi.add(
@@ -428,6 +483,10 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
     if (orari.orarioApertura2 != null && orari.orarioChiusura2 != null) {
       int minAttuale2 = _orarioInMinuti(orari.orarioApertura2!);
       int minLimite2 = _orarioInMinuti(orari.orarioChiusura2!);
+
+      if (minLimite2 == 0 && minAttuale2 > 0) {
+        minLimite2 = 24 * 60;
+      }
 
       while (minAttuale2 + 60 <= minLimite2) {
         String slot =
@@ -447,8 +506,12 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
   }
 
   int _orarioInMinuti(String orario) {
-    List<String> parti = orario.trim().split(':');
-    return (int.parse(parti[0]) * 60) + int.parse(parti[1]);
+    final List<String> parti = orario.trim().split(':');
+
+    final int ore = int.parse(parti[0]);
+    final int minuti = int.parse(parti[1]);
+
+    return (ore * 60) + minuti;
   }
 
   String _calcolaOrarioFine(String oraInizio) {
@@ -456,9 +519,28 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
     return "${(totalMinutes ~/ 60 % 24).toString().padLeft(2, '0')}:${(totalMinutes % 60).toString().padLeft(2, '0')}:00";
   }
 
-  void impostaSport(String sport) {
+  void cambiaSportCampo(String sport) {
+    final campo = state.campoSelezionato;
+
+    if (campo == null) return;
+
+    final sportNormalizzato = sport.trim().toLowerCase();
+
+    final supportato = campo.tariffeSport.any(
+      (t) => t.sport.trim().toLowerCase() == sportNormalizzato,
+    );
+
+    if (!supportato) return;
+
+    state = state.copyWith(sportSelezionato: sportNormalizzato, ospitiExtra: 0);
+  }
+
+  Future<void> impostaSport(String sport) async {
     state = state.copyWith(sportSelezionato: sport);
-    // Ricarica o rifiltra i risultati
+
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setString(_chiaveUltimoSport, sport);
   }
 
   void impostaData(DateTime data) {
@@ -530,7 +612,15 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
 
     if (sport == 'tennis_singolo') return 2;
     if (sport == 'tennis_doppio' || sport == 'padel') return 4;
-    if (sport == 'calcio_5' || sport == 'basket') return 10;
+
+    if (sport == 'calcio_5') return 10;
+    if (sport == 'calcio_6') return 12;
+    if (sport == 'calcio_7') return 14;
+    if (sport == 'calcio_8') return 16;
+    if (sport == 'calcio_11') return 22;
+
+    if (sport == 'basket') return 10;
+    if (sport == 'pallavolo') return 12;
 
     return state.campoSelezionato!.numeroDiGiocatori;
   }
@@ -539,13 +629,25 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
     if (state.campoSelezionato == null) return 0.0;
     final campo = state.campoSelezionato!;
 
-    if (campo.tariffeSport != null && campo.tariffeSport!.isNotEmpty) {
-      for (var t in campo.tariffeSport!) {
+    if (campo.tariffeSport.isNotEmpty) {
+      for (var t in campo.tariffeSport) {
         if (t.sport == state.sportSelezionato) {
           return t.prezzo;
         }
       }
     }
     return campo.prezzo;
+  }
+
+  Future<void> _caricaUltimoSport() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final ultimoSport = prefs.getString(_chiaveUltimoSport);
+
+    if (ultimoSport == null || ultimoSport.trim().isEmpty) {
+      return;
+    }
+
+    state = state.copyWith(sportSelezionato: ultimoSport);
   }
 }

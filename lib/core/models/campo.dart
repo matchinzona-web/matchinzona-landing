@@ -48,7 +48,11 @@ class Campo {
       tariffeSport.map((t) => t.sport).toList();
 
   // Controlla se il campo supporta uno sport specifico
-  bool supportaSport(String sport) => sportDisponibili.contains(sport);
+  bool supportaSport(String sport) {
+    final cercato = sport.trim().toLowerCase();
+
+    return tariffeSport.any((t) => t.sport.trim().toLowerCase() == cercato);
+  }
 
   factory Campo.fromJson(Map<String, dynamic> json) {
     List<TariffaSport> tariffe = [];

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:app_campi/features/auth/data/auth_repository.dart';
@@ -6,17 +7,21 @@ import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:app_campi/core/utils/validators.dart';
 import 'package:app_campi/core/theme/app_styles.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:app_campi/features/auth/application/auth_provider.dart';
 
 const double _spazioTraCampi = 20.0;
 
-class RegistrazioneUtente extends StatefulWidget {
+class RegistrazioneUtente extends ConsumerStatefulWidget {
   const RegistrazioneUtente({super.key});
 
   @override
-  State<RegistrazioneUtente> createState() => _RegistrazioneUtenteState();
+  ConsumerState<RegistrazioneUtente> createState() =>
+      _RegistrazioneUtenteState();
 }
 
-class _RegistrazioneUtenteState extends State<RegistrazioneUtente> {
+class _RegistrazioneUtenteState extends ConsumerState<RegistrazioneUtente> {
   final _formKey = GlobalKey<FormState>();
 
   final TextEditingController _nomeController = TextEditingController();
@@ -36,24 +41,52 @@ class _RegistrazioneUtenteState extends State<RegistrazioneUtente> {
 
   DateTime? _dataNascitaSelezionata;
   bool _isLoading = false;
+  StreamSubscription<AuthState>? _authSubscription;
+  bool _attesaLoginSocial = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
+      data,
+    ) {
+      if (!_attesaLoginSocial) return;
+
+      if (data.event == AuthChangeEvent.signedIn && data.session != null) {
+        _attesaLoginSocial = false;
+
+        if (!mounted) return;
+
+        ref.invalidate(utenteCorrenteProvider);
+
+        Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+      }
+    });
+  }
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
+
     _nomeController.dispose();
     _cognomeController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confermaPasswordController.dispose();
     _telefonoController.dispose();
+
     super.dispose();
   }
 
   Future<void> _selezionaData(BuildContext context) async {
+    final oggi = DateTime.now();
+    final ultimaDataConsentita = DateTime(oggi.year - 14, oggi.month, oggi.day);
     final DateTime? prescelto = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
+      initialDate: ultimaDataConsentita,
       firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
+      lastDate: ultimaDataConsentita,
       builder: (context, child) {
         return Theme(
           data: ThemeData.dark().copyWith(
@@ -74,6 +107,27 @@ class _RegistrazioneUtenteState extends State<RegistrazioneUtente> {
     }
   }
 
+  Future<void> _accediConGoogle() async {
+    try {
+      _attesaLoginSocial = true;
+
+      final authService = AuthService();
+
+      await authService.accediConGoogle();
+    } catch (e) {
+      _attesaLoginSocial = false;
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: AppTheme.statoErrore,
+        ),
+      );
+    }
+  }
+
   Future<void> _submitData() async {
     final isValid = _formKey.currentState?.validate() ?? false;
 
@@ -82,11 +136,11 @@ class _RegistrazioneUtenteState extends State<RegistrazioneUtente> {
     }
 
     if (_dataNascitaSelezionata != null) {
-      final eMaggiorenne = _controllaMaggiorenne(_dataNascitaSelezionata!);
+      final etaValida = _haAlmeno14Anni(_dataNascitaSelezionata!);
       setState(() {
-        _erroreDataNascita = eMaggiorenne
+        _erroreDataNascita = etaValida
             ? null
-            : "Devi essere maggiorenne (18+) per registrarti.";
+            : "Devi avere almeno 14 anni per registrarti.";
       });
     } else {
       setState(() => _erroreDataNascita = "Seleziona la tua data di nascita *");
@@ -247,7 +301,77 @@ class _RegistrazioneUtenteState extends State<RegistrazioneUtente> {
                             ),
                             textAlign: TextAlign.center,
                           ),
-                          const SizedBox(height: 32),
+                          const SizedBox(height: 28),
+
+                          SizedBox(
+                            height: 56,
+                            width: double.infinity,
+                            child: OutlinedButton(
+                              onPressed: _isLoading ? null : _accediConGoogle,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppTheme.textPrimary,
+                                backgroundColor: AppTheme.cardBg,
+                                side: const BorderSide(
+                                  color: AppTheme.cardBorder,
+                                  width: 1.2,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'G',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  SizedBox(width: 12),
+                                  Text(
+                                    'CONTINUA CON GOOGLE',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.6,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Divider(color: AppTheme.cardBorder),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                ),
+                                child: Text(
+                                  'OPPURE REGISTRATI CON EMAIL',
+                                  style: TextStyle(
+                                    color: AppTheme.textSecondary,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ),
+                              const Expanded(
+                                child: Divider(color: AppTheme.cardBorder),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 24),
 
                           TextFormField(
                             controller: _nomeController,
@@ -353,10 +477,12 @@ class _RegistrazioneUtenteState extends State<RegistrazioneUtente> {
                               ),
                             ),
                             validator: (val) {
-                              if (val == null || val.isEmpty)
+                              if (val == null || val.isEmpty) {
                                 return 'Conferma la password *';
-                              if (val != _passwordController.text)
+                              }
+                              if (val != _passwordController.text) {
                                 return 'Le password non coincidono';
+                              }
                               return null;
                             },
                             autovalidateMode: AutovalidateMode.onUnfocus,
@@ -369,11 +495,11 @@ class _RegistrazioneUtenteState extends State<RegistrazioneUtente> {
                               await _selezionaData(context);
                               if (_dataNascitaSelezionata != null) {
                                 setState(() {
-                                  if (!_controllaMaggiorenne(
+                                  if (!_haAlmeno14Anni(
                                     _dataNascitaSelezionata!,
                                   )) {
                                     _erroreDataNascita =
-                                        "Devi essere maggiorenne (18+) per registrarti.";
+                                        "Devi avere almeno 14 anni per registrarti.";
                                   } else {
                                     _erroreDataNascita = null;
                                   }
@@ -439,34 +565,21 @@ class _RegistrazioneUtenteState extends State<RegistrazioneUtente> {
                                     onChanged: (bool? valore) {
                                       setState(() {
                                         _accettoGDPR = valore ?? false;
-                                        if (_accettoGDPR)
+                                        if (_accettoGDPR) {
                                           _mostraErroreGDPR = false;
+                                        }
                                       });
                                     },
                                   ),
                                   Expanded(
                                     child: RichText(
                                       text: TextSpan(
-                                        text: "Ho letto e accetto i ",
+                                        text: "Ho letto e accetto la ",
                                         style: const TextStyle(
                                           color: AppTheme.textSecondary,
                                           fontSize: 13,
                                         ),
                                         children: [
-                                          TextSpan(
-                                            text: "Termini di Servizio",
-                                            style: const TextStyle(
-                                              color: AppTheme.accent,
-                                              fontWeight: FontWeight.bold,
-                                              decoration:
-                                                  TextDecoration.underline,
-                                            ),
-                                            recognizer: TapGestureRecognizer()
-                                              ..onTap = () => _apriUrlLegale(
-                                                "https://www.iubenda.com/",
-                                              ),
-                                          ),
-                                          const TextSpan(text: " e la "),
                                           TextSpan(
                                             text: "Privacy Policy",
                                             style: const TextStyle(
@@ -477,7 +590,21 @@ class _RegistrazioneUtenteState extends State<RegistrazioneUtente> {
                                             ),
                                             recognizer: TapGestureRecognizer()
                                               ..onTap = () => _apriUrlLegale(
-                                                "https://www.iubenda.com/",
+                                                "https://matchlyassistenza-web.github.io/matchly-privacy/",
+                                              ),
+                                          ),
+                                          const TextSpan(text: " e accetto i "),
+                                          TextSpan(
+                                            text: "Termini e Condizioni",
+                                            style: const TextStyle(
+                                              color: AppTheme.accent,
+                                              fontWeight: FontWeight.bold,
+                                              decoration:
+                                                  TextDecoration.underline,
+                                            ),
+                                            recognizer: TapGestureRecognizer()
+                                              ..onTap = () => _apriUrlLegale(
+                                                "https://matchlyassistenza-web.github.io/matchly-privacy/termini.html",
                                               ),
                                           ),
                                         ],
@@ -547,13 +674,16 @@ class _RegistrazioneUtenteState extends State<RegistrazioneUtente> {
     );
   }
 
-  bool _controllaMaggiorenne(DateTime dataNascita) {
+  bool _haAlmeno14Anni(DateTime dataNascita) {
     final adesso = DateTime.now();
     int eta = adesso.year - dataNascita.year;
+
     if (adesso.month < dataNascita.month ||
-        (adesso.month == dataNascita.month && adesso.day < dataNascita.day))
+        (adesso.month == dataNascita.month && adesso.day < dataNascita.day)) {
       eta--;
-    return eta >= 18;
+    }
+
+    return eta >= 14;
   }
 
   Future<void> _apriUrlLegale(String urlString) async {

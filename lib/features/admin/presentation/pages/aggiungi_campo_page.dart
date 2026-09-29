@@ -29,6 +29,7 @@ class _AggiungiCampoState extends State<AggiungiCampo> {
   // Lista sport supportati con icone ed etichette
   final List<Map<String, dynamic>> _sportDisponibili = [
     {'id': 'calcio_5', 'label': 'Calcio a 5', 'icon': Icons.sports_soccer},
+    {'id': 'calcio_6', 'label': 'Calcio a 6', 'icon': Icons.sports_soccer},
     {'id': 'calcio_7', 'label': 'Calcio a 7', 'icon': Icons.sports_soccer},
     {'id': 'calcio_8', 'label': 'Calcio a 8', 'icon': Icons.sports_soccer},
     {'id': 'calcio_11', 'label': 'Calcio a 11', 'icon': Icons.sports_soccer},
@@ -42,9 +43,9 @@ class _AggiungiCampoState extends State<AggiungiCampo> {
       'label': 'Tennis Doppio (2 vs 2)',
       'icon': Icons.sports_tennis,
     },
-    {'id': 'tennis', 'label': 'Tennis', 'icon': Icons.sports_tennis},
+    {'id': 'padel', 'label': 'Padel (2 vs 2)', 'icon': Icons.sports_tennis},
     {'id': 'basket', 'label': 'Basket', 'icon': Icons.sports_basketball},
-    {'id': 'volley', 'label': 'Pallavolo', 'icon': Icons.sports_volleyball},
+    {'id': 'pallavolo', 'label': 'Pallavolo', 'icon': Icons.sports_volleyball},
   ];
 
   final Map<String, bool> _sportSelezionati = {};
@@ -130,8 +131,8 @@ class _AggiungiCampoState extends State<AggiungiCampo> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Errore selezione foto: $e'),
+          const SnackBar(
+            content: Text('Impossibile selezionare la foto. Riprova.'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -577,7 +578,7 @@ class _AggiungiCampoState extends State<AggiungiCampo> {
                           fontSize: 12,
                         ),
                       ),
-                      activeColor: AppTheme.neonOrange,
+                      activeThumbColor: AppTheme.neonOrange,
                       value: _isCoperto,
                       onChanged: (val) => setState(() => _isCoperto = val),
                     ),
@@ -805,6 +806,8 @@ class _AggiungiCampoState extends State<AggiungiCampo> {
     switch (primoSport) {
       case 'calcio_5':
         return 10;
+      case 'calcio_6':
+        return 12;
       case 'calcio_7':
         return 14;
       case 'calcio_8':
@@ -819,7 +822,7 @@ class _AggiungiCampoState extends State<AggiungiCampo> {
         return 4;
       case 'basket':
         return 10;
-      case 'volley':
+      case 'pallavolo':
         return 12;
       default:
         return 10;

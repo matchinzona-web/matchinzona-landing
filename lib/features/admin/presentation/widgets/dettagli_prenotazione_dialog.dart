@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'package:app_campi/core/theme/app_theme.dart';
 
 class DettagliPrenotazioneDialog extends StatelessWidget {
@@ -6,11 +8,173 @@ class DettagliPrenotazioneDialog extends StatelessWidget {
 
   const DettagliPrenotazioneDialog({super.key, required this.partita});
 
+  Future<void> _annullaPrenotazioneManuale(BuildContext context) async {
+    final idPartita = partita['id']?.toString();
+
+    if (idPartita == null || idPartita.isEmpty) {
+      _mostraErrore(context, 'Impossibile identificare la prenotazione.');
+      return;
+    }
+
+    final conferma = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppTheme.cardBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(color: AppTheme.statoErrore.withOpacity(0.6)),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: AppTheme.statoErrore),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Annulla prenotazione',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Vuoi davvero annullare questa prenotazione manuale?\n\n'
+            'Lo slot tornerà disponibile per nuove prenotazioni.',
+            style: TextStyle(color: AppTheme.textSecondary, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: const Text(
+                'NO, MANTIENI',
+                style: TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.statoErrore,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'SÌ, ANNULLA',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (conferma != true || !context.mounted) {
+      return;
+    }
+
+    try {
+      final response = await Supabase.instance.client
+          .from('partite')
+          .update({'stato_partita': 'annullata'})
+          .eq('id', idPartita)
+          .eq('origine_prenotazione', 'gestore')
+          .select('id');
+
+      if (!context.mounted) return;
+
+      if (response.isEmpty) {
+        _mostraErrore(context, 'La prenotazione non può essere annullata.');
+        return;
+      }
+
+      Navigator.of(context).pop(true);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Prenotazione annullata. Lo slot è nuovamente disponibile.',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: AppTheme.statoSuccesso,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+
+      debugPrint('Errore annullamento prenotazione manuale: $e');
+
+      _mostraErrore(
+        context,
+        'Errore durante l’annullamento della prenotazione.',
+      );
+    }
+  }
+
+  void _mostraErrore(BuildContext context, String messaggio) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          messaggio,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: AppTheme.statoErrore,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  IconData _iconaSport(String sport) {
+    final value = sport.trim().toLowerCase();
+
+    if (value.startsWith('calcio_')) {
+      return Icons.sports_soccer_rounded;
+    }
+
+    if (value == 'basket') {
+      return Icons.sports_basketball_rounded;
+    }
+
+    if (value == 'pallavolo' || value == 'volley') {
+      return Icons.sports_volleyball_rounded;
+    }
+
+    if (value == 'padel' || value.startsWith('tennis_')) {
+      return Icons.sports_tennis_rounded;
+    }
+
+    return Icons.sports_rounded;
+  }
+
   @override
   Widget build(BuildContext context) {
     debugPrint("🟢 STRUTTURA PARTITA: $partita");
     final org = partita['organizzatore'] ?? {};
     final campo = partita['campo'] ?? {};
+    final bool isPrenotazioneManuale =
+        partita['origine_prenotazione'] == 'gestore';
+
+    final String nomeClienteManuale = (partita['nome_cliente_manual'] ?? '')
+        .toString()
+        .trim();
+
+    final String telefonoClienteManuale =
+        (partita['telefono_cliente_manual'] ?? '').toString().trim();
+    final String notaGestore = (partita['nota_gestore'] ?? '')
+        .toString()
+        .trim();
     final String nomeCampo = campo['nome_campo'] ?? 'Campo Sconosciuto';
     final String orarioInizio =
         partita['orario_inizio']?.toString().substring(0, 5) ?? '--:--';
@@ -18,28 +182,58 @@ class DettagliPrenotazioneDialog extends StatelessWidget {
         partita['orario_fine']?.toString().substring(0, 5) ?? '--:--';
     final bool isPagato = partita['is_pagato'] == true;
 
-    // 🟢 1. CALCOLO GIOCATORI
-    final int giocaroriPrenotati =
+    final int giocatoriPrenotati =
         partita['numero_giocatori_prenotati'] as int? ?? 1;
+
     final int maxGiocatoriDb = partita['max_giocatori'] as int? ?? 0;
+
     final int maxCampo = campo['numero_di_giocatori'] as int? ?? 2;
 
-    int maxGiocatoriReali = maxGiocatoriDb > 0 ? maxGiocatoriDb : maxCampo;
-    if (nomeCampo.toLowerCase().contains('tennis') && giocaroriPrenotati > 2) {
-      maxGiocatoriReali = 4;
-    }
+    final int maxGiocatoriReali = maxGiocatoriDb > 0
+        ? maxGiocatoriDb
+        : maxCampo;
 
-    // 🟢 2. DETERMINA LO SPORT DISPUTATO
-    String sportDisputato = "Calcio / Altro";
-    final String nomeLower = nomeCampo.toLowerCase();
-    if (nomeLower.contains('tennis')) {
-      sportDisputato = maxGiocatoriReali == 4
-          ? "Tennis Doppio"
-          : "Tennis Singolo";
-    } else if (nomeLower.contains('padel')) {
-      sportDisputato = "Padel";
-    } else if (nomeLower.contains('calcio')) {
-      sportDisputato = "Calcio a 5";
+    final String sportRaw = (partita['sport'] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
+
+    String sportDisputato;
+
+    switch (sportRaw) {
+      case 'tennis_singolo':
+        sportDisputato = 'Tennis singolo';
+        break;
+      case 'tennis_doppio':
+        sportDisputato = 'Tennis doppio';
+        break;
+      case 'padel':
+        sportDisputato = 'Padel';
+        break;
+      case 'calcio_5':
+        sportDisputato = 'Calcio a 5';
+        break;
+      case 'calcio_6':
+        sportDisputato = 'Calcio a 6';
+        break;
+      case 'calcio_7':
+        sportDisputato = 'Calcio a 7';
+        break;
+      case 'calcio_8':
+        sportDisputato = 'Calcio a 8';
+        break;
+      case 'calcio_11':
+        sportDisputato = 'Calcio a 11';
+        break;
+      case 'basket':
+        sportDisputato = 'Basket';
+        break;
+      case 'pallavolo':
+      case 'volley':
+        sportDisputato = 'Pallavolo';
+        break;
+      default:
+        sportDisputato = 'Sport';
     }
 
     // 🟢 3. CALCOLO DINAMICO DELL'INCASSO DAL DATABASE
@@ -55,17 +249,11 @@ class DettagliPrenotazioneDialog extends StatelessWidget {
         0.0;
 
     // Se ci sono tariffe specifiche per sport, cerca quella per lo sport giocato
-    if (tariffeRaw.isNotEmpty) {
-      final tariffaTrovata = tariffeRaw.firstWhere((t) {
-        final String sportName = (t['sport'] ?? '').toString().toLowerCase();
-        return sportName == sportDisputato.toLowerCase() ||
-            (sportDisputato == "Tennis Doppio" &&
-                sportName.contains('doppio')) ||
-            (sportDisputato == "Tennis Singolo" &&
-                sportName.contains('singolo')) ||
-            (sportDisputato == "Calcio a 5" &&
-                (sportName.contains('calcio') || sportName.contains('5')));
-      }, orElse: () => null);
+    if (tariffeRaw.isNotEmpty && sportRaw.isNotEmpty) {
+      final tariffaTrovata = tariffeRaw.firstWhere(
+        (t) => (t['sport'] ?? '').toString().trim().toLowerCase() == sportRaw,
+        orElse: () => null,
+      );
 
       if (tariffaTrovata != null && tariffaTrovata['prezzo'] != null) {
         incassoTotale = (tariffaTrovata['prezzo'] as num).toDouble();
@@ -154,8 +342,8 @@ class DettagliPrenotazioneDialog extends StatelessWidget {
 
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(
-                Icons.sports_tennis,
+              leading: Icon(
+                _iconaSport(sportRaw),
                 color: Colors.white,
                 size: 28,
               ),
@@ -221,7 +409,7 @@ class DettagliPrenotazioneDialog extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        "$giocaroriPrenotati / $maxGiocatoriReali",
+                        "$giocatoriPrenotati / $maxGiocatoriReali",
                         style: const TextStyle(
                           color: AppTheme.neonGreen,
                           fontWeight: FontWeight.w900,
@@ -235,18 +423,37 @@ class DettagliPrenotazioneDialog extends StatelessWidget {
             ),
 
             const Divider(color: Colors.grey),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.person, color: Colors.grey),
-              title: Text(
-                '${org['nome'] ?? 'N/D'} ${org['cognome'] ?? ''}',
-                style: const TextStyle(color: Colors.white),
+            // NOME
+            if (isPrenotazioneManuale) ...[
+              if (nomeClienteManuale.isNotEmpty)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.person, color: Colors.grey),
+                  title: Text(
+                    nomeClienteManuale,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  subtitle: const Text(
+                    'Cliente',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+            ] else ...[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.person, color: Colors.grey),
+                title: Text(
+                  '${org['nome'] ?? 'N/D'} ${org['cognome'] ?? ''}',
+                  style: const TextStyle(color: Colors.white),
+                ),
+                subtitle: const Text(
+                  'Organizzatore',
+                  style: TextStyle(color: Colors.grey),
+                ),
               ),
-              subtitle: const Text(
-                'Organizzatore',
-                style: TextStyle(color: Colors.grey),
-              ),
-            ),
+            ],
+
+            // EMAIL
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.email, color: Colors.grey),
@@ -255,18 +462,98 @@ class DettagliPrenotazioneDialog extends StatelessWidget {
                 style: const TextStyle(color: Colors.white),
               ),
             ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.phone, color: Colors.grey),
-              title: Text(
-                org['telefono'] ?? 'N/D',
-                style: const TextStyle(color: Colors.white),
+
+            // TELEFONO
+            if (isPrenotazioneManuale) ...[
+              if (telefonoClienteManuale.isNotEmpty)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.phone, color: Colors.grey),
+                  title: Text(
+                    telefonoClienteManuale,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+            ] else ...[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.phone, color: Colors.grey),
+                title: Text(
+                  org['telefono'] ?? 'N/D',
+                  style: const TextStyle(color: Colors.white),
+                ),
               ),
-            ),
+            ],
+            if (isPrenotazioneManuale && notaGestore.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.sticky_note_2_outlined,
+                          color: AppTheme.neonOrange,
+                          size: 18,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Nota interna',
+                          style: TextStyle(
+                            color: AppTheme.neonOrange,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      notaGestore,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
+      actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
       actions: [
+        if (isPrenotazioneManuale && partita['stato_partita'] != 'annullata')
+          SizedBox(
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: () => _annullaPrenotazioneManuale(context),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.statoErrore,
+                side: const BorderSide(color: AppTheme.statoErrore),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.event_busy_rounded, size: 20),
+              label: const Text(
+                'ANNULLA PRENOTAZIONE',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
+              ),
+            ),
+          ),
+
+        const SizedBox(width: 6),
+
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text(

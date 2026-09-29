@@ -6,6 +6,7 @@ class MatchCard extends StatelessWidget {
   final Map<String, dynamic> rawPartita;
   final String dataOrario;
   final String nomeCentroSportivo;
+  final String indirizzoCentro;
   final String tipoSport;
   final double distanzaKm;
   final int giocatoriAttuali;
@@ -22,6 +23,7 @@ class MatchCard extends StatelessWidget {
     required this.rawPartita,
     required this.dataOrario,
     required this.nomeCentroSportivo,
+    required this.indirizzoCentro,
     required this.tipoSport,
     required this.distanzaKm,
     required this.giocatoriAttuali,
@@ -180,7 +182,36 @@ class MatchCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+
+                    if (indirizzoCentro.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.location_on_outlined,
+                            size: 12,
+                            color: AppTheme.textSecondary,
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              indirizzoCentro,
+                              style: const TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 11,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+
                     const SizedBox(height: 5),
+
                     Row(
                       children: [
                         const Icon(

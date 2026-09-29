@@ -11,14 +11,12 @@ class PreferitiService {
           .select('societa:id_societa(*)')
           .eq('id_utente', idUtente);
 
-      if (response == null) return [];
-
       return (response as List).map((row) {
         final societaJson = row['societa'] as Map<String, dynamic>;
         return Societa.fromJson(societaJson);
       }).toList();
     } catch (e) {
-      throw Exception('Errore nel caricamento dei preferiti: $e');
+      throw Exception('Errore nel caricamento dei preferiti');
     }
   }
 
@@ -43,7 +41,7 @@ class PreferitiService {
         });
       }
     } catch (e) {
-      throw Exception('Errore nell\'aggiornamento dei preferiti: $e');
+      throw Exception('Errore nell\'aggiornamento dei preferiti');
     }
   }
 }

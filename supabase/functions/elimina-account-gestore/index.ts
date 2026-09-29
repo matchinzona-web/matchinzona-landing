@@ -38,7 +38,7 @@ serve(async (req) => {
     // 1. Recupera la società collegata a questo utente
     const { data: societa, error: societaError } = await supabaseAdmin
       .from("societa")
-      .select("id, stripe_customer_id")
+      .select("id, stripe_customer_id, stripe_account_id")
       .eq("id_utente", user.id)
       .maybeSingle();
 
@@ -65,6 +65,20 @@ serve(async (req) => {
       }
     }
 
+    // 2b. Se esiste un account Stripe Connect Express,
+    // prova a eliminarlo/disconnetterlo dalla piattaforma.
+    if (societa?.stripe_account_id) {
+      try {
+        await stripe.accounts.del(societa.stripe_account_id);
+      } catch (stripeConnectErr) {
+        console.error("Errore eliminazione Stripe Connect:", stripeConnectErr);
+
+        // Non blocchiamo l'eliminazione Matchly:
+        // l'account può avere vincoli Stripe, saldo,
+        // payout pendenti o essere già stato rimosso.
+      }
+    }
+
     // 3. Se esiste una società, elimina tutti i dati collegati (campi, partite, orari, ecc.)
     if (societa) {
       const { error: cleanupSocietaError } = await supabaseAdmin.rpc(
@@ -83,7 +97,7 @@ serve(async (req) => {
 
     // 4. Pulisce anche i dati da "utente giocatore" (partite giocate, preferiti, notifiche)
     const { error: cleanupUtenteError } = await supabaseAdmin.rpc(
-      "elimina_dati_utente",
+      "elimina_dati_gestore",
       {
         p_id_utente: user.id,
       },

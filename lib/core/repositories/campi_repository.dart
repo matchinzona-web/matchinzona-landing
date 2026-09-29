@@ -27,6 +27,37 @@ class CampiRepository {
     return data.map((json) => Campo.fromJson(json)).toList();
   }
 
+  Future<List<Campo>> getCampiSocietaVisibili(String idSocieta) async {
+    try {
+      final societaData = await _supabase
+          .from('societa')
+          .select('limite_campi')
+          .eq('id', idSocieta)
+          .single();
+
+      final int limiteCampi =
+          (societaData['limite_campi'] as num?)?.toInt() ?? 0;
+
+      if (limiteCampi <= 0) {
+        return [];
+      }
+
+      final response = await _supabase
+          .from('campi')
+          .select()
+          .eq('id_societa', idSocieta)
+          .order('created_at', ascending: true)
+          .limit(limiteCampi);
+
+      return (response as List)
+          .map((json) => Campo.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('Errore in getCampiSocietaVisibili: $e');
+      return [];
+    }
+  }
+
   Future<List<Campo>> getCampiSocietaConDettagli(String idSocieta) async {
     try {
       final response = await _supabase

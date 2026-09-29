@@ -67,7 +67,7 @@ class CampiService {
         'coperto': isCoperto,
       });
     } catch (e) {
-      throw Exception('Impossibile salvare il campo: $e');
+      throw Exception('Impossibile salvare il campo');
     }
   }
 
@@ -77,7 +77,7 @@ class CampiService {
     try {
       return await _repository.fetchCampiSocieta(idSocieta);
     } catch (e) {
-      throw Exception('Impossibile recuperare la lista dei campi: $e');
+      throw Exception('Impossibile recuperare la lista dei campi');
     }
   }
 
@@ -98,7 +98,7 @@ class CampiService {
         'coperto': isCoperto,
       });
     } catch (e) {
-      throw Exception('Impossibile aggiornare il campo: $e');
+      throw Exception('Impossibile aggiornare il campo');
     }
   }
 
@@ -109,9 +109,7 @@ class CampiService {
         params: {'p_id_campo': idCampo},
       );
     } catch (e) {
-      throw Exception(
-        'Errore durante la chiusura del campo e notifica utenti: $e',
-      );
+      throw Exception('Errore durante la chiusura del campo e notifica utenti');
     }
   }
 }

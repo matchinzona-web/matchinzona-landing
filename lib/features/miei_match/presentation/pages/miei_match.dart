@@ -117,7 +117,7 @@ class MieiMatch extends ConsumerWidget {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            "Impossibile caricare i match: $err",
+                            "Impossibile caricare i match",
                             style: const TextStyle(
                               color: AppTheme.textSecondary,
                               fontSize: 14,

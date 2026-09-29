@@ -174,8 +174,9 @@ class _ConfigurazioneOrariState extends State<ConfigurazioneOrari> {
 
       if (idSocieta == null) {
         final utenteAttuale = supabase.auth.currentUser;
-        if (utenteAttuale == null)
+        if (utenteAttuale == null) {
           throw Exception("Sessione utente non trovata.");
+        }
         final societaData = await supabase
             .from('societa')
             .select('id')
@@ -333,7 +334,7 @@ class _ConfigurazioneOrariState extends State<ConfigurazioneOrari> {
                                       size: 18,
                                     ),
                                     label: const Text(
-                                      'Copia per tutti',
+                                      'Applica a tutti',
                                       style: TextStyle(
                                         color: Colors.grey,
                                         fontSize: 12,

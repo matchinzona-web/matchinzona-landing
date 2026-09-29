@@ -3,6 +3,7 @@ import 'package:app_campi/core/models/utente.dart';
 import 'package:app_campi/core/theme/app_constants.dart';
 import '../domain/filtro_distanza.dart';
 import '../domain/partita_con_dati.dart';
+import 'package:flutter/foundation.dart';
 
 /// Restituisce true se l'utente loggato è già iscritto alla [partita].
 bool isGiaIscritto(Partita partita, Utente? utenteLoggato) {
@@ -27,7 +28,9 @@ List<PartitaConDati> filtraEOrdina(
       normalizzate.add(
         PartitaConDati(raw: raw, partita: Partita.fromJson(jsonNorm)),
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('🔴 ERRORE Partita.fromJson in Esplora Match: $e');
+      debugPrint('🔴 RAW PARTITA: $raw');
       continue;
     }
   }

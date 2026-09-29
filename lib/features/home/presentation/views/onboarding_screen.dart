@@ -177,7 +177,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
               const SizedBox(height: 15),
 
-              if (secondaryAction != null) secondaryAction,
+              ?secondaryAction,
 
               const SizedBox(height: 100),
             ],

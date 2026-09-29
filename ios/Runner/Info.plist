@@ -7,7 +7,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-	<string>Arena Pro</string>
+	<string>Matchly</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-	<string>Arena Pro</string>
+	<string>Matchly</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -68,9 +68,9 @@
     </array>
     
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Arena Pro ha bisogno della tua posizione per trovare i campi da gioco entro un raggio di 5km.</string>
+    <string>Matchly ha bisogno della tua posizione per trovare i campi da gioco entro un raggio di 5km.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>Arena Pro ha bisogno della tua posizione per mostrarti i campi sportivi più vicini sulla mappa.</string>
+    <string>Matchly ha bisogno della tua posizione per mostrarti i campi sportivi più vicini sulla mappa.</string>
     <key>NSLocationTemporaryUsageDescriptionDictionary</key>
     <dict>
         <key>RadarAccuracy</key>
@@ -78,7 +78,7 @@
     </dict>
     
     <key>NSLocalNetworkUsageDescription</key>
-    <string>Arena Pro ha bisogno di accedere alla rete locale per connettersi al debugger e migliorare l'esperienza di sviluppo.</string>
+    <string>Matchly ha bisogno di accedere alla rete locale per connettersi al debugger e migliorare l'esperienza di sviluppo.</string>
     <key>NSBonjourServices</key>
     <array>
         <string>_dartobservatory._tcp</string>
@@ -86,6 +86,17 @@
     
     <key>io.flutter.embedded_views_preview</key>
     <true/>
+    <key>CFBundleURLTypes</key>
+<array>
+    <dict>
+        <key>CFBundleTypeRole</key>
+        <string>Editor</string>
+        <key>CFBundleURLSchemes</key>
+        <array>
+            <string>myapp</string>
+        </array>
+    </dict>
+</array>
     <key>LSApplicationQueriesSchemes</key>
     <array>
       <string>https</string>

@@ -91,7 +91,7 @@ class HomeAppBar extends ConsumerWidget implements PreferredSizeWidget {
                 ),
                 onPressed: null,
               ),
-              error: (_, __) => const IconButton(
+              error: (_, _) => const IconButton(
                 icon: Icon(
                   Icons.error_outline,
                   color: AppTheme.statoErrore,

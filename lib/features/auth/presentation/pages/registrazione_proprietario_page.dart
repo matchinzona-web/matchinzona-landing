@@ -1,27 +1,21 @@
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app_campi/core/theme/app_theme.dart';
 import 'package:app_campi/features/admin/presentation/widgets/foto_societa_widget.dart';
 import 'package:app_campi/features/admin/presentation/widgets/telefono_form_widget.dart';
 import 'package:app_campi/features/admin/presentation/widgets/indirizzo_form_widget.dart';
+import 'package:app_campi/features/admin/presentation/pages/pagamento_abbonamento_page.dart';
 import 'package:app_campi/features/admin/presentation/service/geocoding_service.dart';
 import 'package:app_campi/features/auth/data/auth_repository.dart';
-import 'package:app_campi/features/admin/presentation/pages/attivazione_pagamenti_page.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const Color _coloreElementi = AppTheme.neonOrange;
 
 class RegistrazioneProprietario extends StatefulWidget {
   final String pianoScelto;
-  final String? sessionId;
 
-  const RegistrazioneProprietario({
-    super.key,
-    required this.pianoScelto,
-    this.sessionId,
-  });
-
+  const RegistrazioneProprietario({super.key, required this.pianoScelto});
   @override
   State<RegistrazioneProprietario> createState() =>
       _RegistrazioneProprietarioState();
@@ -42,6 +36,11 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
   final _civicoController = TextEditingController();
   final _cittaController = TextEditingController();
   final _provinciaController = TextEditingController();
+  final _capController = TextEditingController();
+
+  final _codiceFiscaleController = TextEditingController();
+  final _codiceDestinatarioController = TextEditingController();
+  final _pecController = TextEditingController();
   TextEditingController? _viaInternalController;
 
   final _pIvaFocus = FocusNode();
@@ -50,6 +49,10 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
   final _civicoFocus = FocusNode();
   final _cittaFocus = FocusNode();
   final _provinciaFocus = FocusNode();
+  final _capFocus = FocusNode();
+  final _codiceFiscaleFocus = FocusNode();
+  final _codiceDestinatarioFocus = FocusNode();
+  final _pecFocus = FocusNode();
   final _nomeProprietarioFocus = FocusNode();
   final _telefonoFocus = FocusNode();
   final _numeroFissoFocus = FocusNode();
@@ -57,12 +60,13 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
   final _passwordFocus = FocusNode();
   final _confermaPasswordFocus = FocusNode();
 
-  String? _stripeCustomerId;
   Map<String, double>? _coordinateIndirizzoSelezionato;
   bool _mostraPassword = false;
   bool _mostraConfermaPassword = false;
-  String _telefonoCompleto = '';
-  bool _telefonoValido = false;
+  bool _terminiAccettati = false;
+  bool _mostraErroreTermini = false;
+  final String _telefonoCompleto = '';
+  final bool _telefonoValido = false;
 
   final Map<String, bool> _campiAbbandonati = {};
 
@@ -78,6 +82,10 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
     _configuraListenerFocus(_civicoFocus, 'civico');
     _configuraListenerFocus(_cittaFocus, 'citta');
     _configuraListenerFocus(_provinciaFocus, 'provincia');
+    _configuraListenerFocus(_capFocus, 'cap');
+    _configuraListenerFocus(_codiceFiscaleFocus, 'codiceFiscale');
+    _configuraListenerFocus(_codiceDestinatarioFocus, 'codiceDestinatario');
+    _configuraListenerFocus(_pecFocus, 'pec');
     _configuraListenerFocus(_nomeProprietarioFocus, 'nomeProprietario');
     _configuraListenerFocus(_telefonoFocus, 'telefono');
     _configuraListenerFocus(_numeroFissoFocus, 'numeroFisso');
@@ -107,12 +115,20 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
     _civicoController.dispose();
     _cittaController.dispose();
     _provinciaController.dispose();
+    _capController.dispose();
+    _codiceFiscaleController.dispose();
+    _codiceDestinatarioController.dispose();
+    _pecController.dispose();
     _pIvaFocus.dispose();
     _nomeSocietaFocus.dispose();
     _viaFocus.dispose();
     _civicoFocus.dispose();
     _cittaFocus.dispose();
     _provinciaFocus.dispose();
+    _capFocus.dispose();
+    _codiceFiscaleFocus.dispose();
+    _codiceDestinatarioFocus.dispose();
+    _pecFocus.dispose();
     _nomeProprietarioFocus.dispose();
     _telefonoController.dispose();
     _telefonoFocus.dispose();
@@ -178,8 +194,58 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
     );
   }
 
+  Future<void> _apriLink(String url) async {
+    final uri = Uri.parse(url);
+
+    final aperto = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+    if (!aperto && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossibile aprire il collegamento.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
   void _inviaDati() async {
-    setState(() => _campiAbbandonati.updateAll((key, value) => true));
+    setState(() {
+      _campiAbbandonati.addAll({
+        'pIva': true,
+        'codiceFiscale': true,
+        'nomeSocieta': true,
+        'via': true,
+        'civico': true,
+        'citta': true,
+        'provincia': true,
+        'cap': true,
+        'codiceDestinatario': true,
+        'pec': true,
+        'nomeProprietario': true,
+        'telefono': true,
+        'email': true,
+        'password': true,
+        'confermaPassword': true,
+      });
+    });
+
+    if (!_terminiAccettati) {
+      setState(() {
+        _mostraErroreTermini = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Devi accettare i Termini e dichiarare di aver letto la Privacy Policy.',
+          ),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+
+      return;
+    }
 
     if (_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -190,40 +256,30 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
       );
 
       try {
-        int limiteCampi = 0;
-        final String? sessionIdDallUrl = widget.sessionId;
+        final String via = (_viaInternalController?.text ?? _viaController.text)
+            .trim();
 
-        if (sessionIdDallUrl != null && sessionIdDallUrl.isNotEmpty) {
-          try {
-            final response = await Supabase.instance.client.functions.invoke(
-              'ottieni-dati-sessione',
-              body: {'session_id': sessionIdDallUrl},
-            );
-            if (response.data != null &&
-                response.data['stripe_customer_id'] != null) {
-              _stripeCustomerId = response.data['stripe_customer_id'] as String;
-              final priceId = response.data['price_id'] as String?;
-              if (priceId != null) {
-                const prezziLimiti = {
-                  'price_1Th5bHFxZCOuiQIAaia7ASFn': 1,
-                  'price_1TgjxqFxZCOuiQIA9CjLu34s': 2,
-                  'price_1Th5c2FxZCOuiQIAM6obraB0': 4,
-                  'price_1Th5cRFxZCOuiQIA4VAKya37': 5,
-                };
-                limiteCampi = prezziLimiti[priceId] ?? 0;
-              }
-            }
-          } catch (e) {
-            debugPrint("Errore Edge Function: $e");
-          }
-        }
+        final String civico = _civicoController.text.trim();
 
-        String indirizzoUnito =
-            '${(_viaInternalController?.text ?? _viaController.text).trim()} ${_civicoController.text.trim()}, ${_cittaController.text.trim()}, ${_provinciaController.text.trim().toUpperCase()}';
+        final String cap = _capController.text.trim();
+
+        final String comune = _cittaController.text.trim();
+
+        final String provincia = _provinciaController.text.trim().toUpperCase();
+
+        final String indirizzoUnito = '$via $civico, $cap $comune, $provincia';
 
         Map<String, double>? coordinate = _coordinateIndirizzoSelezionato;
 
-        coordinate ??= await GeocodingService.ottieniCoordinate(indirizzoUnito);
+        coordinate ??= await GeocodingService.ottieniCoordinate(
+          via: (_viaInternalController?.text ?? _viaController.text).trim(),
+          civico: _civicoController.text.trim(),
+          cap: _capController.text.trim(),
+          citta: _cittaController.text.trim(),
+          provincia: _provinciaController.text.trim(),
+        );
+
+        if (!mounted) return;
 
         if (coordinate == null) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -238,23 +294,40 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
           return;
         }
 
-        final double lat = coordinate?['latitudine'] ?? 0.0;
-        final double lng = coordinate?['longitudine'] ?? 0.0;
+        final double lat = coordinate['latitudine'] ?? 0.0;
+        final double lng = coordinate['longitudine'] ?? 0.0;
 
         final String idSocieta = await AuthService().registraProprietario(
-          email: _emailController.text,
+          email: _emailController.text.trim(),
           password: _passwordController.text,
-          nomeProprietario: _nomeProprietarioController.text,
-          pIva: _pIvaController.text,
-          nomeSocieta: _nomeSocietaController.text,
+          nomeProprietario: _nomeProprietarioController.text.trim(),
+
+          pIva: _pIvaController.text.trim(),
+          codiceFiscale: _codiceFiscaleController.text.trim().toUpperCase(),
+
+          nomeSocieta: _nomeSocietaController.text.trim(),
+
           indirizzo: indirizzoUnito,
-          telefonoFisso: _numeroFissoController.text,
+          via: via,
+          civico: civico,
+          cap: cap,
+          comune: comune,
+          provincia: provincia,
+
+          codiceDestinatario: _codiceDestinatarioController.text.trim().isEmpty
+              ? null
+              : _codiceDestinatarioController.text.trim().toUpperCase(),
+
+          pec: _pecController.text.trim().isEmpty
+              ? null
+              : _pecController.text.trim().toLowerCase(),
+
+          telefonoFisso: _numeroFissoController.text.trim(),
+
           cellulare: _telefonoController.text.trim(),
+
           latitudine: lat,
           longitudine: lng,
-          pianoScelto: widget.pianoScelto,
-          limiteCampi: limiteCampi,
-          stripeCustomerId: _stripeCustomerId,
         );
 
         if (_fotoBytes != null && _estensioneFoto != null) {
@@ -275,21 +348,21 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
               .eq('id', idSocieta);
         }
 
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('first_time', false);
+        if (!mounted) return;
 
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).clearSnackBars();
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  AttivazionePagamentiPage(idSocieta: idSocieta),
+        ScaffoldMessenger.of(context).clearSnackBars();
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PagamentoAbbonamentoPage(
+              idSocieta: idSocieta,
+              pianoScelto: widget.pianoScelto,
             ),
-          );
-        }
+          ),
+        );
       } catch (e) {
-        if (context.mounted) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Errore: ${e.toString()}'),
@@ -370,13 +443,45 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
                     icon: Icons.receipt_long,
                     keyboardType: TextInputType.number,
                     validator: (val) {
-                      if (val == null || val.trim().isEmpty)
+                      if (val == null || val.trim().isEmpty) {
                         return 'Inserisci la Partita IVA';
-                      if (!RegExp(r'^\d{11}$').hasMatch(val.trim()))
+                      }
+                      if (!RegExp(r'^\d{11}$').hasMatch(val.trim())) {
                         return 'Deve contenere esattamente 11 numeri';
+                      }
                       return null;
                     },
                   ),
+                  const SizedBox(height: 20),
+
+                  _buildNeonFormField(
+                    controller: _codiceFiscaleController,
+                    focusNode: _codiceFiscaleFocus,
+                    campoKey: 'codiceFiscale',
+                    label: 'Codice Fiscale *',
+                    icon: Icons.badge_outlined,
+                    keyboardType: TextInputType.text,
+                    maxLength: 16,
+                    validator: (val) {
+                      final valore = (val ?? '').trim().toUpperCase();
+
+                      if (valore.isEmpty) {
+                        return 'Inserisci il Codice Fiscale';
+                      }
+
+                      final cfPersona = RegExp(r'^[A-Z0-9]{16}$');
+
+                      final cfSocieta = RegExp(r'^\d{11}$');
+
+                      if (!cfPersona.hasMatch(valore) &&
+                          !cfSocieta.hasMatch(valore)) {
+                        return 'Inserisci un Codice Fiscale valido';
+                      }
+
+                      return null;
+                    },
+                  ),
+
                   const SizedBox(height: 20),
 
                   // NOME SOCIETÀ
@@ -387,8 +492,9 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
                     label: 'Nome della Società *',
                     icon: Icons.business,
                     validator: (val) {
-                      if (val == null || val.trim().isEmpty)
+                      if (val == null || val.trim().isEmpty) {
                         return 'Inserisci il nome della società';
+                      }
                       if (val.trim().length < 3) return 'Almeno 3 lettere';
                       return null;
                     },
@@ -399,10 +505,13 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
                   IndirizzoFormWidget(
                     viaController: _viaController,
                     civicoController: _civicoController,
+                    capController: _capController,
                     cittaController: _cittaController,
                     provinciaController: _provinciaController,
+
                     viaFocus: _viaFocus,
                     civicoFocus: _civicoFocus,
+                    capFocus: _capFocus,
                     cittaFocus: _cittaFocus,
                     provinciaFocus: _provinciaFocus,
                     campiAbbandonati: _campiAbbandonati,
@@ -427,6 +536,56 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
                   ),
                   const SizedBox(height: 20),
 
+                  _buildNeonFormField(
+                    controller: _codiceDestinatarioController,
+                    focusNode: _codiceDestinatarioFocus,
+                    campoKey: 'codiceDestinatario',
+                    label: 'Codice Destinatario (facoltativo)',
+                    icon: Icons.qr_code_rounded,
+                    maxLength: 7,
+                    validator: (val) {
+                      final valore = (val ?? '').trim();
+
+                      if (valore.isEmpty) {
+                        return null;
+                      }
+
+                      if (!RegExp(r'^[A-Za-z0-9]{7}$').hasMatch(valore)) {
+                        return 'Deve contenere 7 caratteri';
+                      }
+
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  _buildNeonFormField(
+                    controller: _pecController,
+                    focusNode: _pecFocus,
+                    campoKey: 'pec',
+                    label: 'PEC (facoltativa)',
+                    icon: Icons.alternate_email_rounded,
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (val) {
+                      final valore = (val ?? '').trim();
+
+                      if (valore.isEmpty) {
+                        return null;
+                      }
+
+                      if (!RegExp(
+                        r'^[\w\-.]+@([\w-]+\.)+[\w-]{2,}$',
+                      ).hasMatch(valore)) {
+                        return 'Inserisci una PEC valida';
+                      }
+
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 20),
+
                   // NOME PROPRIETARIO
                   _buildNeonFormField(
                     controller: _nomeProprietarioController,
@@ -443,6 +602,7 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
                   TelefonoFormWidget(
                     controller: _telefonoController,
                     focusNode: _telefonoFocus,
+                    mostraErrore: _campiAbbandonati['telefono'] == true,
                   ),
 
                   // TELEFONO FISSO
@@ -465,12 +625,14 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
                     icon: Icons.email,
                     keyboardType: TextInputType.emailAddress,
                     validator: (val) {
-                      if (val == null || val.trim().isEmpty)
+                      if (val == null || val.trim().isEmpty) {
                         return 'Inserisci l\'indirizzo email';
+                      }
                       if (!RegExp(
                         r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                      ).hasMatch(val.trim()))
+                      ).hasMatch(val.trim())) {
                         return 'Inserisci una email valida';
+                      }
                       return null;
                     },
                   ),
@@ -495,15 +657,18 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
                           setState(() => _mostraPassword = !_mostraPassword),
                     ),
                     validator: (val) {
-                      if (val == null || val.isEmpty)
+                      if (val == null || val.isEmpty) {
                         return 'Inserisci una password';
+                      }
                       if (val.length < 8) return 'Minimo 8 caratteri';
-                      if (!RegExp(r'[A-Z]').hasMatch(val))
+                      if (!RegExp(r'[A-Z]').hasMatch(val)) {
                         return 'Almeno 1 lettera maiuscola';
+                      }
                       if (!RegExp(
                         r'[!@#\$%^&*(),.?":{}|<>_\-+=\[\]\\\/]',
-                      ).hasMatch(val))
+                      ).hasMatch(val)) {
                         return 'Almeno 1 carattere speciale';
+                      }
                       return null;
                     },
                   ),
@@ -530,14 +695,133 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
                       ),
                     ),
                     validator: (val) {
-                      if (val == null || val.isEmpty)
+                      if (val == null || val.isEmpty) {
                         return 'Conferma la password';
-                      if (val != _passwordController.text)
+                      }
+                      if (val != _passwordController.text) {
                         return 'Le password non coincidono';
+                      }
                       return null;
                     },
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 30),
+
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppTheme.cardBg,
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(
+                        color: _mostraErroreTermini && !_terminiAccettati
+                            ? Colors.redAccent
+                            : Colors.grey.shade700,
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Checkbox(
+                          value: _terminiAccettati,
+                          activeColor: AppTheme.neonOrange,
+                          checkColor: AppTheme.darkBg,
+                          side: BorderSide(
+                            color: _mostraErroreTermini && !_terminiAccettati
+                                ? Colors.redAccent
+                                : Colors.grey,
+                          ),
+                          onChanged: (value) {
+                            setState(() {
+                              _terminiAccettati = value ?? false;
+
+                              if (_terminiAccettati) {
+                                _mostraErroreTermini = false;
+                              }
+                            });
+                          },
+                        ),
+
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 9),
+                            child: Wrap(
+                              children: [
+                                const Text(
+                                  'Dichiaro di aver letto la ',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                  ),
+                                ),
+
+                                GestureDetector(
+                                  onTap: () => _apriLink(
+                                    'https://matchlyassistenza-web.github.io/matchly-privacy/',
+                                  ),
+                                  child: const Text(
+                                    'Privacy Policy',
+                                    style: TextStyle(
+                                      color: AppTheme.neonOrange,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      decoration: TextDecoration.underline,
+                                      decorationColor: AppTheme.neonOrange,
+                                    ),
+                                  ),
+                                ),
+
+                                const Text(
+                                  ' e accetto i ',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                  ),
+                                ),
+
+                                GestureDetector(
+                                  onTap: () => _apriLink(
+                                    'https://matchlyassistenza-web.github.io/matchly-privacy/termini.html',
+                                  ),
+                                  child: const Text(
+                                    'Termini e Condizioni',
+                                    style: TextStyle(
+                                      color: AppTheme.neonOrange,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      decoration: TextDecoration.underline,
+                                      decorationColor: AppTheme.neonOrange,
+                                    ),
+                                  ),
+                                ),
+
+                                const Text(
+                                  '.',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  if (_mostraErroreTermini && !_terminiAccettati)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 14, top: 7),
+                      child: Text(
+                        'Devi accettare per continuare.',
+                        style: TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 25),
 
                   // BOTTONE
                   SizedBox(

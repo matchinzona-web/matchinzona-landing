@@ -5,9 +5,13 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <application
-        android:label="Arena Pro"
+        android:label="Matchly"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
+
+        <meta-data
+    android:name="com.google.firebase.messaging.default_notification_icon"
+    android:resource="@drawable/ic_stat_matchly" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -17,42 +21,66 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
-            
-            <meta-data
-              android:name="io.flutter.embedding.android.NormalTheme"
-              android:resource="@style/NormalTheme"
-              />
 
-              <intent-filter>
-    <action android:name="android.intent.action.MAIN"/>
-    <category android:name="android.intent.category.LAUNCHER"/>
-</intent-filter>
+            <meta-data
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme" />
+
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="false" />
 
             <intent-filter>
-    <action android:name="android.intent.action.VIEW"/>
-    <category android:name="android.intent.category.DEFAULT"/>
-    <category android:name="android.intent.category.BROWSABLE"/>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:scheme="myapp"
+                    android:host="registrazione" />
+            </intent-filter>
+            <intent-filter>
+    <action android:name="android.intent.action.VIEW" />
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
 
     <data
         android:scheme="myapp"
-        android:host="registrazione" />
+        android:host="login-callback" />
 </intent-filter>
+
+<intent-filter>
+    <action android:name="android.intent.action.VIEW" />
+
+    <category android:name="android.intent.category.DEFAULT" />
+    <category android:name="android.intent.category.BROWSABLE" />
+
+    <data
+        android:scheme="myapp"
+        android:host="abbonamento" />
+</intent-filter>
+
         </activity>
-        
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-            
+
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyBDivilBxBjRLpV2CqvnnR0ViU-5uUYFgg"/>
-            
+            android:value="AIzaSyDMVaseGGhmFghDBQ6l2jElRXAYtUFaTiY" />
+
     </application>
 
     <queries>
         <intent>
-            <action android:name="android.intent.action.PROCESS_TEXT"/>
-            <data android:mimeType="text/plain"/>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <data android:mimeType="text/plain" />
         </intent>
 
         <intent>
@@ -61,4 +89,5 @@
             <data android:scheme="https" />
         </intent>
     </queries>
+
 </manifest>

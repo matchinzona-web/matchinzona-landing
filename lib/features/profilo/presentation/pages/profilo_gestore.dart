@@ -7,6 +7,7 @@ import 'package:app_campi/features/profilo/application/profilo_notifier.dart';
 import 'package:app_campi/features/admin/presentation/widgets/telefono_form_widget.dart';
 import 'package:app_campi/features/admin/presentation/widgets/indirizzo_form_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:app_campi/core/services/push_notification_service.dart';
 
 class ProfiloGestore extends ConsumerStatefulWidget {
   final Utente utenteLoggato;
@@ -22,19 +23,23 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
 
   final FocusNode _viaFocus = FocusNode();
   final FocusNode _civicoFocus = FocusNode();
+  final FocusNode _capFocus = FocusNode();
   final FocusNode _cittaFocus = FocusNode();
   final FocusNode _provinciaFocus = FocusNode();
 
   late final TextEditingController _nomeController;
   late final TextEditingController _cognomeController;
+  final TextEditingController _nomeSocietaController = TextEditingController();
   final TextEditingController _telefonoController = TextEditingController();
   final TextEditingController _telefonoFissoController =
       TextEditingController();
   final TextEditingController _viaController = TextEditingController();
   final TextEditingController _civicoController = TextEditingController();
+  final TextEditingController _capController = TextEditingController();
   final TextEditingController _cittaController = TextEditingController();
   final TextEditingController _provinciaController = TextEditingController();
   TextEditingController? _viaInternalController;
+  Map<String, double>? _coordinateIndirizzo;
   final TextEditingController _nuovaPasswordController =
       TextEditingController();
   final TextEditingController _confermaPasswordController =
@@ -45,6 +50,7 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
   final Map<String, bool> _campiAbbandonati = {
     'via': true,
     'civico': true,
+    'cap': true,
     'citta': true,
     'provincia': true,
   };
@@ -66,9 +72,13 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
       _telefonoController.text = state.telefonoCompleto;
 
       final data = await _caricaDatiExtra();
+
       if (data != null && mounted) {
-        _telefonoFissoController.text = data['cellulare']?.toString() ?? '';
-        _impostaIndirizzo(data['indirizzo']?.toString() ?? '');
+        _nomeSocietaController.text = data['nome_societa']?.toString() ?? '';
+
+        _telefonoFissoController.text = data['telefono']?.toString() ?? '';
+
+        _impostaDatiIndirizzo(data);
       }
     });
   }
@@ -77,7 +87,10 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
     try {
       return await Supabase.instance.client
           .from('societa')
-          .select('cellulare, indirizzo')
+          .select(
+            'nome_societa, telefono, cellulare, indirizzo, '
+            'via, civico, cap, comune, provincia',
+          )
           .eq('id_utente', widget.utenteLoggato.id)
           .maybeSingle();
     } catch (e) {
@@ -86,29 +99,79 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
     }
   }
 
-  void _impostaIndirizzo(String indirizzoDb) {
-    if (indirizzoDb.isEmpty) return;
-    List<String> parti = indirizzoDb.split(',');
-    if (parti.length >= 3) {
-      String viaECivico = parti[0].trim();
-      int ultimoSpazio = viaECivico.lastIndexOf(' ');
-      if (ultimoSpazio != -1) {
-        _viaController.text = viaECivico.substring(0, ultimoSpazio).trim();
-        _civicoController.text = viaECivico.substring(ultimoSpazio + 1).trim();
-      } else {
-        _viaController.text = viaECivico;
-        _civicoController.text = '';
-      }
-      _cittaController.text = parti[1].trim();
-      _provinciaController.text = parti[2]
-          .trim()
-          .replaceAll('(', '')
-          .replaceAll(')', '');
+  void _impostaDatiIndirizzo(Map<String, dynamic> data) {
+    final via = data['via']?.toString().trim() ?? '';
+
+    final civico = data['civico']?.toString().trim() ?? '';
+
+    final cap = data['cap']?.toString().trim() ?? '';
+
+    final comune = data['comune']?.toString().trim() ?? '';
+
+    final provincia = data['provincia']?.toString().trim().toUpperCase() ?? '';
+
+    final haIndirizzoStrutturato =
+        via.isNotEmpty ||
+        civico.isNotEmpty ||
+        cap.isNotEmpty ||
+        comune.isNotEmpty ||
+        provincia.isNotEmpty;
+
+    if (haIndirizzoStrutturato) {
+      _viaController.text = via;
+      _civicoController.text = civico;
+      _capController.text = cap;
+      _cittaController.text = comune;
+      _provinciaController.text = provincia;
+
       if (_viaInternalController != null) {
         _viaInternalController!.text = _viaController.text;
       }
-    } else {
-      _viaController.text = indirizzoDb;
+
+      return;
+    }
+
+    // Fallback per eventuali record vecchi
+    // che hanno ancora solo "indirizzo".
+    final indirizzoDb = data['indirizzo']?.toString().trim() ?? '';
+
+    if (indirizzoDb.isEmpty) return;
+
+    final parti = indirizzoDb.split(',');
+
+    if (parti.length >= 3) {
+      final viaECivico = parti[0].trim();
+      final ultimoSpazio = viaECivico.lastIndexOf(' ');
+
+      if (ultimoSpazio != -1) {
+        _viaController.text = viaECivico.substring(0, ultimoSpazio).trim();
+
+        _civicoController.text = viaECivico.substring(ultimoSpazio + 1).trim();
+      } else {
+        _viaController.text = viaECivico;
+      }
+
+      final parteComune = parti[1].trim();
+
+      final match = RegExp(r'^(\d{5})\s+(.+)$').firstMatch(parteComune);
+
+      if (match != null) {
+        _capController.text = match.group(1) ?? '';
+
+        _cittaController.text = match.group(2) ?? '';
+      } else {
+        _cittaController.text = parteComune;
+      }
+
+      _provinciaController.text = parti[2]
+          .trim()
+          .replaceAll('(', '')
+          .replaceAll(')', '')
+          .toUpperCase();
+
+      if (_viaInternalController != null) {
+        _viaInternalController!.text = _viaController.text;
+      }
     }
   }
 
@@ -126,8 +189,8 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Errore selezione foto: $e'),
+          const SnackBar(
+            content: Text('Impossibile selezionare la foto. Riprova.'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -167,6 +230,7 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
           utenteLoggato: widget.utenteLoggato,
           via: (_viaInternalController?.text ?? _viaController.text).trim(),
           civico: _civicoController.text.trim(),
+          cap: _capController.text.trim(),
           citta: _cittaController.text.trim(),
           provincia: _provinciaController.text.trim().toUpperCase(),
           telefonoFisso: _telefonoFissoController.text.trim(),
@@ -186,6 +250,11 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
       return;
     }
 
+    await Supabase.instance.client
+        .from('societa')
+        .update({'nome_societa': _nomeSocietaController.text.trim()})
+        .eq('id_utente', widget.utenteLoggato.id);
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Profilo aggiornato con successo! ✅'),
@@ -199,14 +268,17 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
   void dispose() {
     _nomeController.dispose();
     _cognomeController.dispose();
+    _nomeSocietaController.dispose();
     _telefonoController.dispose();
     _telefonoFissoController.dispose();
     _viaController.dispose();
     _civicoController.dispose();
+    _capController.dispose();
     _cittaController.dispose();
     _provinciaController.dispose();
     _viaFocus.dispose();
     _civicoFocus.dispose();
+    _capFocus.dispose();
     _cittaFocus.dispose();
     _provinciaFocus.dispose();
     _nuovaPasswordController.dispose();
@@ -269,7 +341,7 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
     return Scaffold(
       backgroundColor: AppTheme.darkBg,
       appBar: AppBar(
-        title: const Text('Il Mio Profilo'),
+        title: const Text('Profilo e Sicurezza'),
         backgroundColor: AppTheme.darkBg,
         iconTheme: const IconThemeData(color: AppTheme.neonOrange),
       ),
@@ -418,6 +490,28 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
                         const SizedBox(height: 15),
 
                         TelefonoFormWidget(controller: _telefonoController),
+                        _buildNeonFormField(
+                          controller: _nomeSocietaController,
+                          label: 'Nome Società',
+                          icon: Icons.business_rounded,
+                          campoKey: 'nome_societa',
+                          maxLength: 100,
+                          validator: (val) {
+                            final nomeSocieta = val?.trim() ?? '';
+
+                            if (nomeSocieta.isEmpty) {
+                              return 'Inserisci il nome della società';
+                            }
+
+                            if (nomeSocieta.length < 3) {
+                              return 'Il nome della società deve avere almeno 3 lettere';
+                            }
+
+                            return null;
+                          },
+                        ),
+
+                        const SizedBox(height: 15),
                         const SizedBox(height: 15),
 
                         _buildNeonFormField(
@@ -442,10 +536,12 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
                         IndirizzoFormWidget(
                           viaController: _viaController,
                           civicoController: _civicoController,
+                          capController: _capController,
                           cittaController: _cittaController,
                           provinciaController: _provinciaController,
                           viaFocus: _viaFocus,
                           civicoFocus: _civicoFocus,
+                          capFocus: _capFocus,
                           cittaFocus: _cittaFocus,
                           provinciaFocus: _provinciaFocus,
                           campiAbbandonati: _campiAbbandonati,
@@ -454,10 +550,10 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
                             _viaInternalController!.text = _viaController.text;
                           },
                           onCoordinateSelezionate: (coordinate) {
-                            // Aggiorna le coordinate nel profilo se presente la variabile
+                            _coordinateIndirizzo = coordinate;
                           },
                           onIndirizzoModificato: () {
-                            // Reset coordinate se l'utente modifica manualmente il testo
+                            _coordinateIndirizzo = null;
                           },
                         ),
                         const SizedBox(height: 30),
@@ -499,12 +595,14 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
                           validator: (val) {
                             if (val == null || val.isEmpty) return null;
                             if (val.length < 8) return 'Minimo 8 caratteri';
-                            if (!RegExp(r'[A-Z]').hasMatch(val))
+                            if (!RegExp(r'[A-Z]').hasMatch(val)) {
                               return 'Almeno 1 lettera maiuscola';
+                            }
                             if (!RegExp(
                               r'[!@#\$%^&*(),.?":{}|<>_\-+=\[\]\\\/]',
-                            ).hasMatch(val))
+                            ).hasMatch(val)) {
                               return 'Almeno 1 carattere speciale';
+                            }
                             return null;
                           },
                         ),
@@ -532,10 +630,12 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
                                 ),
                               ),
                           validator: (val) {
-                            if (_nuovaPasswordController.text.isEmpty)
+                            if (_nuovaPasswordController.text.isEmpty) {
                               return null;
-                            if (val != _nuovaPasswordController.text)
+                            }
+                            if (val != _nuovaPasswordController.text) {
                               return 'Le password non coincidono';
+                            }
                             return null;
                           },
                         ),
@@ -571,7 +671,37 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
                                   ),
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 30),
+
+                        const Divider(color: AppTheme.cardBorder),
+
+                        const SizedBox(height: 16),
+
+                        const Text(
+                          'ZONA PERICOLO',
+                          style: TextStyle(
+                            color: Colors.redAccent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        const Text(
+                          'L’eliminazione dell’account gestore comporta anche la rimozione '
+                          'del centro sportivo, dei campi e dei dati collegati. '
+                          'L’operazione non può essere annullata.',
+                          style: TextStyle(
+                            color: Colors.white60,
+                            fontSize: 13,
+                            height: 1.4,
+                          ),
+                        ),
+
+                        const SizedBox(height: 18),
+
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton.icon(
@@ -623,7 +753,15 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
           ),
         ),
         content: const Text(
-          'Sei sicuro di voler eliminare il tuo account?\n\nQuesta azione eliminerà definitivamente:\n• Il tuo centro sportivo e tutti i campi\n• Tutte le prenotazioni attive\n• Il tuo abbonamento Stripe\n\nGli utenti con prenotazioni attive verranno avvisati. Questa azione è irreversibile.',
+          'Sei sicuro di voler eliminare definitivamente il tuo account gestore?\n\n'
+          'Verranno rimossi:\n'
+          '• il profilo gestore;\n'
+          '• il centro sportivo e i relativi campi;\n'
+          '• le prenotazioni e gli altri dati collegati al centro;\n'
+          '• i dati associati al servizio Matchly.\n\n'
+          'L’abbonamento collegato verrà inoltre gestito tramite Stripe.\n\n'
+          'Alcuni dati potranno essere conservati solo quando richiesto da obblighi di legge.\n\n'
+          'Questa azione è irreversibile.',
           style: TextStyle(color: Colors.white70, height: 1.5),
         ),
         actions: [
@@ -652,9 +790,12 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
     if (conferma != true) return;
 
     try {
+      await PushNotificationService.rimuoviTokenCorrente();
+
       await Supabase.instance.client.functions.invoke(
         'elimina-account-gestore',
       );
+
       await Supabase.instance.client.auth.signOut();
       if (mounted) {
         Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
@@ -663,7 +804,7 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Errore eliminazione: $e'),
+            content: Text('Errore eliminazione'),
             backgroundColor: Colors.redAccent,
           ),
         );

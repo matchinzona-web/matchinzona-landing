@@ -27,7 +27,11 @@ class SocietaRepository {
       final response = await _supabase
           .from('societa')
           .select()
-          .ilike('indirizzo', '%$query%');
+          .or(
+            'comune.ilike.%$query%,'
+            'provincia.ilike.%$query%,'
+            'indirizzo.ilike.%$query%',
+          );
 
       return (response as List).map((json) => Societa.fromJson(json)).toList();
     } catch (e) {
@@ -41,7 +45,13 @@ class SocietaRepository {
       final response = await _supabase
           .from('societa')
           .select()
-          .or('nome_societa.ilike.%$query%, indirizzo.ilike.%$query%');
+          .or(
+            'nome_societa.ilike.%$query%,'
+            'via.ilike.%$query%,'
+            'comune.ilike.%$query%,'
+            'provincia.ilike.%$query%,'
+            'indirizzo.ilike.%$query%',
+          );
 
       return (response as List).map((json) => Societa.fromJson(json)).toList();
     } catch (e) {
@@ -67,56 +77,159 @@ class SocietaRepository {
 
   Future<List<Map<String, dynamic>>> cercaSocietaEPrezziPerSport({
     required String sport,
-    required int giornoSettimana, // 1 = Lunedì, ..., 7 = Domenica
+    required int giornoSettimana,
   }) async {
     try {
       debugPrint("Cerco società per sport: $sport e giorno: $giornoSettimana");
 
-      // Query che estrae i campi e le società che HANNO un orario APERTO per il giorno richiesto
+      // 1. Trova i CAMPI che supportano lo sport richiesto,
+      // insieme alla società e agli orari.
       final response = await _supabase
           .from('campi')
           .select('''
-          tariffe_sport, 
+          id,
+          id_societa,
+          created_at,
+          tariffe_sport,
           societa!inner(
             *,
-            orari_societa!inner(giorno_settimana, is_chiuso)
+            orari_societa!inner(
+              giorno_settimana,
+              is_chiuso
+            )
           )
         ''')
           .filter('tariffe_sport', 'cs', '[{"sport":"$sport"}]')
           .eq('societa.orari_societa.giorno_settimana', giornoSettimana)
           .eq('societa.orari_societa.is_chiuso', false);
 
+      final List<dynamic> righeSport = response as List;
+
+      if (righeSport.isEmpty) {
+        return [];
+      }
+
+      // 2. Recuperiamo gli ID delle società candidate.
+      final Set<String> idsSocieta = righeSport
+          .map((row) => row['id_societa'].toString())
+          .toSet();
+
+      if (idsSocieta.isEmpty) {
+        return [];
+      }
+
+      // 3. Recuperiamo TUTTI i campi delle società candidate,
+      // nello stesso ordine usato per determinare quali sono visibili.
+      //
+      // È una sola query aggiuntiva, indipendentemente
+      // dal numero di società trovate.
+      final campiResponse = await _supabase
+          .from('campi')
+          .select('id, id_societa, created_at')
+          .inFilter('id_societa', idsSocieta.toList())
+          .order('created_at', ascending: true);
+
+      final List<dynamic> tuttiCampi = campiResponse as List;
+
+      // 4. Raggruppiamo i campi per società mantenendo l'ordine.
+      final Map<String, List<String>> campiPerSocieta = {};
+
+      for (final campo in tuttiCampi) {
+        final idSocieta = campo['id_societa'].toString();
+        final idCampo = campo['id'].toString();
+
+        campiPerSocieta.putIfAbsent(idSocieta, () => <String>[]);
+
+        campiPerSocieta[idSocieta]!.add(idCampo);
+      }
+
+      // 5. Recuperiamo limite_campi dalle società già presenti
+      // nella prima query.
+      final Map<String, int> limitiPerSocieta = {};
+
+      for (final row in righeSport) {
+        final datiSocieta = row['societa'] as Map<String, dynamic>?;
+
+        if (datiSocieta == null) continue;
+
+        final idSocieta = datiSocieta['id'].toString();
+
+        limitiPerSocieta[idSocieta] =
+            (datiSocieta['limite_campi'] as num?)?.toInt() ?? 0;
+      }
+
+      // 6. Costruiamo l'insieme dei campi realmente VISIBILI.
+      final Set<String> campiVisibili = {};
+
+      for (final entry in campiPerSocieta.entries) {
+        final idSocieta = entry.key;
+        final campi = entry.value;
+
+        final limite = limitiPerSocieta[idSocieta] ?? 0;
+
+        if (limite <= 0) continue;
+
+        campiVisibili.addAll(campi.take(limite));
+      }
+
+      // 7. Ora consideriamo soltanto i campi che:
+      // - supportano lo sport
+      // - sono dentro limite_campi
+      // - appartengono a una società aperta quel giorno.
       final Map<String, Map<String, dynamic>> mappaRisultati = {};
 
-      for (var row in response) {
-        if (row['societa'] != null) {
-          final societa = Societa.fromJson(row['societa']);
+      for (final row in righeSport) {
+        final idCampo = row['id'].toString();
 
-          // Estraggo il prezzo specifico per questo sport
-          double prezzoMinimo = 0.0;
-          final List tariffe = row['tariffe_sport'] ?? [];
-          for (var t in tariffe) {
-            if (t['sport'] == sport) {
-              prezzoMinimo = (t['prezzo'] ?? 0.0).toDouble();
-              break;
-            }
-          }
+        // Campo sospeso/invisibile dal piano:
+        // NON deve far comparire la società.
+        if (!campiVisibili.contains(idCampo)) {
+          continue;
+        }
 
-          // Se la società è già presente, tengo il prezzo più conveniente
-          if (!mappaRisultati.containsKey(societa.id) ||
-              prezzoMinimo <
-                  (mappaRisultati[societa.id]!['prezzo'] as double)) {
-            mappaRisultati[societa.id] = {
-              'societa': societa,
-              'prezzo': prezzoMinimo,
-            };
+        if (row['societa'] == null) continue;
+
+        final societa = Societa.fromJson(
+          row['societa'] as Map<String, dynamic>,
+        );
+
+        double prezzoMinimo = 0.0;
+
+        final List tariffe = row['tariffe_sport'] as List? ?? [];
+
+        for (final t in tariffe) {
+          final sportTariffa =
+              t['sport']?.toString().trim().toLowerCase() ?? '';
+
+          final sportRichiesto = sport.trim().toLowerCase();
+
+          if (sportTariffa == sportRichiesto) {
+            prezzoMinimo = (t['prezzo'] as num?)?.toDouble() ?? 0.0;
+
+            break;
           }
+        }
+
+        if (prezzoMinimo <= 0) {
+          continue;
+        }
+
+        // Se più campi VISIBILI supportano lo stesso sport,
+        // mostriamo il prezzo più conveniente.
+        if (!mappaRisultati.containsKey(societa.id) ||
+            prezzoMinimo < (mappaRisultati[societa.id]!['prezzo'] as double)) {
+          mappaRisultati[societa.id] = {
+            'societa': societa,
+            'prezzo': prezzoMinimo,
+          };
         }
       }
 
       debugPrint(
-        "Società aperte e con $sport trovate: ${mappaRisultati.length}",
+        "Società visibili, aperte e con $sport: "
+        "${mappaRisultati.length}",
       );
+
       return mappaRisultati.values.toList();
     } catch (e) {
       debugPrint("Errore ricerca società con filtri: $e");

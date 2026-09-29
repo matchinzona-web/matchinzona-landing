@@ -22,20 +22,9 @@ class PartitaService {
   final OrarioSocietaRepository _orarioRepository;
   final ChiusuraStraordinariaRepository _chiusuraRepository;
 
-  static const int oreLimiteScadenza = 4;
-  static const int orePerditaProtezioneFissa = 24;
-  static const int oreDurataMassimaProtezione = 48;
-  static const int maxPartiteNelloSlot = 3;
-  static const int maxGiocatoriSportPiccoli = 4;
-  static const int minAperturaSportPiccoli = 2;
-  static const int minProtezioneSportPiccoli = 3;
-  static const double percentualeProtezioneSportGrandi = 0.8;
-  static const double percentualeAperturaPrimeTime = 0.6;
-  static const double percentualeAperturaStandardTime = 0.4;
-  static const int primeTimeInizio = 18;
-  static const int primeTimeFine = 22;
-
-  static const int oreMinPreavvisoCreazione = 1;
+  static const int oreAnnullamentoAutomatico = 2;
+  static const int minutiLimiteAbbandono = 30;
+  static const int minutiMinPreavvisoCreazione = 30;
 
   PartitaService({
     PartitaRepository? repository,
@@ -64,25 +53,6 @@ class PartitaService {
         .toList();
   }
 
-  int getSogliaProtezione(int maxGiocatori) =>
-      maxGiocatori <= maxGiocatoriSportPiccoli
-      ? minProtezioneSportPiccoli
-      : (maxGiocatori * percentualeProtezioneSportGrandi).floor();
-
-  int getMinimoApertura(int maxGiocatori, bool isPrimeTime) =>
-      maxGiocatori <= maxGiocatoriSportPiccoli
-      ? minAperturaSportPiccoli
-      : (maxGiocatori *
-                (isPrimeTime
-                    ? percentualeAperturaPrimeTime
-                    : percentualeAperturaStandardTime))
-            .ceil();
-
-  bool _isPrimeTime(String orarioInizio) {
-    final ora = int.tryParse(orarioInizio.split(':')[0]) ?? 0;
-    return ora >= primeTimeInizio && ora < primeTimeFine;
-  }
-
   DateTime _calcolaInizioEsatto(DateTime data, String orarioInizio) {
     final parti = orarioInizio.split(':');
     return DateTime(
@@ -96,7 +66,11 @@ class PartitaService {
 
   int _orarioInMinuti(String orario) {
     final parti = orario.trim().split(':');
-    return (int.parse(parti[0]) * 60) + int.parse(parti[1]);
+
+    final int ore = int.parse(parti[0]);
+    final int minuti = int.parse(parti[1]);
+
+    return (ore * 60) + minuti;
   }
 
   // 🔴 CORRETTO: Ora usa partita.maxGiocatoriReali
@@ -115,26 +89,17 @@ class PartitaService {
       return 'annullata';
     }
 
-    final int maxPosti =
-        partita.maxGiocatoriReali; // 🟢 Usiamo maxGiocatoriReali
-    final isPt = _isPrimeTime(partita.orarioInizio);
-    final minimoApertura = getMinimoApertura(maxPosti, isPt);
-
-    if (partita.numeroGiocatoriPrenotati < minimoApertura) {
-      return 'annullata';
-    }
+    final int maxPosti = partita.maxGiocatoriReali;
 
     if (partita.numeroGiocatoriPrenotati >= maxPosti) {
       return 'completa';
     }
 
-    if (DateTime.now().isAfter(
-      inizioEsatto.subtract(const Duration(hours: orePerditaProtezioneFissa)),
-    )) {
-      return 'aperta_a_rischio';
+    if (partita.numeroGiocatoriPrenotati <= 0) {
+      return 'annullata';
     }
 
-    return partita.statoPartita;
+    return 'aperta_a_rischio';
   }
 
   Future<List<Partita>> getPartiteDisponibili() async {
@@ -150,9 +115,51 @@ class PartitaService {
     }
   }
 
+  double _calcolaImportoPartita({
+    required Campo campo,
+    required String? sport,
+    required String orarioInizio,
+    required String orarioFine,
+  }) {
+    double prezzoOrario = campo.prezzo;
+
+    final sportNormalizzato = sport?.trim().toLowerCase();
+
+    if (sportNormalizzato != null &&
+        sportNormalizzato.isNotEmpty &&
+        campo.tariffeSport.isNotEmpty) {
+      for (final tariffa in campo.tariffeSport) {
+        if (tariffa.sport.trim().toLowerCase() == sportNormalizzato) {
+          prezzoOrario = tariffa.prezzo;
+          break;
+        }
+      }
+    }
+
+    try {
+      final inizio = orarioInizio.split(':');
+      final fine = orarioFine.split(':');
+
+      final minutiInizio = int.parse(inizio[0]) * 60 + int.parse(inizio[1]);
+
+      int minutiFine = int.parse(fine[0]) * 60 + int.parse(fine[1]);
+
+      if (minutiFine == 0 && minutiInizio > 0) {
+        minutiFine = 24 * 60;
+      }
+
+      final durataOre = (minutiFine - minutiInizio) / 60.0;
+
+      return prezzoOrario * durataOre;
+    } catch (_) {
+      return prezzoOrario;
+    }
+  }
+
   Future<RisultatoCreazionePartita> creaNuovaPartita({
     required Campo campo,
     required Utente organizzatore,
+    required String sport,
     required DateTime dataPartita,
     required String orarioInizio,
     required String orarioFine,
@@ -169,18 +176,55 @@ class PartitaService {
         );
       }
 
-      int maxGiocatori = campo.numeroDiGiocatori;
+      final sportNormalizzato = sport.trim().toLowerCase();
 
-      if (campo.nomeCampo.toLowerCase().contains('tennis')) {
-        if (ospitiExtra >= 3 || (isPartitaPrivata && ospitiExtra > 1)) {
-          maxGiocatori = 4;
-        } else if (ospitiExtra <= 1) {
+      int maxGiocatori;
+
+      switch (sportNormalizzato) {
+        case 'tennis_singolo':
           maxGiocatori = 2;
-        }
+          break;
+
+        case 'tennis_doppio':
+        case 'padel':
+          maxGiocatori = 4;
+          break;
+
+        case 'calcio_5':
+          maxGiocatori = 10;
+          break;
+
+        case 'calcio_6':
+          maxGiocatori = 12;
+          break;
+
+        case 'calcio_7':
+          maxGiocatori = 14;
+          break;
+
+        case 'calcio_8':
+          maxGiocatori = 16;
+          break;
+
+        case 'calcio_11':
+          maxGiocatori = 22;
+          break;
+
+        case 'basket':
+          maxGiocatori = 10;
+          break;
+
+        case 'pallavolo':
+          maxGiocatori = 12;
+          break;
+
+        default:
+          maxGiocatori = campo.numeroDiGiocatori;
       }
 
       final int giocatoriTotaliIniziali = 1 + ospitiExtra;
       final bool isPartitaGiaCompleta = giocatoriTotaliIniziali >= maxGiocatori;
+      final bool isPartitaAperta = !isPartitaPrivata && !isPartitaGiaCompleta;
 
       final inizioEsatto = _calcolaInizioEsatto(dataPartita, orarioInizio);
       final adesso = DateTime.now();
@@ -191,34 +235,33 @@ class PartitaService {
         );
       }
 
-      if (adesso.isAfter(
-        inizioEsatto.subtract(const Duration(hours: oreMinPreavvisoCreazione)),
-      )) {
+      if (isPartitaAperta &&
+          adesso.isAfter(
+            inizioEsatto.subtract(
+              const Duration(hours: oreAnnullamentoAutomatico),
+            ),
+          )) {
         return RisultatoCreazionePartita.fallimento(
-          'Non puoi creare una partita con meno di $oreMinPreavvisoCreazione ora di anticipo.',
+          'Non puoi aprire una partita quando mancano meno di '
+          '$oreAnnullamentoAutomatico ore all\'inizio.',
         );
       }
 
-      final isPt = _isPrimeTime(orarioInizio);
+      if (!isPartitaAperta &&
+          adesso.isAfter(
+            inizioEsatto.subtract(
+              const Duration(minutes: minutiMinPreavvisoCreazione),
+            ),
+          )) {
+        return RisultatoCreazionePartita.fallimento(
+          'Puoi prenotare il campo intero fino a '
+          '$minutiMinPreavvisoCreazione minuti prima dell\'inizio.',
+        );
+      }
 
       if (giocatoriTotaliIniziali > maxGiocatori) {
         return RisultatoCreazionePartita.fallimento(
           'Errore: troppi giocatori per questo campo.',
-        );
-      }
-
-      if (giocatoriTotaliIniziali < getMinimoApertura(maxGiocatori, isPt)) {
-        return RisultatoCreazionePartita.fallimento(
-          'Servono più giocatori per aprire una partita in questo orario.',
-        );
-      }
-
-      if (giocatoriTotaliIniziali < getSogliaProtezione(maxGiocatori) &&
-          adesso.isAfter(
-            inizioEsatto.subtract(const Duration(hours: oreLimiteScadenza)),
-          )) {
-        return RisultatoCreazionePartita.fallimento(
-          'Mancano meno di $oreLimiteScadenza ore all\'inizio: impossibile aprire una partita a rischio.',
         );
       }
 
@@ -228,7 +271,7 @@ class PartitaService {
         orarioInizio,
       )) {
         return RisultatoCreazionePartita.fallimento(
-          'Lo slot è già occupato da una partita completa o protetta.',
+          'Lo slot è già occupato da una partita completa.',
         );
       }
 
@@ -247,57 +290,6 @@ class PartitaService {
         );
       }
 
-      if (partiteEsistenti.any(
-        (p) => p['stato_partita'] == 'aperta_protetta',
-      )) {
-        return RisultatoCreazionePartita.fallimento(
-          'È già presente una partita protetta in questo orario.',
-        );
-      }
-
-      if (!isPartitaGiaCompleta && !isPartitaPrivata) {
-        if (partiteEsistenti.isNotEmpty) {
-          final partiteCompatibili = partiteEsistenti.where((p) {
-            final int giocatoriAttuali =
-                p['numero_giocatori_prenotati'] as int? ?? 0;
-            final int postiLiberi = maxGiocatori - giocatoriAttuali;
-            return giocatoriTotaliIniziali <= postiLiberi;
-          }).toList();
-
-          if (partiteCompatibili.isNotEmpty) {
-            partiteCompatibili.sort((a, b) {
-              final int gA = a['numero_giocatori_prenotati'] as int? ?? 0;
-              final int gB = b['numero_giocatori_prenotati'] as int? ?? 0;
-              return gB.compareTo(gA);
-            });
-
-            final partitaMigliore = partiteCompatibili.first;
-            final int maxGiocatoriTrovati =
-                partitaMigliore['numero_giocatori_prenotati'] as int? ?? 0;
-
-            return RisultatoCreazionePartita.fallimento(
-              'Esiste già una partita con $maxGiocatoriTrovati giocatori in cui c\'è posto per voi. Unisciti a quella per ottimizzare le presenze. UNISCITI_FORZATO',
-            );
-          }
-        }
-
-        if (partiteEsistenti.length >= maxPartiteNelloSlot) {
-          return RisultatoCreazionePartita.fallimento(
-            'Raggiunto il limite massimo di $maxPartiteNelloSlot partite aperte in questo orario. Puoi solo prenotare il Campo Intero o unirti a una esistente. MAX_PARTITE_RAGGIUNTE',
-          );
-        }
-      }
-
-      if (isPartitaPrivata &&
-          !isPartitaGiaCompleta &&
-          partiteEsistenti.any(
-            (p) => p['stato_partita'] == 'aperta_protetta',
-          )) {
-        return RisultatoCreazionePartita.fallimento(
-          'Non puoi creare una partita privata in uno slot con una partita protetta.',
-        );
-      }
-
       if (!await _isSocietaAperta(
         campo.idSocieta,
         dataPartita,
@@ -309,16 +301,10 @@ class PartitaService {
         );
       }
 
-      final int sogliaProtezione = getSogliaProtezione(maxGiocatori);
-      final bool isMenoDi24h = adesso.isAfter(
-        inizioEsatto.subtract(const Duration(hours: orePerditaProtezioneFissa)),
-      );
-      final bool laNuovaPartitaSeraProtetta =
-          giocatoriTotaliIniziali >= sogliaProtezione && !isMenoDi24h;
-
       final result = await _repository.creaPartitaDinamica({
         'p_id_campo': campo.id,
         'p_id_organizzatore': organizzatore.id,
+        'p_sport': sportNormalizzato,
         'p_data':
             "${dataPartita.year}-${dataPartita.month.toString().padLeft(2, '0')}-${dataPartita.day.toString().padLeft(2, '0')}",
         'p_inizio': orarioInizio,
@@ -339,6 +325,23 @@ class PartitaService {
 
       final String idPartitaGenerata = result['id'].toString();
 
+      final double importoTotale = _calcolaImportoPartita(
+        campo: campo,
+        sport: sportNormalizzato,
+        orarioInizio: orarioInizio,
+        orarioFine: orarioFine,
+      );
+
+      try {
+        await _repository.aggiornaImportoTotalePartita(
+          idPartitaGenerata,
+          importoTotale,
+        );
+      } catch (_) {
+        // La prenotazione è già stata creata:
+        // non la facciamo fallire solo per il salvataggio dello storico.
+      }
+
       await _repository.inserisciGiocatorePartita({
         'id_partita': idPartitaGenerata,
         'id_utente': organizzatore.id,
@@ -352,19 +355,123 @@ class PartitaService {
           orarioInizio: orarioInizio,
           idPartitaVincente: idPartitaGenerata,
         );
-      } else if (laNuovaPartitaSeraProtetta) {
-        await _repository.annullaPartiteARischioNelloSlot(
-          idCampo: campo.id,
-          dataPartita: dataPartita,
-          orarioInizio: orarioInizio,
-          idPartitaVincente: idPartitaGenerata,
-        );
       }
 
       return RisultatoCreazionePartita.successo(idPartitaGenerata);
     } catch (e) {
       return RisultatoCreazionePartita.fallimento(
-        'Errore durante la creazione: $e',
+        'Errore durante la creazione',
+      );
+    }
+  }
+
+  Future<RisultatoCreazionePartita> creaPrenotazioneManuale({
+    required Campo campo,
+    required String idGestore,
+    required DateTime dataPartita,
+    required String orarioInizio,
+    String? nomeCliente,
+    String? telefonoCliente,
+    String? notaGestore,
+  }) async {
+    try {
+      final parti = orarioInizio.split(':');
+
+      final int ora = int.parse(parti[0]);
+      final int minuto = int.parse(parti[1]);
+
+      final inizioEsatto = DateTime(
+        dataPartita.year,
+        dataPartita.month,
+        dataPartita.day,
+        ora,
+        minuto,
+      );
+
+      if (inizioEsatto.isBefore(DateTime.now())) {
+        return RisultatoCreazionePartita.fallimento(
+          'Non puoi inserire una prenotazione in un orario già passato.',
+        );
+      }
+
+      // Prenotazioni Matchly: durata fissa di 60 minuti.
+      final fineEsatto = inizioEsatto.add(const Duration(minutes: 60));
+
+      final String inizioDb =
+          '${ora.toString().padLeft(2, '0')}:'
+          '${minuto.toString().padLeft(2, '0')}:00';
+
+      final String orarioFine =
+          '${fineEsatto.hour.toString().padLeft(2, '0')}:'
+          '${fineEsatto.minute.toString().padLeft(2, '0')}:00';
+
+      final centroAperto = await _isSocietaAperta(
+        campo.idSocieta,
+        dataPartita,
+        inizioDb,
+        orarioFine,
+      );
+
+      if (!centroAperto) {
+        return RisultatoCreazionePartita.fallimento(
+          'Il centro sportivo è chiuso in questo orario.',
+        );
+      }
+
+      final disponibile = await _repository
+          .isSlotDisponibilePerPrenotazioneManuale(
+            idCampo: campo.id,
+            dataPartita: dataPartita,
+            orarioInizio: inizioDb,
+          );
+
+      if (!disponibile) {
+        return RisultatoCreazionePartita.fallimento(
+          'Questo orario è già occupato da una prenotazione completa.',
+        );
+      }
+
+      final idPartita = await _repository.creaPrenotazioneManuale(
+        idCampo: campo.id,
+        idGestore: idGestore,
+        dataPartita: dataPartita,
+        orarioInizio: inizioDb,
+        orarioFine: orarioFine,
+        maxGiocatori: campo.numeroDiGiocatori,
+        nomeCliente: nomeCliente,
+        telefonoCliente: telefonoCliente,
+        notaGestore: notaGestore,
+      );
+
+      final double importoTotale = _calcolaImportoPartita(
+        campo: campo,
+        sport: null,
+        orarioInizio: orarioInizio,
+        orarioFine: orarioFine,
+      );
+
+      try {
+        await _repository.aggiornaImportoTotalePartita(
+          idPartita,
+          importoTotale,
+        );
+      } catch (_) {
+        // Non blocchiamo la prenotazione manuale.
+      }
+
+      // La prenotazione manuale completa prende lo slot.
+      // Le eventuali partite aperte vengono annullate.
+      await _repository.annullaAltrePartiteNelloSlot(
+        idCampo: campo.id,
+        dataPartita: dataPartita,
+        orarioInizio: inizioDb,
+        idPartitaVincente: idPartita,
+      );
+
+      return RisultatoCreazionePartita.successo(idPartita);
+    } catch (e) {
+      return RisultatoCreazionePartita.fallimento(
+        e.toString().replaceFirst('Exception: ', ''),
       );
     }
   }
@@ -397,8 +504,11 @@ class PartitaService {
         return 'Questa partita è già iniziata.';
       }
 
-      if (adesso.isAfter(inizioEsatto.subtract(const Duration(hours: 1)))) {
-        return 'Iscrizioni chiuse: manca meno di 1 ora all\'inizio.';
+      if (adesso.isAfter(
+        inizioEsatto.subtract(const Duration(hours: oreAnnullamentoAutomatico)),
+      )) {
+        return 'Iscrizioni chiuse: mancano meno di '
+            '$oreAnnullamentoAutomatico ore all\'inizio.';
       }
 
       final int maxPosti =
@@ -416,10 +526,6 @@ class PartitaService {
         'ospiti_extra': ospitiExtra,
       });
 
-      final bool isMenoDi24h = adesso.isAfter(
-        inizioEsatto.subtract(const Duration(hours: orePerditaProtezioneFissa)),
-      );
-
       if (nuovoTotale >= maxPosti) {
         await _repository.completaPartitaEAnnullaSlotRpc(
           idPartita: partita.id,
@@ -429,21 +535,16 @@ class PartitaService {
           orarioInizio: partita.orarioInizio,
         );
       } else {
-        final String nuovoStato =
-            (nuovoTotale >= getSogliaProtezione(maxPosti) && !isMenoDi24h)
-            ? 'aperta_protetta'
-            : 'aperta_a_rischio';
-
         await _repository.aggiornaGiocatoriEStato(
           idPartita: partita.id,
           nuovoTotale: nuovoTotale,
-          nuovoStato: nuovoStato,
+          nuovoStato: 'aperta_a_rischio',
         );
       }
 
       return null;
     } catch (e) {
-      return 'Errore iscrizione: $e';
+      return 'Impossibile completare l’iscrizione. Riprova tra poco.';
     }
   }
 
@@ -463,12 +564,11 @@ class PartitaService {
       }
 
       if (adesso.isAfter(
-        inizioEsatto.subtract(const Duration(hours: oreLimiteScadenza)),
+        inizioEsatto.subtract(const Duration(minutes: minutiLimiteAbbandono)),
       )) {
-        return 'Abbandono bloccato: mancano meno di $oreLimiteScadenza ore all\'inizio.';
+        return 'Abbandono bloccato: mancano meno di '
+            '$minutiLimiteAbbandono minuti all\'inizio.';
       }
-
-      final int maxGiocatoriReali = partita.maxGiocatoriReali;
 
       final int ospitiExtra = await _repository.getOspitiExtraGiocatore(
         partita.id,
@@ -483,32 +583,17 @@ class PartitaService {
       final int nuovoTotale =
           (partita.numeroGiocatoriPrenotati - (1 + ospitiExtra)).clamp(0, 99);
 
-      final isPt = _isPrimeTime(partita.orarioInizio);
-      final minimoApertura = getMinimoApertura(maxGiocatoriReali, isPt);
-
-      if (nuovoTotale <= 0 || nuovoTotale < minimoApertura) {
+      if (nuovoTotale <= 0) {
         await _repository.aggiornaGiocatoriEStato(
           idPartita: partita.id,
           nuovoTotale: nuovoTotale,
           nuovoStato: 'annullata',
         );
       } else {
-        final bool isMenoDi24h = adesso.isAfter(
-          inizioEsatto.subtract(
-            const Duration(hours: orePerditaProtezioneFissa),
-          ),
-        );
-
-        final String stato =
-            (nuovoTotale >= getSogliaProtezione(maxGiocatoriReali) &&
-                !isMenoDi24h)
-            ? 'aperta_protetta'
-            : 'aperta_a_rischio';
-
         await _repository.aggiornaGiocatoriEStato(
           idPartita: partita.id,
           nuovoTotale: nuovoTotale,
-          nuovoStato: stato,
+          nuovoStato: 'aperta_a_rischio',
         );
       }
 
@@ -533,20 +618,37 @@ class PartitaService {
     if (o == null || o.isChiuso) return false;
 
     final int startMin = _orarioInMinuti(start);
-    final int endMin = _orarioInMinuti(end);
+
+    int endMin = _orarioInMinuti(end);
+
+    if (endMin == 0 && startMin > 0) {
+      endMin = 24 * 60;
+    }
 
     bool inTurno1 = false;
     if (o.orarioApertura != null && o.orarioChiusura != null) {
-      inTurno1 =
-          startMin >= _orarioInMinuti(o.orarioApertura!) &&
-          endMin <= _orarioInMinuti(o.orarioChiusura!);
+      final int apertura1 = _orarioInMinuti(o.orarioApertura!);
+
+      int chiusura1 = _orarioInMinuti(o.orarioChiusura!);
+
+      if (chiusura1 == 0 && apertura1 > 0) {
+        chiusura1 = 24 * 60;
+      }
+
+      inTurno1 = startMin >= apertura1 && endMin <= chiusura1;
     }
 
     bool inTurno2 = false;
     if (o.orarioApertura2 != null && o.orarioChiusura2 != null) {
-      inTurno2 =
-          startMin >= _orarioInMinuti(o.orarioApertura2!) &&
-          endMin <= _orarioInMinuti(o.orarioChiusura2!);
+      final int apertura2 = _orarioInMinuti(o.orarioApertura2!);
+
+      int chiusura2 = _orarioInMinuti(o.orarioChiusura2!);
+
+      if (chiusura2 == 0 && apertura2 > 0) {
+        chiusura2 = 24 * 60;
+      }
+
+      inTurno2 = startMin >= apertura2 && endMin <= chiusura2;
     }
 
     return inTurno1 || inTurno2;
@@ -556,46 +658,6 @@ class PartitaService {
     return _calcolaInizioEsatto(
       partita.dataPartita,
       partita.orarioInizio,
-    ).subtract(const Duration(hours: oreLimiteScadenza));
-  }
-
-  String tempoRimanenteScadenza(Partita partita) {
-    try {
-      final scadenza = getScadenzaPartita(partita);
-      final differenza = scadenza.difference(DateTime.now());
-      if (differenza.isNegative) return "00h : 00m";
-      return "${differenza.inHours.toString().padLeft(2, '0')}h : ${differenza.inMinutes.remainder(60).toString().padLeft(2, '0')}m";
-    } catch (_) {
-      return "00h : 00m";
-    }
-  }
-
-  String tempoRimanenteProtezione(Partita partita) {
-    try {
-      final inizioEsatto = _calcolaInizioEsatto(
-        partita.dataPartita,
-        partita.orarioInizio,
-      );
-
-      final scadenzaProtezione = inizioEsatto.subtract(
-        const Duration(hours: orePerditaProtezioneFissa),
-      );
-
-      final differenza = scadenzaProtezione.difference(DateTime.now());
-
-      if (differenza.isNegative) return "Scaduta";
-
-      final int giorni = differenza.inDays;
-      final int ore = differenza.inHours % 24;
-      final int minuti = differenza.inMinutes % 60;
-
-      if (giorni > 0) {
-        return "$giorni g ${ore}h";
-      } else {
-        return "${ore}h ${minuti.toString().padLeft(2, '0')}m";
-      }
-    } catch (_) {
-      return "N/D";
-    }
+    ).subtract(const Duration(hours: oreAnnullamentoAutomatico));
   }
 }

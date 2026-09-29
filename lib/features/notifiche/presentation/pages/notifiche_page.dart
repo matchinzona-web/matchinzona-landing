@@ -15,6 +15,7 @@ class NotifichePage extends ConsumerStatefulWidget {
 class _NotifichePageState extends ConsumerState<NotifichePage> {
   final Set<String> _notificheAppenaLette = {};
   final Set<String> _notificheEliminate = {};
+  final Set<String> _notificheEspande = {};
 
   String _formattaData(DateTime data) {
     final diff = DateTime.now().difference(data);
@@ -55,9 +56,6 @@ class _NotifichePageState extends ConsumerState<NotifichePage> {
       case 'completa':
       case 'match_completo':
         return Icons.check_circle_rounded;
-      case 'aperta_protetta':
-      case 'match_protetto':
-        return Icons.shield_rounded;
       case 'aperta_a_rischio':
       case 'match_a_rischio':
         return Icons.warning_rounded;
@@ -68,6 +66,11 @@ class _NotifichePageState extends ConsumerState<NotifichePage> {
         return Icons.person_add_alt_1_rounded;
       case 'giocatore_abbandonato':
         return Icons.person_remove_alt_1_rounded;
+      case 'prenotazione_gestore':
+        return Icons.event_available_rounded;
+
+      case 'prenotazione_annullata_gestore':
+        return Icons.event_busy_rounded;
       case 'invito_torneo':
         return Icons.military_tech_rounded;
       default:
@@ -80,9 +83,6 @@ class _NotifichePageState extends ConsumerState<NotifichePage> {
       case 'completa':
       case 'match_completo':
         return AppTheme.statoSuccesso;
-      case 'aperta_protetta':
-      case 'match_protetto':
-        return AppTheme.textPrimary;
       case 'aperta_a_rischio':
       case 'match_a_rischio':
       case 'annullata':
@@ -92,6 +92,11 @@ class _NotifichePageState extends ConsumerState<NotifichePage> {
         return AppTheme.accent;
       case 'giocatore_abbandonato':
         return AppTheme.statoAttenzione;
+      case 'prenotazione_gestore':
+        return AppTheme.statoSuccesso;
+
+      case 'prenotazione_annullata_gestore':
+        return AppTheme.statoErrore;
       case 'invito_torneo':
         return AppTheme.neonPurple;
       default:
@@ -166,7 +171,7 @@ class _NotifichePageState extends ConsumerState<NotifichePage> {
                     ),
                     error: (err, _) => Center(
                       child: Text(
-                        "Errore nel caricamento: $err",
+                        "Errore nel caricamento",
                         style: const TextStyle(color: AppTheme.statoErrore),
                       ),
                     ),
@@ -235,7 +240,7 @@ class _NotifichePageState extends ConsumerState<NotifichePage> {
             ),
             const SizedBox(height: 10),
             const Text(
-              "Tutto tranquillo! Quando ci saranno aggiornamenti sui tuoi match, li troverai qui.",
+              "Tutto tranquillo! Quando ci saranno nuovi aggiornamenti, li troverai qui.",
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: AppTheme.textSecondary,
@@ -271,6 +276,7 @@ class _NotifichePageState extends ConsumerState<NotifichePage> {
 
   Widget _buildNotificaCard(var n, bool isLetta) {
     final color = _getColoreTipo(n.tipo);
+    final bool isEspansa = _notificheEspande.contains(n.id);
 
     return Dismissible(
       key: Key(n.id),
@@ -295,7 +301,17 @@ class _NotifichePageState extends ConsumerState<NotifichePage> {
       ),
       child: GestureDetector(
         onTap: () {
-          if (!isLetta) _segnaComeLetta(n.id);
+          if (!isLetta) {
+            _segnaComeLetta(n.id);
+          }
+
+          setState(() {
+            if (isEspansa) {
+              _notificheEspande.remove(n.id);
+            } else {
+              _notificheEspande.add(n.id);
+            }
+          });
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
@@ -367,17 +383,35 @@ class _NotifichePageState extends ConsumerState<NotifichePage> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      n.messaggio,
-                      style: TextStyle(
-                        color: isLetta
-                            ? AppTheme.textDisabled
-                            : AppTheme.textSecondary,
-                        fontSize: 13,
-                        height: 1.4,
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeInOut,
+                      child: Text(
+                        n.messaggio,
+                        style: TextStyle(
+                          color: isLetta
+                              ? AppTheme.textDisabled
+                              : AppTheme.textSecondary,
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                        maxLines: isEspansa ? null : 3,
+                        overflow: isEspansa
+                            ? TextOverflow.visible
+                            : TextOverflow.ellipsis,
                       ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Icon(
+                        isEspansa
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        color: AppTheme.textDisabled,
+                        size: 20,
+                      ),
                     ),
                   ],
                 ),

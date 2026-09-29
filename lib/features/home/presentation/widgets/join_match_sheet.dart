@@ -10,6 +10,7 @@ import 'package:app_campi/core/services/location_provider.dart';
 import 'package:app_campi/features/home/presentation/widgets/auth_bottom_sheet.dart';
 import 'package:app_campi/core/models/utente.dart';
 import 'package:app_campi/features/miei_match/application/partite_utente_provider.dart';
+import 'package:app_campi/features/home/presentation/home_page.dart';
 
 void showJoinMatchSheet({
   required BuildContext context,
@@ -57,7 +58,7 @@ void showJoinMatchSheet({
     isScrollControlled: true,
     useSafeArea: true,
     builder: (ctx) {
-      int ospitiExtra = 0;
+      int numeroPersone = 1;
       bool isLoading = false;
 
       return StatefulBuilder(
@@ -340,7 +341,7 @@ void showJoinMatchSheet({
                       ),
                     ] else ...[
                       const Text(
-                        "Porti degli amici con te?",
+                        "In quanti siete?",
                         style: TextStyle(
                           color: AppTheme.textPrimary,
                           fontWeight: FontWeight.bold,
@@ -361,12 +362,12 @@ void showJoinMatchSheet({
                         child: Row(
                           children: [
                             IconButton(
-                              onPressed: ospitiExtra > 0
-                                  ? () => setSheetState(() => ospitiExtra--)
+                              onPressed: numeroPersone > 1
+                                  ? () => setSheetState(() => numeroPersone--)
                                   : null,
                               icon: Icon(
                                 Icons.remove_circle_outline,
-                                color: ospitiExtra > 0
+                                color: numeroPersone > 1
                                     ? AppTheme.accent
                                     : AppTheme.textDisabled,
                                 size: 30,
@@ -376,7 +377,7 @@ void showJoinMatchSheet({
                               width: 40,
                               alignment: Alignment.center,
                               child: Text(
-                                "$ospitiExtra",
+                                "$numeroPersone ",
                                 style: const TextStyle(
                                   color: AppTheme.textPrimary,
                                   fontSize: 22,
@@ -385,12 +386,13 @@ void showJoinMatchSheet({
                               ),
                             ),
                             IconButton(
-                              onPressed: ospitiExtra < maxOspitiAggiungibili
-                                  ? () => setSheetState(() => ospitiExtra++)
+                              onPressed:
+                                  numeroPersone < maxOspitiAggiungibili + 1
+                                  ? () => setSheetState(() => numeroPersone++)
                                   : null,
                               icon: Icon(
                                 Icons.add_circle_outline,
-                                color: ospitiExtra < maxOspitiAggiungibili
+                                color: numeroPersone < maxOspitiAggiungibili + 1
                                     ? AppTheme.accent
                                     : AppTheme.textDisabled,
                                 size: 30,
@@ -400,7 +402,7 @@ void showJoinMatchSheet({
                             Padding(
                               padding: const EdgeInsets.only(right: 12.0),
                               child: Text(
-                                "Tu + $ospitiExtra (${ospitiExtra + 1} posti)",
+                                "$numeroPersone ${numeroPersone == 1 ? 'persona' : 'persone'}",
                                 style: const TextStyle(
                                   color: AppTheme.textSecondary,
                                   fontSize: 13,
@@ -423,48 +425,45 @@ void showJoinMatchSheet({
                               : () async {
                                   setSheetState(() => isLoading = true);
 
+                                  final int nuovoTotale =
+                                      partita.numeroGiocatoriPrenotati +
+                                      numeroPersone;
+
+                                  final bool diventaCompleta =
+                                      nuovoTotale >= partita.maxGiocatoriReali;
+
                                   final service = PartitaService();
                                   final errore = await service.uniscitiAPartita(
                                     partita: partita,
                                     nuovoGiocatore: utenteLoggato!,
-                                    ospitiExtra: ospitiExtra,
+                                    ospitiExtra: numeroPersone - 1,
                                   );
 
                                   if (!context.mounted) return;
                                   if (errore == null) {
                                     Navigator.pop(context);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: const Row(
-                                          children: [
-                                            Icon(
-                                              Icons.celebration_rounded,
-                                              color: AppTheme.darkBg,
-                                              size: 20,
-                                            ),
-                                            SizedBox(width: 10),
-                                            Text(
-                                              "Iscrizione completata!",
-                                              style: TextStyle(
-                                                color: AppTheme.darkBg,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        backgroundColor: AppTheme.accent,
-                                        behavior: SnackBarBehavior.floating,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                        ),
-                                      ),
-                                    );
+
+                                    ref
+                                        .read(filtroPartitaProvider.notifier)
+                                        .impostaFiltro(
+                                          diventaCompleta
+                                              ? FiltroPartita.complete
+                                              : FiltroPartita.aperte,
+                                        );
 
                                     ref.invalidate(matchInZonaProvider);
                                     ref.invalidate(
                                       partiteUtenteProvider(utenteLoggato.id),
+                                    );
+
+                                    if (!context.mounted) return;
+
+                                    Navigator.of(context).pushAndRemoveUntil(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const HomePage(initialIndex: 2),
+                                      ),
+                                      (route) => false,
                                     );
                                   } else {
                                     setSheetState(() => isLoading = false);
