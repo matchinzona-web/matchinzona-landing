@@ -100,12 +100,12 @@ class ProfiloUtente extends ConsumerWidget {
     bool segnalaProblema = false,
   }) async {
     final subject = segnalaProblema
-        ? 'Segnalazione problema Matchly'
-        : 'Assistenza Matchly';
+        ? 'Segnalazione problema MatchInZona'
+        : 'Assistenza MatchInZona';
 
     final uri = Uri(
       scheme: 'mailto',
-      path: 'matchly.assistenza@gmail.com',
+      path: 'matchinzona@gmail.com',
       queryParameters: {'subject': subject},
     );
 
@@ -148,7 +148,7 @@ class ProfiloUtente extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
             const Text(
-              'Benvenuto in Matchly',
+              'Benvenuto in MatchInZona',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 26,
@@ -241,7 +241,7 @@ class ProfiloUtente extends ConsumerWidget {
                 TextButton(
                   onPressed: () => _apriUrl(
                     context,
-                    'https://matchlyassistenza-web.github.io/matchly-privacy/',
+                    'https://matchinzona-web.github.io/matchinzona-privacy/',
                   ),
                   child: const Text(
                     'Privacy Policy',
@@ -251,7 +251,7 @@ class ProfiloUtente extends ConsumerWidget {
                 TextButton(
                   onPressed: () => _apriUrl(
                     context,
-                    'https://matchlyassistenza-web.github.io/matchly-privacy/termini.html',
+                    'https://matchinzona-web.github.io/matchinzona-privacy/termini.html',
                   ),
                   child: const Text(
                     'Termini e Condizioni',
@@ -268,7 +268,7 @@ class ProfiloUtente extends ConsumerWidget {
                 TextButton(
                   onPressed: () => _apriUrl(
                     context,
-                    'https://matchlyassistenza-web.github.io/matchly-privacy/elimina-account.html',
+                    'https://matchinzona-web.github.io/matchinzona-privacy/elimina-account.html',
                   ),
                   child: const Text(
                     'Eliminazione account',
@@ -464,7 +464,7 @@ class ProfiloUtente extends ConsumerWidget {
                   subtitle: 'Come vengono trattati i tuoi dati',
                   onTap: () => _apriUrl(
                     context,
-                    'https://matchlyassistenza-web.github.io/matchly-privacy/',
+                    'https://matchinzona-web.github.io/matchinzona-privacy/',
                   ),
                 ),
 
@@ -475,7 +475,7 @@ class ProfiloUtente extends ConsumerWidget {
                   subtitle: 'Consulta le condizioni di utilizzo',
                   onTap: () => _apriUrl(
                     context,
-                    'https://matchlyassistenza-web.github.io/matchly-privacy/termini.html',
+                    'https://matchinzona-web.github.io/matchinzona-privacy/termini.html',
                   ),
                 ),
 
@@ -486,7 +486,7 @@ class ProfiloUtente extends ConsumerWidget {
                   subtitle: 'Informazioni sulla cancellazione dei dati',
                   onTap: () => _apriUrl(
                     context,
-                    'https://matchlyassistenza-web.github.io/matchly-privacy/elimina-account.html',
+                    'https://matchinzona-web.github.io/matchinzona-privacy/elimina-account.html',
                   ),
                 ),
 
@@ -517,7 +517,7 @@ class ProfiloUtente extends ConsumerWidget {
                   icon: Icons.bug_report_outlined,
                   iconColor: Colors.amber,
                   title: 'Segnala un problema',
-                  subtitle: 'Aiutaci a migliorare Matchly',
+                  subtitle: 'Aiutaci a migliorare MatchInZona',
                   onTap: () =>
                       _contattaAssistenza(context, segnalaProblema: true),
                 ),
@@ -534,7 +534,7 @@ class ProfiloUtente extends ConsumerWidget {
                   child: const Column(
                     children: [
                       Text(
-                        'MATCHLY',
+                        'MatchInZona',
                         style: TextStyle(
                           color: AppTheme.accent,
                           fontSize: 14,
@@ -552,7 +552,7 @@ class ProfiloUtente extends ConsumerWidget {
                       ),
                       SizedBox(height: 5),
                       Text(
-                        'Assistenza: matchly.assistenza@gmail.com',
+                        'Assistenza: matchinzona@gmail.com',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: AppTheme.textSecondary,

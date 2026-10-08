@@ -6,7 +6,8 @@ import 'package:app_campi/core/theme/app_theme.dart';
 import 'package:app_campi/core/models/partita.dart';
 import 'package:app_campi/core/services/partita_service.dart';
 import 'package:app_campi/core/services/location_provider.dart';
-
+import 'package:app_campi/core/shared_widget/selezione_livello_dialog.dart';
+import 'package:app_campi/features/auth/application/auth_provider.dart';
 import 'package:app_campi/features/home/presentation/widgets/auth_bottom_sheet.dart';
 import 'package:app_campi/core/models/utente.dart';
 import 'package:app_campi/features/miei_match/application/partite_utente_provider.dart';
@@ -48,6 +49,34 @@ void showJoinMatchSheet({
   final int maxOspitiAggiungibili = postiDisponibili > 0
       ? postiDisponibili - 1
       : 0;
+
+  double prezzoCampoTotale = partita.campo.prezzo;
+
+  final sport = partita.sportNormalizzato.trim().toLowerCase();
+
+  for (final tariffa in partita.campo.tariffeSport) {
+    if (tariffa.sport.trim().toLowerCase() == sport) {
+      prezzoCampoTotale = tariffa.prezzo;
+      break;
+    }
+  }
+
+  try {
+    final inizio = partita.orarioInizio.split(':');
+    final fine = partita.orarioFine.split(':');
+
+    final minutiInizio = int.parse(inizio[0]) * 60 + int.parse(inizio[1]);
+
+    int minutiFine = int.parse(fine[0]) * 60 + int.parse(fine[1]);
+
+    if (minutiFine == 0 && minutiInizio > 0) {
+      minutiFine = 24 * 60;
+    }
+
+    final durataOre = (minutiFine - minutiInizio) / 60.0;
+
+    prezzoCampoTotale *= durataOre;
+  } catch (_) {}
 
   final bool isARischio =
       rawPartita['stato_partita'] == 'aperta_a_rischio' && !giaIscritto;
@@ -200,6 +229,49 @@ void showJoinMatchSheet({
                       ],
                     ),
                     const SizedBox(height: 24),
+
+                    // PREZZO CAMPO
+                    Container(
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: AppTheme.cardBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppTheme.cardBorder),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(
+                                Icons.euro_rounded,
+                                color: AppTheme.accent,
+                                size: 20,
+                              ),
+                              SizedBox(width: 10),
+                              Text(
+                                "Prezzo campo",
+                                style: TextStyle(
+                                  color: AppTheme.textSecondary,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            "${prezzoCampoTotale.toStringAsFixed(2)} €",
+                            style: const TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              fontFamily: AppTheme.fontMono,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
 
                     // POSTI DISPONIBILI
                     Container(
@@ -422,70 +494,174 @@ void showJoinMatchSheet({
                         child: ElevatedButton(
                           onPressed: isLoading
                               ? null
-                              : () async {
-                                  setSheetState(() => isLoading = true);
+                              : () {
+                                  verificaESelezionaLivello(
+                                    context: context,
+                                    userId: utenteLoggato!.id,
+                                    livelliSportAttuali:
+                                        utenteLoggato.livelliSport,
+                                    sports: [partita.sportNormalizzato],
+                                    onCompletato: () async {
+                                      ref.invalidate(utenteCorrenteProvider);
 
-                                  final int nuovoTotale =
-                                      partita.numeroGiocatoriPrenotati +
-                                      numeroPersone;
+                                      if (!context.mounted) return;
 
-                                  final bool diventaCompleta =
-                                      nuovoTotale >= partita.maxGiocatoriReali;
+                                      setSheetState(() => isLoading = true);
 
-                                  final service = PartitaService();
-                                  final errore = await service.uniscitiAPartita(
-                                    partita: partita,
-                                    nuovoGiocatore: utenteLoggato!,
-                                    ospitiExtra: numeroPersone - 1,
-                                  );
+                                      final int nuovoTotale =
+                                          partita.numeroGiocatoriPrenotati +
+                                          numeroPersone;
 
-                                  if (!context.mounted) return;
-                                  if (errore == null) {
-                                    Navigator.pop(context);
+                                      final bool diventaCompleta =
+                                          nuovoTotale >=
+                                          partita.maxGiocatoriReali;
 
-                                    ref
-                                        .read(filtroPartitaProvider.notifier)
-                                        .impostaFiltro(
-                                          diventaCompleta
-                                              ? FiltroPartita.complete
-                                              : FiltroPartita.aperte,
+                                      final service = PartitaService();
+
+                                      final errore = await service
+                                          .uniscitiAPartita(
+                                            partita: partita,
+                                            nuovoGiocatore: utenteLoggato,
+                                            ospitiExtra: numeroPersone - 1,
+                                          );
+
+                                      if (!context.mounted) return;
+
+                                      if (errore == null) {
+                                        final navigator = Navigator.of(context);
+
+                                        ref
+                                            .read(
+                                              filtroPartitaProvider.notifier,
+                                            )
+                                            .impostaFiltro(
+                                              diventaCompleta
+                                                  ? FiltroPartita.complete
+                                                  : FiltroPartita.aperte,
+                                            );
+
+                                        ref.invalidate(matchInZonaProvider);
+                                        ref.invalidate(
+                                          partiteUtenteProvider(
+                                            utenteLoggato.id,
+                                          ),
                                         );
 
-                                    ref.invalidate(matchInZonaProvider);
-                                    ref.invalidate(
-                                      partiteUtenteProvider(utenteLoggato.id),
-                                    );
+                                        await showDialog<void>(
+                                          context: context,
+                                          barrierDismissible: false,
+                                          builder: (dialogContext) {
+                                            return AlertDialog(
+                                              backgroundColor: AppTheme.cardBg,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                                side: BorderSide(
+                                                  color: diventaCompleta
+                                                      ? AppTheme.statoSuccesso
+                                                            .withOpacity(0.5)
+                                                      : AppTheme.accent
+                                                            .withOpacity(0.5),
+                                                ),
+                                              ),
+                                              title: Row(
+                                                children: [
+                                                  Icon(
+                                                    diventaCompleta
+                                                        ? Icons
+                                                              .check_circle_rounded
+                                                        : Icons
+                                                              .info_outline_rounded,
+                                                    color: diventaCompleta
+                                                        ? AppTheme.statoSuccesso
+                                                        : AppTheme.accent,
+                                                  ),
+                                                  const SizedBox(width: 10),
+                                                  Text(
+                                                    diventaCompleta
+                                                        ? "MATCH COMPLETO"
+                                                        : "MATCH APERTO",
+                                                    style: const TextStyle(
+                                                      color:
+                                                          AppTheme.textPrimary,
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                      fontSize: 18,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              content: Text(
+                                                diventaCompleta
+                                                    ? "Il campo è riservato esclusivamente a te e ai tuoi amici. "
+                                                          "Potrai disdire la prenotazione fino a 30 minuti prima "
+                                                          "dell'inizio della partita. Buona partita bomber 💪"
+                                                    : "Se il match non raggiunge il numero necessario entro 2 ore "
+                                                          "dall'inizio, verrà annullato.\n\n"
+                                                          "Se il campo viene prenotato per intero, il match verrà annullato.",
+                                                style: const TextStyle(
+                                                  color: AppTheme.textSecondary,
+                                                  fontSize: 14,
+                                                  height: 1.5,
+                                                ),
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.pop(
+                                                        dialogContext,
+                                                      ),
+                                                  child: const Text(
+                                                    "HO CAPITO",
+                                                    style: TextStyle(
+                                                      color: AppTheme.accent,
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        );
 
-                                    if (!context.mounted) return;
+                                        if (!context.mounted) return;
 
-                                    Navigator.of(context).pushAndRemoveUntil(
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const HomePage(initialIndex: 2),
-                                      ),
-                                      (route) => false,
-                                    );
-                                  } else {
-                                    setSheetState(() => isLoading = false);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          errore,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
+                                        navigator.pop();
+
+                                        navigator.pushAndRemoveUntil(
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                const HomePage(initialIndex: 2),
                                           ),
-                                        ),
-                                        backgroundColor: AppTheme.statoErrore,
-                                        behavior: SnackBarBehavior.floating,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
+                                          (route) => false,
+                                        );
+                                      } else {
+                                        setSheetState(() => isLoading = false);
+
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              errore,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            backgroundColor:
+                                                AppTheme.statoErrore,
+                                            behavior: SnackBarBehavior.floating,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
                                           ),
-                                        ),
-                                      ),
-                                    );
-                                  }
+                                        );
+                                      }
+                                    },
+                                  );
                                 },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.accent,

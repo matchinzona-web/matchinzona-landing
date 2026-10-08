@@ -189,7 +189,7 @@ class AuthService {
     } on AuthException catch (e) {
       throw Exception('Errore di Autenticazione: ${e.message}');
     } catch (e) {
-      throw Exception('Errore durante il salvataggio dei dati');
+      throw Exception('Errore durante il salvataggio dei dati: $e');
     }
   }
 

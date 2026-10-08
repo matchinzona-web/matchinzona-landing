@@ -414,21 +414,39 @@ class PartitaRepository {
 
   Future<List<Map<String, dynamic>>> getPartiteUtente(String idUtente) async {
     try {
+      final partecipazioni = await _supabase
+          .from('giocatori_partita')
+          .select('id_partita')
+          .eq('id_utente', idUtente);
+
+      final idsPartite = partecipazioni
+          .map((e) => e['id_partita'].toString())
+          .toList();
+
+      if (idsPartite.isEmpty) {
+        return [];
+      }
+
       final response = await _supabase
           .from('partite')
           .select('''
-            *,
-            campo:campi(*, societa(*)), 
-            organizzatore:utenti!partite_id_organizzatore_fkey(*),
-            giocatori_partita!inner(ospiti_extra, utenti(*))
-          ''')
-          .eq('giocatori_partita.id_utente', idUtente)
+          *,
+          campo:campi(*, societa(*)),
+          organizzatore:utenti!partite_id_organizzatore_fkey(*),
+          giocatori_partita(
+            id_utente,
+            ospiti_extra,
+            utenti(*)
+          )
+        ''')
+          .inFilter('id', idsPartite)
           .neq('stato_partita', 'annullata')
           .order('data_partita', ascending: true)
           .order('orario_inizio', ascending: true);
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
+      debugPrint('Errore getPartiteUtente: $e');
       throw Exception('Impossibile recuperare le tue partite.');
     }
   }
@@ -452,11 +470,29 @@ class PartitaRepository {
           .from('partite')
           .select('*, campo:campi(*)')
           .inFilter('id_campo', idCampi)
-          .eq('stato_partita', 'completa');
+          .eq('stato_partita', 'completa')
+          .eq('is_rimborsata', false);
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       throw Exception('Errore nel calcolo dei guadagni');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchRiepiloghiMensiliGuadagni(
+    String idSocieta,
+  ) async {
+    try {
+      final response = await _supabase
+          .from('riepiloghi_mensili_campi')
+          .select('*')
+          .eq('id_societa', idSocieta)
+          .order('anno', ascending: false)
+          .order('mese', ascending: false);
+
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      throw Exception('Errore nel recupero dello storico guadagni');
     }
   }
 
@@ -470,6 +506,7 @@ class PartitaRepository {
     String? nomeCliente,
     String? telefonoCliente,
     String? notaGestore,
+    required double importoTotale,
   }) async {
     try {
       final dataStr = _formatData(dataPartita);
@@ -499,6 +536,7 @@ class PartitaRepository {
             'nota_gestore': notaGestore?.trim().isEmpty == true
                 ? null
                 : notaGestore?.trim(),
+            'importo_totale': importoTotale,
           })
           .select('id')
           .single();
@@ -554,7 +592,8 @@ class PartitaRepository {
           .select('orario_inizio')
           .eq('id_campo', idCampo)
           .eq('data_partita', dataStr)
-          .eq('stato_partita', 'completa');
+          .eq('stato_partita', 'completa')
+          .eq('is_rimborsata', false);
 
       final partite = List<Map<String, dynamic>>.from(response);
 

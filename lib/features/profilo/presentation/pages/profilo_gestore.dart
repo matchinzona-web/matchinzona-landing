@@ -75,6 +75,7 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
 
       if (data != null && mounted) {
         _nomeSocietaController.text = data['nome_societa']?.toString() ?? '';
+        _telefonoController.text = data['cellulare']?.toString() ?? '';
 
         _telefonoFissoController.text = data['telefono']?.toString() ?? '';
 
@@ -200,6 +201,19 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
 
   Future<void> _salvaProfilo() async {
     if (!_formKey.currentState!.validate()) return;
+    final cellulare = _telefonoController.text.trim();
+
+    if (!RegExp(r'^\d{10}$').hasMatch(cellulare)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Il numero di cellulare deve contenere esattamente 10 cifre.',
+          ),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
 
     if (_nuovaPasswordController.text.isNotEmpty) {
       final okPassword = await ref
@@ -252,7 +266,10 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
 
     await Supabase.instance.client
         .from('societa')
-        .update({'nome_societa': _nomeSocietaController.text.trim()})
+        .update({
+          'nome_societa': _nomeSocietaController.text.trim(),
+          'cellulare': _telefonoController.text.trim(),
+        })
         .eq('id_utente', widget.utenteLoggato.id);
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -758,7 +775,7 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
           '• il profilo gestore;\n'
           '• il centro sportivo e i relativi campi;\n'
           '• le prenotazioni e gli altri dati collegati al centro;\n'
-          '• i dati associati al servizio Matchly.\n\n'
+          '• i dati associati al servizio MatchInZona.\n\n'
           'L’abbonamento collegato verrà inoltre gestito tramite Stripe.\n\n'
           'Alcuni dati potranno essere conservati solo quando richiesto da obblighi di legge.\n\n'
           'Questa azione è irreversibile.',

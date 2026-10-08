@@ -42,6 +42,14 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
   final CalendarController _calendarController = CalendarController();
   final ScrollController _scrollController = ScrollController();
   late final DashboardNotifier _dashboardNotifier;
+  DateTime get _oggi {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  DateTime get _dataMassimaCalendario {
+    return _oggi.add(const Duration(days: 13));
+  }
 
   @override
   void initState() {
@@ -691,27 +699,24 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            "Ciao,",
+                            "Ciao, ",
                             style: TextStyle(
                               color: Colors.grey.shade500,
-                              fontSize: 14,
+                              fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              height: 0.9,
                             ),
                           ),
                           Text(
                             widget.utenteLoggato?.nome ?? 'Gestore',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 26,
+                              fontSize: 22,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 0.5,
-                              height: 1.0,
                             ),
                           ),
                         ],
@@ -1164,7 +1169,22 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                             color: AppTheme.neonOrange,
                             size: 28,
                           ),
-                          onPressed: () => _calendarController.backward!(),
+                          onPressed: () {
+                            final dataAttuale =
+                                _calendarController.displayDate ?? _oggi;
+
+                            final giornoAttuale = DateTime(
+                              dataAttuale.year,
+                              dataAttuale.month,
+                              dataAttuale.day,
+                            );
+
+                            if (!giornoAttuale.isAfter(_oggi)) {
+                              return;
+                            }
+
+                            _calendarController.backward!();
+                          },
                         ),
                         TextButton.icon(
                           onPressed: () async {
@@ -1173,12 +1193,8 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                               initialDate:
                                   _calendarController.displayDate ??
                                   DateTime.now(),
-                              firstDate: DateTime.now().subtract(
-                                const Duration(days: 365),
-                              ),
-                              lastDate: DateTime.now().add(
-                                const Duration(days: 365),
-                              ),
+                              firstDate: _oggi,
+                              lastDate: _dataMassimaCalendario,
                               builder: (context, child) {
                                 return Theme(
                                   data: ThemeData.dark().copyWith(
@@ -1225,7 +1241,24 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                             color: AppTheme.neonOrange,
                             size: 28,
                           ),
-                          onPressed: () => _calendarController.forward!(),
+                          onPressed: () {
+                            final dataAttuale =
+                                _calendarController.displayDate ?? _oggi;
+
+                            final giornoAttuale = DateTime(
+                              dataAttuale.year,
+                              dataAttuale.month,
+                              dataAttuale.day,
+                            );
+
+                            if (!giornoAttuale.isBefore(
+                              _dataMassimaCalendario,
+                            )) {
+                              return;
+                            }
+
+                            _calendarController.forward!();
+                          },
                         ),
                       ],
                     ),

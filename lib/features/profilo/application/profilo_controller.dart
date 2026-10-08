@@ -17,6 +17,7 @@ class ProfiloController {
     required String telefono,
     required DateTime dataNascita,
     String? nuovaPassword,
+    Map<String, dynamic>? livelliSport,
   }) async {
     try {
       if (nuovaPassword != null && nuovaPassword.isNotEmpty) {
@@ -32,6 +33,7 @@ class ProfiloController {
             'cognome': cognome,
             'telefono': telefono,
             'data_nascita': dataNascita.toIso8601String(),
+            if (livelliSport != null) 'livelli_sport': livelliSport,
           })
           .eq('id', idUtente);
 

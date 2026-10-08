@@ -3,73 +3,125 @@ import 'package:app_campi/core/repositories/partita_repository.dart';
 
 class StatisticheState {
   final List<Map<String, dynamic>> partiteComplete;
+  final List<Map<String, dynamic>> riepiloghiMensili;
   final bool isLoading;
   final String periodoSelezionato;
+  final int? annoSelezionato;
 
   const StatisticheState({
     this.partiteComplete = const [],
+    this.riepiloghiMensili = const [],
     this.isLoading = true,
     this.periodoSelezionato = 'Mese',
+    this.annoSelezionato,
   });
 
   StatisticheState copyWith({
     List<Map<String, dynamic>>? partiteComplete,
+    List<Map<String, dynamic>>? riepiloghiMensili,
     bool? isLoading,
     String? periodoSelezionato,
+    int? annoSelezionato,
   }) {
     return StatisticheState(
       partiteComplete: partiteComplete ?? this.partiteComplete,
+      riepiloghiMensili: riepiloghiMensili ?? this.riepiloghiMensili,
       isLoading: isLoading ?? this.isLoading,
       periodoSelezionato: periodoSelezionato ?? this.periodoSelezionato,
+      annoSelezionato: annoSelezionato ?? this.annoSelezionato,
     );
   }
 
-  // ricavo di una singola partita dinamico
   double calcolaRicavoPartita(Map<String, dynamic> partita) {
     final importoStorico = partita['importo_totale'];
 
-    if (importoStorico != null) {
-      return (importoStorico as num).toDouble();
+    if (importoStorico == null) {
+      return 0.0;
     }
-    final campo = partita['campo'] ?? {};
-    final String nomeCampo = (campo['nome_campo'] ?? '')
-        .toString()
-        .toLowerCase();
-    final int maxGiocatori =
-        partita['max_giocatori'] as int? ??
-        campo['numero_di_giocatori'] as int? ??
-        2;
 
-    // 🟢 1. Estrazione tariffe e prezzo base
-    final List<dynamic> tariffeRaw =
-        campo['tariffe_sport'] as List<dynamic>? ?? [];
-    double prezzoAllOra = (campo['prezzo'] as num?)?.toDouble() ?? 0.0;
+    return (importoStorico as num).toDouble();
+  }
 
-    // 🟢 2. Se ci sono tariffe specifiche (es. Tennis Doppio vs Singolo), applica quella esatta
-    if (tariffeRaw.isNotEmpty) {
-      final bool isDoppio = nomeCampo.contains('tennis') && maxGiocatori == 4;
-      final tariffa = tariffeRaw.firstWhere((t) {
-        final String s = (t['sport'] ?? '').toString().toLowerCase();
-        if (isDoppio) return s.contains('doppio');
-        if (nomeCampo.contains('tennis')) return s.contains('singolo');
-        return true;
-      }, orElse: () => null);
+  bool isPartitaTerminata(Map<String, dynamic> p) {
+    try {
+      final String dStr = p['data_partita']
+          .toString()
+          .split('T')[0]
+          .split(' ')[0];
 
-      if (tariffa != null && tariffa['prezzo'] != null) {
-        prezzoAllOra = (tariffa['prezzo'] as num).toDouble();
+      final String fineStr =
+          p['orario_fine']?.toString().substring(0, 5) ?? '23:59';
+
+      final DateTime finePartita = DateTime.parse('$dStr $fineStr:00');
+
+      return DateTime.now().isAfter(finePartita);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  List<int> get anniDisponibili {
+    final Set<int> anni = {};
+
+    // Anni presenti nei riepiloghi mensili con un incasso reale.
+    for (final r in riepiloghiMensili) {
+      final double incasso = (r['incasso_totale'] as num?)?.toDouble() ?? 0.0;
+
+      if (incasso > 0) {
+        final anno = r['anno'];
+        if (anno is num) {
+          anni.add(anno.toInt());
+        }
       }
     }
 
-    // 🟢 3. Calcolo su durata oraria
+    // Anni presenti nelle partite dettagliate con importo salvato.
+    for (final p in partiteComplete) {
+      if (!isPartitaTerminata(p)) continue;
+
+      final double importo = calcolaRicavoPartita(p);
+      if (importo <= 0) continue;
+
+      try {
+        final data = DateTime.parse(p['data_partita'].toString().split(' ')[0]);
+
+        anni.add(data.year);
+      } catch (_) {}
+    }
+
+    final lista = anni.toList();
+    lista.sort((a, b) => b.compareTo(a));
+
+    return lista;
+  }
+
+  int? get annoAttivo {
+    if (anniDisponibili.isEmpty) {
+      return null;
+    }
+
+    if (annoSelezionato != null && anniDisponibili.contains(annoSelezionato)) {
+      return annoSelezionato;
+    }
+
+    return anniDisponibili.first;
+  }
+
+  bool _meseCampoGiaArchiviato(Map<String, dynamic> partita) {
     try {
-      final inizio = partita['orario_inizio'].toString().split(':');
-      final fine = partita['orario_fine'].toString().split(':');
-      final int minInizio = int.parse(inizio[0]) * 60 + int.parse(inizio[1]);
-      final int minFine = int.parse(fine[0]) * 60 + int.parse(fine[1]);
-      final double oreTotali = (minFine - minInizio) / 60.0;
-      return oreTotali * prezzoAllOra;
-    } catch (e) {
-      return prezzoAllOra;
+      final data = DateTime.parse(
+        partita['data_partita'].toString().split(' ')[0],
+      );
+
+      final String idCampo = partita['id_campo'].toString();
+
+      return riepiloghiMensili.any((r) {
+        return r['id_campo'].toString() == idCampo &&
+            (r['anno'] as num).toInt() == data.year &&
+            (r['mese'] as num).toInt() == data.month;
+      });
+    } catch (_) {
+      return false;
     }
   }
 
@@ -77,69 +129,140 @@ class StatisticheState {
     try {
       final dataPartita = DateTime.parse(dataPartitaStr.split(' ')[0]);
       final adesso = DateTime.now();
+
       if (periodoSelezionato == 'Oggi') {
         return dataPartita.year == adesso.year &&
             dataPartita.month == adesso.month &&
             dataPartita.day == adesso.day;
-      } else if (periodoSelezionato == 'Settimana') {
+      }
+
+      if (periodoSelezionato == 'Settimana') {
         final inizioSettimana = adesso.subtract(
           Duration(days: adesso.weekday - 1),
         );
+
         final dataInizioPura = DateTime(
           inizioSettimana.year,
           inizioSettimana.month,
           inizioSettimana.day,
         );
+
         return dataPartita.isAfter(
           dataInizioPura.subtract(const Duration(seconds: 1)),
         );
-      } else if (periodoSelezionato == 'Mese') {
+      }
+
+      if (periodoSelezionato == 'Mese') {
         return dataPartita.year == adesso.year &&
             dataPartita.month == adesso.month;
-      } else if (periodoSelezionato == 'Anno') {
-        return dataPartita.year == adesso.year;
       }
-      return false;
-    } catch (e) {
-      return false;
-    }
-  }
 
-  // 🟢 Considera la partita conclusa se la data/ora di fine è precedente al momento attuale
-  bool isPartitaTerminata(Map<String, dynamic> p) {
-    try {
-      final String dStr = p['data_partita']
-          .toString()
-          .split('T')[0]
-          .split(' ')[0];
-      final String fineStr =
-          p['orario_fine']?.toString().substring(0, 5) ?? '23:59';
-      final DateTime finePartita = DateTime.parse('$dStr $fineStr:00');
+      if (periodoSelezionato == 'Anno') {
+        final anno = annoAttivo;
+        if (anno == null) return false;
 
-      return DateTime.now().isAfter(finePartita);
-    } catch (e) {
+        return dataPartita.year == anno;
+      }
+
+      return false;
+    } catch (_) {
       return false;
     }
   }
 
-  List<Map<String, dynamic>> get partiteFiltrate => partiteComplete
-      .where(
-        (p) =>
-            isPartitaTerminata(p) &&
-            rientraNelPeriodo(p['data_partita'].toString()),
-      )
-      .toList();
+  List<Map<String, dynamic>> get partiteFiltrate {
+    final partite = partiteComplete.where((p) {
+      if (!isPartitaTerminata(p)) {
+        return false;
+      }
 
-  double get guadagnoTotale =>
-      partiteFiltrate.fold(0.0, (sum, p) => sum + calcolaRicavoPartita(p));
+      if (!rientraNelPeriodo(p['data_partita'].toString())) {
+        return false;
+      }
+
+      // Se stiamo guardando l'anno e quel campo/mese
+      // è già stato archiviato, non contiamo nuovamente
+      // la singola partita.
+      if (periodoSelezionato == 'Anno' && _meseCampoGiaArchiviato(p)) {
+        return false;
+      }
+
+      return true;
+    }).toList();
+
+    return partite;
+  }
+
+  List<Map<String, dynamic>> get riepiloghiAnnoSelezionato {
+    if (periodoSelezionato != 'Anno') {
+      return [];
+    }
+
+    final anno = annoAttivo;
+    if (anno == null) {
+      return [];
+    }
+
+    return riepiloghiMensili.where((r) {
+      final valoreAnno = r['anno'];
+      if (valoreAnno is! num) return false;
+
+      return valoreAnno.toInt() == anno;
+    }).toList();
+  }
+
+  double get guadagnoTotale {
+    double totale = 0.0;
+
+    for (final p in partiteFiltrate) {
+      totale += calcolaRicavoPartita(p);
+    }
+
+    if (periodoSelezionato == 'Anno') {
+      for (final r in riepiloghiAnnoSelezionato) {
+        totale += (r['incasso_totale'] as num?)?.toDouble() ?? 0.0;
+      }
+    }
+
+    return totale;
+  }
+
+  int get numeroPartiteVisualizzate {
+    int totale = partiteFiltrate.length;
+
+    if (periodoSelezionato == 'Anno') {
+      for (final r in riepiloghiAnnoSelezionato) {
+        totale += (r['numero_partite'] as num?)?.toInt() ?? 0;
+      }
+    }
+
+    return totale;
+  }
 
   Map<String, double> get guadagniPerCampo {
     final Map<String, double> risultato = {};
-    for (var p in partiteFiltrate) {
-      final String nomeCampo = p['campo']?['nome_campo'] ?? 'Campo Sconosciuto';
+
+    // Partite dettagliate recenti
+    for (final p in partiteFiltrate) {
+      final String nomeCampo =
+          p['campo']?['nome_campo']?.toString() ?? 'Campo sconosciuto';
+
       risultato[nomeCampo] =
           (risultato[nomeCampo] ?? 0.0) + calcolaRicavoPartita(p);
     }
+
+    // Mesi già archiviati
+    if (periodoSelezionato == 'Anno') {
+      for (final r in riepiloghiAnnoSelezionato) {
+        final String nomeCampo =
+            r['nome_campo']?.toString() ?? 'Campo sconosciuto';
+
+        final double incasso = (r['incasso_totale'] as num?)?.toDouble() ?? 0.0;
+
+        risultato[nomeCampo] = (risultato[nomeCampo] ?? 0.0) + incasso;
+      }
+    }
+
     return risultato;
   }
 }
@@ -152,13 +275,22 @@ class StatisticheNotifier extends Notifier<StatisticheState> {
 
   Future<void> caricaDati(String idSocieta) async {
     state = state.copyWith(isLoading: true);
+
     try {
-      final dati = await _repository.fetchPartiteCompletatePerGuadagni(
+      final partite = await _repository.fetchPartiteCompletatePerGuadagni(
         idSocieta,
       );
-      state = state.copyWith(partiteComplete: dati);
-    } catch (e) {
-      state = state.copyWith(partiteComplete: []);
+
+      final riepiloghi = await _repository.fetchRiepiloghiMensiliGuadagni(
+        idSocieta,
+      );
+
+      state = state.copyWith(
+        partiteComplete: partite,
+        riepiloghiMensili: riepiloghi,
+      );
+    } catch (_) {
+      state = state.copyWith(partiteComplete: [], riepiloghiMensili: []);
     } finally {
       state = state.copyWith(isLoading: false);
     }
@@ -166,6 +298,10 @@ class StatisticheNotifier extends Notifier<StatisticheState> {
 
   void impostaPeriodo(String periodo) {
     state = state.copyWith(periodoSelezionato: periodo);
+  }
+
+  void impostaAnno(int anno) {
+    state = state.copyWith(periodoSelezionato: 'Anno', annoSelezionato: anno);
   }
 }
 

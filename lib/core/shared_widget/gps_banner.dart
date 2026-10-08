@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:app_campi/core/theme/app_theme.dart';
 import 'package:app_campi/core/theme/app_constants.dart';
 import 'package:app_campi/core/services/location_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class GpsBanner extends ConsumerStatefulWidget {
   const GpsBanner({super.key});
@@ -18,6 +19,10 @@ class _GpsBannerState extends ConsumerState<GpsBanner>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _richiediPosizioneAutomaticamente();
+    });
   }
 
   @override
@@ -35,6 +40,9 @@ class _GpsBannerState extends ConsumerState<GpsBanner>
       ref.invalidate(matchInZonaProvider);
     }
   }
+
+  static const _chiaveRichiestaPosizioneFatta =
+      'richiesta_posizione_automatica_fatta';
 
   @override
   Widget build(BuildContext context) {
@@ -189,5 +197,41 @@ class _GpsBannerState extends ConsumerState<GpsBanner>
       loading: () => const SizedBox.shrink(),
       error: (_, _) => const SizedBox.shrink(),
     );
+  }
+
+  Future<void> _richiediPosizioneAutomaticamente() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final giaRichiesta = prefs.getBool(_chiaveRichiestaPosizioneFatta) ?? false;
+
+    if (giaRichiesta) return;
+
+    final servizioAttivo = await Geolocator.isLocationServiceEnabled();
+
+    if (!servizioAttivo) {
+      return;
+    }
+
+    final permessoAttuale = await Geolocator.checkPermission();
+
+    if (permessoAttuale != LocationPermission.denied) {
+      await prefs.setBool(_chiaveRichiestaPosizioneFatta, true);
+      return;
+    }
+
+    // Segniamo che la richiesta automatica è già stata fatta.
+    await prefs.setBool(_chiaveRichiestaPosizioneFatta, true);
+
+    final nuovoPermesso = await richiediPermessoPosizione();
+
+    if (!mounted) return;
+
+    ref.invalidate(permessoPosizioneProvider);
+    ref.invalidate(posizioneAttualeProvider);
+
+    if (nuovoPermesso == LocationPermission.whileInUse ||
+        nuovoPermesso == LocationPermission.always) {
+      ref.invalidate(matchInZonaProvider);
+    }
   }
 }

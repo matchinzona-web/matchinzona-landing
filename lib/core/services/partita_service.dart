@@ -301,6 +301,13 @@ class PartitaService {
         );
       }
 
+      final double importoTotale = _calcolaImportoPartita(
+        campo: campo,
+        sport: sportNormalizzato,
+        orarioInizio: orarioInizio,
+        orarioFine: orarioFine,
+      );
+
       final result = await _repository.creaPartitaDinamica({
         'p_id_campo': campo.id,
         'p_id_organizzatore': organizzatore.id,
@@ -315,6 +322,7 @@ class PartitaService {
         'p_is_pagato': isPagato,
         'p_stripe_payment_intent_id': stripePaymentIntentId,
         'p_importo_rimborsabile_centesimi': importoRimborsabileCentesimi,
+        'p_importo_totale': importoTotale,
       });
 
       if (result['status'] == 'error') {
@@ -324,23 +332,6 @@ class PartitaService {
       }
 
       final String idPartitaGenerata = result['id'].toString();
-
-      final double importoTotale = _calcolaImportoPartita(
-        campo: campo,
-        sport: sportNormalizzato,
-        orarioInizio: orarioInizio,
-        orarioFine: orarioFine,
-      );
-
-      try {
-        await _repository.aggiornaImportoTotalePartita(
-          idPartitaGenerata,
-          importoTotale,
-        );
-      } catch (_) {
-        // La prenotazione è già stata creata:
-        // non la facciamo fallire solo per il salvataggio dello storico.
-      }
 
       await _repository.inserisciGiocatorePartita({
         'id_partita': idPartitaGenerata,
@@ -394,7 +385,7 @@ class PartitaService {
         );
       }
 
-      // Prenotazioni Matchly: durata fissa di 60 minuti.
+      // Prenotazioni : durata fissa di 60 minuti.
       final fineEsatto = inizioEsatto.add(const Duration(minutes: 60));
 
       final String inizioDb =
@@ -431,6 +422,13 @@ class PartitaService {
         );
       }
 
+      final double importoTotale = _calcolaImportoPartita(
+        campo: campo,
+        sport: null,
+        orarioInizio: orarioInizio,
+        orarioFine: orarioFine,
+      );
+
       final idPartita = await _repository.creaPrenotazioneManuale(
         idCampo: campo.id,
         idGestore: idGestore,
@@ -441,23 +439,8 @@ class PartitaService {
         nomeCliente: nomeCliente,
         telefonoCliente: telefonoCliente,
         notaGestore: notaGestore,
+        importoTotale: importoTotale,
       );
-
-      final double importoTotale = _calcolaImportoPartita(
-        campo: campo,
-        sport: null,
-        orarioInizio: orarioInizio,
-        orarioFine: orarioFine,
-      );
-
-      try {
-        await _repository.aggiornaImportoTotalePartita(
-          idPartita,
-          importoTotale,
-        );
-      } catch (_) {
-        // Non blocchiamo la prenotazione manuale.
-      }
 
       // La prenotazione manuale completa prende lo slot.
       // Le eventuali partite aperte vengono annullate.

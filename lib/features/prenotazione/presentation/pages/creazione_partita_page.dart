@@ -1010,8 +1010,9 @@ class _SelettorePartecipanti extends StatelessWidget {
       state.sportSelezionato,
       state.campoSelezionato?.numeroDiGiocatori ?? 0,
     );
-    final int postiDisponibiliPerAmici = maxGiocatori - 1;
-    final int mancanti = maxGiocatori - (state.ospitiExtra + 1);
+    final int massimoOspitiExtra = maxGiocatori - 1;
+    final int giocatoriTotali = state.ospitiExtra + 1;
+    final int mancanti = maxGiocatori - giocatoriTotali;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1027,7 +1028,7 @@ class _SelettorePartecipanti extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                "QUANTI AMICI PORTI CON TE?",
+                "QUANTI SIETE?",
                 style: TextStyle(
                   color: AppTheme.textPrimary,
                   fontWeight: FontWeight.w900,
@@ -1058,7 +1059,7 @@ class _SelettorePartecipanti extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             mancanti > 0
-                ? "Indica se vieni con amici. Troveremo noi i restanti $mancanti giocatori."
+                ? "Indica in quanti siete. Troveremo noi i restanti $mancanti giocatori."
                 : "Hai occupato tutti i posti. Il match diventerà un Campo Intero (Completo).",
             style: TextStyle(
               color: AppTheme.textSecondary,
@@ -1080,7 +1081,7 @@ class _SelettorePartecipanti extends StatelessWidget {
               SizedBox(
                 width: 50,
                 child: Text(
-                  "${state.ospitiExtra}",
+                  "$giocatoriTotali",
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: AppTheme.textPrimary,
@@ -1092,7 +1093,7 @@ class _SelettorePartecipanti extends StatelessWidget {
               const SizedBox(width: 32),
               _buildPulsanteRotondo(
                 icona: Icons.add,
-                attivo: state.ospitiExtra < postiDisponibiliPerAmici,
+                attivo: state.ospitiExtra < massimoOspitiExtra,
                 onTap: () => controller.aggiornaOspiti(state.ospitiExtra + 1),
               ),
             ],
@@ -1147,7 +1148,7 @@ class _LegendaSlot extends StatelessWidget {
         _LegendaItem(
           color: AppTheme.statoAttenzione,
           icon: Icons.bolt,
-          label: "In gara",
+          label: "In cerca",
         ),
         _LegendaItem(
           color: AppTheme.statoAttenzione,
@@ -1463,8 +1464,168 @@ class _BuildStickyBottomBar extends ConsumerWidget {
   ) async {
     try {
       final utente = ref.read(utenteCorrenteProvider).value;
-      if (utente == null) throw Exception('Utente non autenticato.');
+
+      if (utente == null) {
+        throw Exception('Utente non autenticato.');
+      }
+
       final bool isMaggiorenne = utente.eta != null && utente.eta! >= 18;
+
+      // ------------------------------------------------------------
+      // CONTROLLO ORARIO PRIMA DI QUALSIASI PAGAMENTO
+      // ------------------------------------------------------------
+
+      final oraSelezionata = state.oraInizioSelezionata;
+
+      if (oraSelezionata == null) {
+        throw Exception('Seleziona un orario.');
+      }
+
+      final partiOra = oraSelezionata.split(':');
+
+      final inizioPartita = DateTime(
+        state.dataSelezionata.year,
+        state.dataSelezionata.month,
+        state.dataSelezionata.day,
+        int.parse(partiOra[0]),
+        int.parse(partiOra[1]),
+      );
+
+      final client = Supabase.instance.client;
+
+      final campo = state.campoSelezionato!;
+      final idSocieta = campo.societa!.id;
+
+      final dataDb =
+          "${state.dataSelezionata.year.toString().padLeft(4, '0')}-"
+          "${state.dataSelezionata.month.toString().padLeft(2, '0')}-"
+          "${state.dataSelezionata.day.toString().padLeft(2, '0')}";
+
+      final oraInizioMinuti =
+          int.parse(partiOra[0]) * 60 + int.parse(partiOra[1]);
+
+      // Le tue partite risultano a slot orari.
+      // Se la durata viene calcolata diversamente nel controller,
+      // usiamo poi la stessa identica durata.
+      final oraFineMinuti = oraInizioMinuti + 60;
+
+      // ------------------------------------------------------------
+      // 1. RICONTROLLO CHIUSURE STRAORDINARIE
+      // ------------------------------------------------------------
+
+      final chiusure = await client
+          .from('chiusure_straordinarie')
+          .select('data_inizio, data_fine, orario_inizio, orario_fine')
+          .eq('id_societa', idSocieta)
+          .lte('data_inizio', dataDb)
+          .gte('data_fine', dataDb);
+
+      int timeToMinutes(String valore) {
+        final parti = valore.substring(0, 5).split(':');
+        return int.parse(parti[0]) * 60 + int.parse(parti[1]);
+      }
+
+      for (final chiusura in chiusure) {
+        final chiusuraInizio = timeToMinutes(
+          chiusura['orario_inizio']?.toString() ?? '00:00',
+        );
+
+        final chiusuraFine = timeToMinutes(
+          chiusura['orario_fine']?.toString() ?? '23:59',
+        );
+
+        final sovrapposta =
+            oraInizioMinuti < chiusuraFine && oraFineMinuti > chiusuraInizio;
+
+        if (sovrapposta) {
+          throw Exception(
+            'Questo orario non è più disponibile: il centro ha inserito una chiusura straordinaria.',
+          );
+        }
+      }
+
+      // ------------------------------------------------------------
+      // 2. RICONTROLLO ORARI NORMALI DEL CENTRO
+      // ------------------------------------------------------------
+
+      final giornoSettimana = state.dataSelezionata.weekday;
+
+      final orario = await client
+          .from('orari_societa')
+          .select(
+            'is_chiuso, orario_apertura, orario_chiusura, '
+            'orario_apertura_2, orario_chiusura_2',
+          )
+          .eq('id_societa', idSocieta)
+          .eq('giorno_settimana', giornoSettimana)
+          .maybeSingle();
+
+      if (orario == null || orario['is_chiuso'] == true) {
+        throw Exception('Il centro non è più disponibile in questa giornata.');
+      }
+
+      bool dentroFascia(String? apertura, String? chiusura) {
+        if (apertura == null || chiusura == null) return false;
+
+        final ap = timeToMinutes(apertura);
+        final ch = timeToMinutes(chiusura);
+
+        return oraInizioMinuti >= ap && oraFineMinuti <= ch;
+      }
+
+      final validoPrimaFascia = dentroFascia(
+        orario['orario_apertura']?.toString(),
+        orario['orario_chiusura']?.toString(),
+      );
+
+      final validoSecondaFascia = dentroFascia(
+        orario['orario_apertura_2']?.toString(),
+        orario['orario_chiusura_2']?.toString(),
+      );
+
+      if (!validoPrimaFascia && !validoSecondaFascia) {
+        throw Exception(
+          'Questo orario non è più disponibile: il centro ha modificato gli orari di apertura.',
+        );
+      }
+
+      final adesso = DateTime.now();
+
+      final maxGiocatoriPreCheck = _calcolaMaxGiocatoriPerSport(
+        state.sportSelezionato,
+        state.campoSelezionato!.numeroDiGiocatori,
+      );
+
+      final giocatoriTotaliPreCheck = state.ospitiExtra + 1;
+
+      final bool isPartitaApertaPreCheck =
+          !state.isPartitaPrivata &&
+          giocatoriTotaliPreCheck < maxGiocatoriPreCheck;
+
+      // Orario già iniziato/passato.
+      if (!inizioPartita.isAfter(adesso)) {
+        throw Exception(
+          'Non puoi creare una partita in un orario già passato.',
+        );
+      }
+
+      // Matchmaking: minimo 2 ore prima.
+      if (isPartitaApertaPreCheck &&
+          adesso.isAfter(inizioPartita.subtract(const Duration(hours: 2)))) {
+        throw Exception(
+          'Non puoi aprire una partita quando mancano meno di '
+          '2 ore all\'inizio.',
+        );
+      }
+
+      // Campo intero/completo: massimo fino a 30 minuti prima.
+      if (!isPartitaApertaPreCheck &&
+          adesso.isAfter(inizioPartita.subtract(const Duration(minutes: 30)))) {
+        throw Exception(
+          'Puoi prenotare il campo intero fino a '
+          '30 minuti prima dell\'inizio.',
+        );
+      }
 
       String? stripePaymentIntentId;
       int? importoRimborsabileCentesimi;

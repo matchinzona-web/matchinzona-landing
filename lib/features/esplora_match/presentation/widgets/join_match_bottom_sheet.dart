@@ -11,6 +11,7 @@ import 'package:app_campi/core/services/location_provider.dart';
 import 'auth_bottom_sheet.dart';
 import 'package:app_campi/features/miei_match/application/partite_utente_provider.dart';
 import 'package:app_campi/features/home/presentation/home_page.dart';
+import 'package:app_campi/core/shared_widget/selezione_livello_dialog.dart';
 
 void mostraDettagliEUnisciti(
   BuildContext context,
@@ -61,6 +62,38 @@ class _JoinMatchSheetContent extends StatelessWidget {
   int get _postiDisponibili =>
       partita.maxGiocatoriReali - partita.numeroGiocatoriPrenotati;
 
+  double get _prezzoCampoTotale {
+    double prezzoOrario = partita.campo.prezzo;
+
+    final sport = partita.sportNormalizzato.trim().toLowerCase();
+
+    for (final tariffa in partita.campo.tariffeSport) {
+      if (tariffa.sport.trim().toLowerCase() == sport) {
+        prezzoOrario = tariffa.prezzo;
+        break;
+      }
+    }
+
+    try {
+      final inizio = partita.orarioInizio.split(':');
+      final fine = partita.orarioFine.split(':');
+
+      final minutiInizio = int.parse(inizio[0]) * 60 + int.parse(inizio[1]);
+
+      int minutiFine = int.parse(fine[0]) * 60 + int.parse(fine[1]);
+
+      if (minutiFine == 0 && minutiInizio > 0) {
+        minutiFine = 24 * 60;
+      }
+
+      final durataOre = (minutiFine - minutiInizio) / 60.0;
+
+      return prezzoOrario * durataOre;
+    } catch (_) {
+      return prezzoOrario;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final postiDisponibili = _postiDisponibili;
@@ -100,8 +133,14 @@ class _JoinMatchSheetContent extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               _DataOraChip(partita: partita),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+
+              _PrezzoCampoTile(prezzo: _prezzoCampoTotale),
+
+              const SizedBox(height: 16),
+
               _PostiDisponibiliTile(posti: postiDisponibili),
+
               const SizedBox(height: 24),
               _buildCtaSection(postiDisponibili, maxOspitiAggiungibili),
             ],
@@ -185,6 +224,50 @@ class _DataOraChip extends StatelessWidget {
               color: AppTheme.textPrimary,
               fontSize: 14,
               fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrezzoCampoTile extends StatelessWidget {
+  final double prezzo;
+
+  const _PrezzoCampoTile({required this.prezzo});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.cardBorder),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.euro_rounded, color: AppTheme.accent, size: 20),
+              SizedBox(width: 10),
+              Text(
+                "Prezzo campo",
+                style: TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          Text(
+            "${prezzo.toStringAsFixed(2)} €",
+            style: const TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ],
@@ -389,11 +472,28 @@ class _IscrizioneConOspitiSectionState
   }
 
   Future<void> _confermaIscrizione(BuildContext context) async {
+    verificaESelezionaLivello(
+      context: context,
+      userId: widget.utenteLoggato.id,
+      livelliSportAttuali: widget.utenteLoggato.livelliSport,
+      sports: [widget.partita.sportNormalizzato],
+      onCompletato: () {
+        ref.invalidate(utenteCorrenteProvider);
+
+        if (!context.mounted) return;
+
+        _eseguiIscrizione(context);
+      },
+    );
+  }
+
+  Future<void> _eseguiIscrizione(BuildContext context) async {
     final int nuovoTotale =
         widget.partita.numeroGiocatoriPrenotati + _numeroPersone;
 
     final bool diventaCompleta =
         nuovoTotale >= widget.partita.maxGiocatoriReali;
+
     final errore = await ref
         .read(joinMatchControllerProvider.notifier)
         .unisciti(widget.partita, widget.utenteLoggato, _numeroPersone - 1);
@@ -401,7 +501,7 @@ class _IscrizioneConOspitiSectionState
     if (!context.mounted) return;
 
     if (errore == null) {
-      Navigator.pop(context);
+      final navigator = Navigator.of(context);
 
       ref
           .read(filtroPartitaProvider.notifier)
@@ -412,9 +512,76 @@ class _IscrizioneConOspitiSectionState
       ref.invalidate(matchInZonaProvider);
       ref.invalidate(partiteUtenteProvider(widget.utenteLoggato.id));
 
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          return AlertDialog(
+            backgroundColor: AppTheme.cardBg,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(
+                color: diventaCompleta
+                    ? AppTheme.statoSuccesso.withOpacity(0.5)
+                    : AppTheme.accent.withOpacity(0.5),
+              ),
+            ),
+            title: Row(
+              children: [
+                Icon(
+                  diventaCompleta
+                      ? Icons.check_circle_rounded
+                      : Icons.info_outline_rounded,
+                  color: diventaCompleta
+                      ? AppTheme.statoSuccesso
+                      : AppTheme.accent,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  diventaCompleta ? "MATCH COMPLETO" : "MATCH APERTO",
+                  style: const TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              diventaCompleta
+                  ? "Il campo è riservato esclusivamente a te e ai tuoi amici. "
+                        "Potrai disdire la prenotazione fino a 30 minuti prima "
+                        "dell'inizio della partita. Buona partita bomber 💪"
+                  : "Se il match non raggiunge il numero necessario entro 2 ore "
+                        "dall'inizio, verrà annullato.\n\n"
+                        "Se il campo viene prenotato per intero, il match verrà annullato.",
+              style: const TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text(
+                  "HO CAPITO",
+                  style: TextStyle(
+                    color: AppTheme.accent,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+
       if (!context.mounted) return;
 
-      Navigator.of(context).pushAndRemoveUntil(
+      navigator.pop();
+
+      navigator.pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const HomePage(initialIndex: 2)),
         (route) => false,
       );

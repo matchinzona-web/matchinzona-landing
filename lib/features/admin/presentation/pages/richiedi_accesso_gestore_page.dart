@@ -186,7 +186,7 @@ class _RichiediAccessoGestorePageState
                       ),
                       const SizedBox(height: 20),
                       const Text(
-                        'Prova Matchly gratuitamente',
+                        'Prova MatchInZona gratuitamente',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 28,
@@ -196,7 +196,7 @@ class _RichiediAccessoGestorePageState
                       const SizedBox(height: 14),
                       Text(
                         'Compila il modulo per richiedere l’attivazione del profilo gestore. '
-                        'Ti contatteremo per configurare il tuo centro sportivo su Matchly.',
+                        'Ti contatteremo per configurare il tuo centro sportivo su MatchInZona.',
                         style: TextStyle(
                           color: Colors.grey.shade400,
                           fontSize: 15,

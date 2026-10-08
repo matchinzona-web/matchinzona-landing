@@ -5,6 +5,8 @@ import 'package:app_campi/core/models/campo.dart';
 import 'package:app_campi/core/repositories/campi_repository.dart';
 import 'package:app_campi/features/prenotazione/application/creazione_partita_controller.dart';
 import 'package:app_campi/features/prenotazione/presentation/pages/creazione_partita_page.dart';
+import 'package:app_campi/features/auth/application/auth_provider.dart';
+import 'package:app_campi/core/shared_widget/selezione_livello_dialog.dart';
 
 class ListaCampiScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> societa;
@@ -102,6 +104,19 @@ class _ListaCampiScreenState extends ConsumerState<ListaCampiScreen> {
             itemCount: campi.length,
             itemBuilder: (context, index) {
               final Campo campo = campi[index];
+
+              final List<String> sportLivelliCampo = [];
+
+              for (final tariffa in campo.tariffeSport) {
+                final String sport = tariffa.sport
+                    .toString()
+                    .trim()
+                    .toLowerCase();
+
+                if (sport.isNotEmpty) {
+                  sportLivelliCampo.add(sport);
+                }
+              }
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
@@ -253,15 +268,51 @@ class _ListaCampiScreenState extends ConsumerState<ListaCampiScreen> {
                     ],
                   ),
                   onTap: () {
-                    ref
-                        .read(creazionePartitaProvider.notifier)
-                        .selezionaCampo(campo);
+                    final utente = ref.read(utenteCorrenteProvider).value;
+                    final controller = ref.read(
+                      creazionePartitaProvider.notifier,
+                    );
 
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const CreazionePartitaPage(),
-                      ),
+                    String sportCampo = '';
+
+                    if (campo.tariffeSport.isNotEmpty) {
+                      sportCampo = campo.tariffeSport.first.sport
+                          .trim()
+                          .toLowerCase();
+                    }
+
+                    if (utente == null) {
+                      controller.impostaSport(sportCampo);
+                      controller.selezionaCampo(campo);
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const CreazionePartitaPage(),
+                        ),
+                      );
+
+                      return;
+                    }
+
+                    verificaESelezionaLivello(
+                      context: context,
+                      userId: utente.id,
+                      livelliSportAttuali: utente.livelliSport,
+                      sports: sportLivelliCampo,
+                      onCompletato: () {
+                        ref.invalidate(utenteCorrenteProvider);
+
+                        controller.impostaSport(sportCampo);
+                        controller.selezionaCampo(campo);
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const CreazionePartitaPage(),
+                          ),
+                        );
+                      },
                     );
                   },
                 ),

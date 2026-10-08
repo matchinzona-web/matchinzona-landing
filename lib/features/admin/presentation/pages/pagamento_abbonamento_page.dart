@@ -147,7 +147,7 @@ class _PagamentoAbbonamentoPageState extends State<PagamentoAbbonamentoPage> {
         elevation: 0,
         automaticallyImplyLeading: false,
         title: const Text(
-          'Attiva Matchly',
+          'Attiva MatchInZona',
           style: TextStyle(
             color: AppTheme.neonOrange,
             fontWeight: FontWeight.bold,
@@ -183,7 +183,7 @@ class _PagamentoAbbonamentoPageState extends State<PagamentoAbbonamentoPage> {
 
                   Text(
                     'Il tuo centro è stato creato. Completa il pagamento '
-                    'per attivare il tuo piano Matchly.',
+                    'per attivare il tuo piano MatchInZona.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.grey.shade400,

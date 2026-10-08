@@ -94,7 +94,7 @@ serve(async (req) => {
     const session = await stripe.checkout.sessions.retrieve(session_id);
 
     // La Checkout Session deve appartenere
-    // all'utente Matchly attualmente autenticato.
+    // all'utente attualmente autenticato.
     if (session.client_reference_id !== user.id) {
       return new Response(
         JSON.stringify({

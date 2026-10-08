@@ -755,7 +755,7 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
 
                                 GestureDetector(
                                   onTap: () => _apriLink(
-                                    'https://matchlyassistenza-web.github.io/matchly-privacy/',
+                                    'https://matchinzona-web.github.io/matchinzona-privacy/',
                                   ),
                                   child: const Text(
                                     'Privacy Policy',
@@ -779,7 +779,7 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
 
                                 GestureDetector(
                                   onTap: () => _apriLink(
-                                    'https://matchlyassistenza-web.github.io/matchly-privacy/termini.html',
+                                    'https://matchinzona-web.github.io/matchinzona-privacy/termini.html',
                                   ),
                                   child: const Text(
                                     'Termini e Condizioni',

@@ -73,7 +73,7 @@ serve(async (req) => {
       } catch (stripeConnectErr) {
         console.error("Errore eliminazione Stripe Connect:", stripeConnectErr);
 
-        // Non blocchiamo l'eliminazione Matchly:
+        // Non blocchiamo l'eliminazione:
         // l'account può avere vincoli Stripe, saldo,
         // payout pendenti o essere già stato rimosso.
       }

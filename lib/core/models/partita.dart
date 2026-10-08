@@ -103,7 +103,7 @@ class Partita {
             json['id_organizzatore']?.toString() ??
             '',
         nome: mappaOrganizzatore['nome']?.toString() ?? 'Giocatore',
-        cognome: mappaOrganizzatore['cognome']?.toString() ?? 'Matchly',
+        cognome: mappaOrganizzatore['cognome']?.toString() ?? 'MatchInZona',
         email: mappaOrganizzatore['email']?.toString() ?? '',
         dataNascita: mappaOrganizzatore['data_nascita'] != null
             ? DateTime.tryParse(mappaOrganizzatore['data_nascita'].toString())
@@ -127,7 +127,7 @@ class Partita {
       organizzatoreParsato = Utente(
         id: json['id_organizzatore']?.toString() ?? '',
         nome: 'Giocatore',
-        cognome: 'Matchly',
+        cognome: 'MatchInZona',
         email: '',
       );
     }

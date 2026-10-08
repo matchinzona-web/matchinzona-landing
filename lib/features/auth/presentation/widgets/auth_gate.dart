@@ -40,7 +40,7 @@ class AuthGate extends ConsumerWidget {
       },
 
       data: (utente) {
-        // Sessione Auth esistente, ma nessun profilo Matchly:
+        // Sessione Auth esistente, ma nessun profilo:
         // tipico primo accesso Google/Apple.
         if (utente == null) {
           return const CompletaProfiloSocialPage();

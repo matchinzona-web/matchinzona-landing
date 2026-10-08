@@ -38,6 +38,30 @@ class _NotifichePageState extends ConsumerState<NotifichePage> {
     }
   }
 
+  Future<void> _segnaTutteComeLette() async {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+
+    if (userId == null) return;
+
+    try {
+      await Supabase.instance.client
+          .from('notifiche')
+          .update({'letto': true})
+          .eq('id_utente', userId)
+          .eq('letto', false);
+
+      if (!mounted) return;
+
+      setState(() {
+        _notificheAppenaLette.clear();
+      });
+
+      ref.invalidate(notificheStreamProvider);
+    } catch (e) {
+      debugPrint('Errore segna tutte come lette: $e');
+    }
+  }
+
   Future<void> _eliminaNotifica(String idNotifica) async {
     try {
       await Supabase.instance.client
@@ -151,13 +175,28 @@ class _NotifichePageState extends ConsumerState<NotifichePage> {
                         onPressed: () => Navigator.pop(context),
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        "CENTRO NOTIFICHE",
-                        style: TextStyle(
-                          color: AppTheme.textSecondary.withOpacity(0.8),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2.0,
+
+                      Expanded(
+                        child: Text(
+                          "CENTRO NOTIFICHE",
+                          style: TextStyle(
+                            color: AppTheme.textSecondary.withOpacity(0.8),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 2.0,
+                          ),
+                        ),
+                      ),
+
+                      TextButton(
+                        onPressed: _segnaTutteComeLette,
+                        child: const Text(
+                          "SEGNA TUTTE",
+                          style: TextStyle(
+                            color: AppTheme.accent,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     ],
@@ -169,12 +208,78 @@ class _NotifichePageState extends ConsumerState<NotifichePage> {
                     loading: () => const Center(
                       child: CircularProgressIndicator(color: AppTheme.accent),
                     ),
-                    error: (err, _) => Center(
-                      child: Text(
-                        "Errore nel caricamento",
-                        style: const TextStyle(color: AppTheme.statoErrore),
-                      ),
-                    ),
+                    error: (err, stack) {
+                      debugPrint('ERRORE NOTIFICHE STREAM: $err');
+                      debugPrint('STACK NOTIFICHE: $stack');
+
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 100,
+                                height: 100,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppTheme.accent.withOpacity(0.10),
+                                ),
+                                child: const Icon(
+                                  Icons.wifi_off_rounded,
+                                  size: 52,
+                                  color: AppTheme.accent,
+                                ),
+                              ),
+
+                              const SizedBox(height: 28),
+
+                              const Text(
+                                'Non è stato possibile connettersi',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: AppTheme.textPrimary,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+
+                              const SizedBox(height: 10),
+
+                              const Text(
+                                'Controlla la tua connessione internet e riprova.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: AppTheme.textSecondary,
+                                  fontSize: 14,
+                                  height: 1.5,
+                                ),
+                              ),
+
+                              const SizedBox(height: 28),
+
+                              SizedBox(
+                                width: double.infinity,
+                                height: 52,
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    ref.invalidate(notificheStreamProvider);
+                                  },
+                                  icon: const Icon(Icons.refresh_rounded),
+                                  label: const Text(
+                                    'RIPROVA',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                     data: (notifiche) {
                       final notificheVisibili = notifiche
                           .where((n) => !_notificheEliminate.contains(n.id))

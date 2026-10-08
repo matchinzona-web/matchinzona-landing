@@ -71,6 +71,12 @@ class WidgetCalendarioGestore extends StatelessWidget {
                   backgroundColor: AppTheme.cardBg,
                   viewNavigationMode: ViewNavigationMode.none,
 
+                  minDate: DateTime(
+                    DateTime.now().year,
+                    DateTime.now().month,
+                    DateTime.now().day,
+                  ),
+
                   maxDate: DateTime(
                     DateTime.now().year,
                     DateTime.now().month,
@@ -78,7 +84,7 @@ class WidgetCalendarioGestore extends StatelessWidget {
                     23,
                     59,
                     59,
-                  ).add(const Duration(days: 7)),
+                  ).add(const Duration(days: 13)),
 
                   dataSource: _PartiteDataSource(prenotazioniVisibili),
 
@@ -126,9 +132,9 @@ class WidgetCalendarioGestore extends StatelessWidget {
                     ),
 
                     startHour: giornoChiuso ? 8.0 : startHour,
-
                     endHour: giornoChiuso ? 11.0 : endHour,
 
+                    timeInterval: const Duration(hours: 1),
                     timeIntervalHeight: 60,
                   ),
 
@@ -353,75 +359,92 @@ class _AppointmentCard extends StatelessWidget {
 
   Widget _buildChiusuraCard() {
     final String start = _formatTime(appointment.startTime);
-
     final String end = _formatTime(appointment.endTime);
 
+    final int durataMinuti = appointment.endTime
+        .difference(appointment.startTime)
+        .inMinutes;
+
+    final bool compatta = durataMinuti < 30;
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.035),
         borderRadius: BorderRadius.circular(11),
         border: Border.all(color: Colors.white.withOpacity(0.10), width: 1),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 3,
-            height: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade600,
-              borderRadius: const BorderRadius.horizontal(
-                left: Radius.circular(11),
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 9),
-
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.lock_outline_rounded,
-              color: Colors.grey.shade500,
-              size: 15,
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'CHIUSO',
+      child: compatta
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Text(
+                  'CHIUSO $start – $end',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Colors.grey.shade400,
-                    fontSize: 10.5,
+                    fontSize: 9.5,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 0.8,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '$start – $end',
-                  style: TextStyle(
+              ),
+            )
+          : Row(
+              children: [
+                Container(
+                  width: 3,
+                  height: double.infinity,
+                  decoration: BoxDecoration(
                     color: Colors.grey.shade600,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
+                    borderRadius: const BorderRadius.horizontal(
+                      left: Radius.circular(11),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.lock_outline_rounded,
+                    color: Colors.grey.shade500,
+                    size: 15,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'CHIUSO',
+                        style: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$start – $end',
+                        style: TextStyle(
+                          color: Colors.grey.shade600,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -282,9 +282,12 @@ class DashboardNotifier extends Notifier<DashboardState> {
       return;
     }
 
+    final double startGriglia = minH!.floorToDouble();
+    final double endGriglia = maxH!.ceilToDouble();
+
     state = state.copyWith(
-      startHour: minH!,
-      endHour: maxH!,
+      startHour: startGriglia,
+      endHour: endGriglia,
       giornoChiuso: false,
     );
   }

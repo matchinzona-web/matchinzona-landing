@@ -136,7 +136,7 @@ serve(async (req) => {
 
     const disabledReason = account.requirements?.disabled_reason ?? null;
 
-    // Un account è realmente pronto per Matchly
+    // Un account è realmente pronto l'app
     // quando può ricevere pagamenti e ricevere payout.
     const isFullyActive = chargesEnabled && payoutsEnabled;
 

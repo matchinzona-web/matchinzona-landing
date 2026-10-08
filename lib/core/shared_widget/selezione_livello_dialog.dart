@@ -25,10 +25,22 @@ final List<Map<String, String>> livelliDisponibili = [
   },
 ];
 
-// Normalizza la chiave per il database (es. tennis_singolo e tennis_doppio diventano entrambi "tennis")
 String _normalizzaChiaveSport(String sport) {
-  if (sport.contains('tennis')) return 'tennis';
-  return sport;
+  final valore = sport.trim().toLowerCase();
+
+  if (valore.startsWith('tennis')) {
+    return 'tennis';
+  }
+
+  if (valore.startsWith('calcio')) {
+    return 'calcio';
+  }
+
+  if (valore == 'volley' || valore == 'pallavolo') {
+    return 'pallavolo';
+  }
+
+  return valore;
 }
 
 // Icona dinamica per il popup
@@ -71,22 +83,49 @@ Future<void> verificaESelezionaLivello({
   required BuildContext context,
   required String userId,
   required Map<String, dynamic>? livelliSportAttuali,
-  required String sport,
+  required List<String> sports,
   required VoidCallback onCompletato,
 }) async {
-  Map<String, dynamic> mappaLivelli = Map.from(livelliSportAttuali ?? {});
+  final Map<String, dynamic> mappaLivelli = Map<String, dynamic>.from(
+    livelliSportAttuali ?? {},
+  );
 
-  // Sia 'tennis_singolo' che 'tennis_doppio' useranno la chiave "tennis"
-  final String chiaveSport = _normalizzaChiaveSport(sport);
+  final Set<String> sportNormalizzati = sports
+      .map(_normalizzaChiaveSport)
+      .where((sport) => sport.isNotEmpty)
+      .toSet();
 
-  // Se ha già un livello impostato per questo sport, proseguiamo direttamente
-  if (mappaLivelli.containsKey(chiaveSport) &&
-      mappaLivelli[chiaveSport] != null) {
+  final List<String> sportSenzaLivello = sportNormalizzati.where((sport) {
+    final livello = mappaLivelli[sport];
+
+    return livello == null || livello.toString().trim().isEmpty;
+  }).toList();
+
+  // L'utente ha già un livello per tutti gli sport del campo.
+  if (sportSenzaLivello.isEmpty) {
     onCompletato();
     return;
   }
 
-  // Mostra il Bottom Sheet
+  String nomeSport(String sport) {
+    switch (sport) {
+      case 'calcio':
+        return 'Calcio';
+      case 'tennis':
+        return 'Tennis';
+      case 'padel':
+        return 'Padel';
+      case 'basket':
+        return 'Basket';
+      case 'pallavolo':
+        return 'Pallavolo';
+      default:
+        return sport;
+    }
+  }
+
+  final String sportDaMostrare = sportSenzaLivello.map(nomeSport).join(' • ');
+
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -121,28 +160,38 @@ Future<void> verificaESelezionaLivello({
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      _getIconaSport(chiaveSport),
+                      sportSenzaLivello.length == 1
+                          ? _getIconaSport(sportSenzaLivello.first)
+                          : Icons.sports_rounded,
                       color: AppTheme.accent,
                       size: 24,
                     ),
                   ),
+
                   const SizedBox(width: 12),
+
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "Livello ${_getTitoloSportPulito(chiaveSport)}",
+                          sportSenzaLivello.length == 1
+                              ? 'Livello $sportDaMostrare'
+                              : 'Livello $sportDaMostrare',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+
                         const SizedBox(height: 2),
-                        const Text(
-                          "Serve per bilanciare i match in zona.",
-                          style: TextStyle(
+
+                        Text(
+                          sportSenzaLivello.length == 1
+                              ? 'Serve per bilanciare i match in zona.'
+                              : 'Il livello scelto verrà impostato per questi sport.',
+                          style: const TextStyle(
                             color: AppTheme.textSecondary,
                             fontSize: 12,
                           ),
@@ -152,6 +201,7 @@ Future<void> verificaESelezionaLivello({
                   ),
                 ],
               ),
+
               const SizedBox(height: 20),
 
               Flexible(
@@ -162,39 +212,32 @@ Future<void> verificaESelezionaLivello({
                   separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
                     final item = livelliDisponibili[index];
+
                     return InkWell(
                       borderRadius: BorderRadius.circular(16),
                       onTap: () async {
+                        final livelloScelto = item['titolo']!;
+
                         Navigator.pop(sheetContext);
 
-                        // 1. Aggiorniamo la mappa locale
-                        mappaLivelli[chiaveSport] = item['titolo'];
-
-                        try {
-                          debugPrint(
-                            "Sto salvando su Supabase per $userId la mappa: $mappaLivelli",
-                          );
-
-                          // 2. Inviamo la mappa aggiornata a Supabase
-                          await Supabase.instance.client
-                              .from('utenti')
-                              .update({
-                                'livelli_sport':
-                                    mappaLivelli, // Passiamo la Map aggiornata
-                              })
-                              .eq('id', userId);
-
-                          debugPrint(
-                            "Livello salvato con successo per $chiaveSport: ${item['titolo']}",
-                          );
-                        } catch (e) {
-                          debugPrint(
-                            "❌ Errore durante il salvataggio su Supabase",
-                          );
+                        // Stesso livello per tutti gli sport del campo
+                        // che non avevano ancora un livello.
+                        for (final sport in sportSenzaLivello) {
+                          mappaLivelli[sport] = livelloScelto;
                         }
 
-                        // 3. Proseguiamo con il callback
-                        onCompletato();
+                        try {
+                          await Supabase.instance.client
+                              .from('utenti')
+                              .update({'livelli_sport': mappaLivelli})
+                              .eq('id', userId);
+
+                          onCompletato();
+                        } catch (e) {
+                          debugPrint(
+                            'Errore durante il salvataggio dei livelli sportivi: $e',
+                          );
+                        }
                       },
                       child: Container(
                         padding: const EdgeInsets.all(14),

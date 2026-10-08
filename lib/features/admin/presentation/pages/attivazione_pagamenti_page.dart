@@ -190,14 +190,14 @@ class _AttivazionePagamentiPageState extends State<AttivazionePagamentiPage> {
 
   String get _descrizione {
     if (_pagamentiAttivi) {
-      return 'Il tuo conto è pronto per ricevere i pagamenti delle prenotazioni su Matchly.';
+      return 'Il tuo conto è pronto per ricevere i pagamenti delle prenotazioni su MatchInZona.';
     }
 
     if (_configurazioneIncompleta) {
       return 'La configurazione è stata iniziata, ma servono ancora alcuni passaggi per attivare completamente i pagamenti.';
     }
 
-    return 'Configura il tuo conto per permettere ai clienti di pagare le prenotazioni direttamente su Matchly.';
+    return 'Configura il tuo conto per permettere ai clienti di pagare le prenotazioni direttamente su MatchInZona.';
   }
 
   String get _testoPulsante {

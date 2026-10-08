@@ -118,6 +118,68 @@ serve(async (req) => {
     }
 
     // ==========================================================
+    // 4. RINNOVO ABBONAMENTO PAGATO CON SUCCESSO
+    // ==========================================================
+    if (event.type === "invoice.payment_succeeded") {
+      const invoice = event.data.object;
+
+      const customerId =
+        typeof invoice.customer === "string"
+          ? invoice.customer
+          : invoice.customer?.id;
+
+      if (customerId) {
+        const subscriptionId =
+          typeof invoice.subscription === "string"
+            ? invoice.subscription
+            : invoice.subscription?.id;
+
+        if (subscriptionId) {
+          const subscription =
+            await stripe.subscriptions.retrieve(subscriptionId);
+
+          const priceId = subscription.items.data[0]?.price?.id;
+
+          if (priceId) {
+            const specifiche = ottieniSpecifichePiano(priceId);
+
+            if (specifiche.nome !== "NESSUNO") {
+              await supabaseClient
+                .from("societa")
+                .update({
+                  piano_attuale: specifiche.nome,
+                  limite_campi: specifiche.limite,
+                  status_abbonamento: "active",
+                })
+                .eq("stripe_customer_id", customerId);
+            }
+          }
+        }
+      }
+    }
+
+    // ==========================================================
+    // 5. PAGAMENTO ABBONAMENTO FALLITO
+    // ==========================================================
+    if (event.type === "invoice.payment_failed") {
+      const invoice = event.data.object;
+
+      const customerId =
+        typeof invoice.customer === "string"
+          ? invoice.customer
+          : invoice.customer?.id;
+
+      if (customerId) {
+        await supabaseClient
+          .from("societa")
+          .update({
+            status_abbonamento: "payment_failed",
+          })
+          .eq("stripe_customer_id", customerId);
+      }
+    }
+
+    // ==========================================================
     // 4. AGGIORNAMENTO STATO ONBOARDING STRIPE CONNECT (GESTORE)
     // ==========================================================
     if (event.type === "account.updated") {

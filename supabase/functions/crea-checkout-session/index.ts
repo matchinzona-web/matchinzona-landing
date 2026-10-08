@@ -180,7 +180,7 @@ serve(async (req) => {
         },
       ],
 
-      // Ora contiene DAVVERO l'ID dell'utente Matchly.
+      // Ora contiene DAVVERO l'ID dell'utente.
       client_reference_id: user.id,
 
       metadata: {

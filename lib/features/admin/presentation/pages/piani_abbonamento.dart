@@ -51,7 +51,7 @@ class _PianiAbbonamentoScreenState extends State<PianiAbbonamentoScreen> {
             border: Border.all(color: AppTheme.neonOrange.withOpacity(0.5)),
           ),
           child: const Text(
-            'ABBONAMENTI MATCHLY',
+            'ABBONAMENTI MatchInZona',
             style: TextStyle(
               color: AppTheme.neonOrange,
               fontWeight: FontWeight.w800,
@@ -342,7 +342,7 @@ class _PianiAbbonamentoScreenState extends State<PianiAbbonamentoScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Perché scegliere Matchly?',
+            'Perché scegliere MatchInZona?',
             style: TextStyle(
               color: AppTheme.neonOrange,
               fontSize: 22,
@@ -367,7 +367,7 @@ class _PianiAbbonamentoScreenState extends State<PianiAbbonamentoScreen> {
           _buildFeatureRow(
             Icons.groups_rounded,
             'Più opportunità per riempire i campi',
-            'Con le Partite Aperte, i giocatori possono trovare nuovi compagni e completare le partite direttamente su Matchly.',
+            'Con le Partite Aperte, i giocatori possono trovare nuovi compagni e completare le partite direttamente su MatchInZona.',
           ),
 
           _buildFeatureRow(
@@ -379,7 +379,7 @@ class _PianiAbbonamentoScreenState extends State<PianiAbbonamentoScreen> {
           _buildFeatureRow(
             Icons.location_on_rounded,
             'Fatti trovare dai giocatori vicini',
-            'Il tuo centro può comparire nella ricerca e nel radar di Matchly, aiutando i giocatori della zona a scoprirlo.',
+            'Il tuo centro può comparire nella ricerca e nel radar di MatchInZona, aiutando i giocatori della zona a scoprirlo.',
           ),
 
           _buildFeatureRow(

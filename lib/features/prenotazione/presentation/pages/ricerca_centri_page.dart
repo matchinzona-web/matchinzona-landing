@@ -17,13 +17,25 @@ class _RicercaCentriPageState extends ConsumerState<RicercaCentriPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(creazionePartitaProvider.notifier).applicaFiltri();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final controller = ref.read(creazionePartitaProvider.notifier);
+
+      controller.applicaFiltri();
+
+      final province = await controller.caricaProvinceDisponibili();
+
+      if (!mounted) return;
+
+      setState(() {
+        _provinceDisponibili = province;
+      });
     });
   }
 
   final TextEditingController searchCtrl = TextEditingController();
   TipoRicerca filtroSelezionato = TipoRicerca.tutti;
+  String _provinciaSelezionata = 'Tutte le province';
+  List<String> _provinceDisponibili = [];
 
   Timer? _debounceTimer;
   bool _ricercaAttiva = false;
@@ -385,11 +397,18 @@ class _RicercaCentriPageState extends ConsumerState<RicercaCentriPage> {
                     controller: searchCtrl,
                     style: const TextStyle(color: Colors.white),
                     onChanged: (val) {
-                      setState(() => _ricercaAttiva = val.trim().isNotEmpty);
-                      if (val.trim().length >= 3) {
+                      final testo = val.trim();
+
+                      setState(() => _ricercaAttiva = testo.length >= 3);
+
+                      if (testo.length >= 3) {
                         ref
                             .read(creazionePartitaProvider.notifier)
-                            .cercaSocieta(val.trim());
+                            .cercaSocieta(testo);
+                      } else {
+                        ref
+                            .read(creazionePartitaProvider.notifier)
+                            .applicaFiltri();
                       }
                     },
                     decoration: InputDecoration(
@@ -485,6 +504,36 @@ class _RicercaCentriPageState extends ConsumerState<RicercaCentriPage> {
                       backgroundColor: const Color(0xFF1E2026),
                       onSelected: (_) => _selezionaGiorno(context),
                     ),
+                    const SizedBox(width: 8),
+
+                    FilterChip(
+                      avatar: const Icon(
+                        Icons.location_on_outlined,
+                        size: 16,
+                        color: AppTheme.neonOrange,
+                      ),
+                      label: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _provinciaSelezionata,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: Colors.white54,
+                            size: 18,
+                          ),
+                        ],
+                      ),
+                      selected: false,
+                      backgroundColor: const Color(0xFF1E2026),
+                      onSelected: (_) => _mostraSelezionaProvincia(context),
+                    ),
                   ],
                 ),
               ),
@@ -502,7 +551,7 @@ class _RicercaCentriPageState extends ConsumerState<RicercaCentriPage> {
                   : state.societaTrovate.isEmpty
                   ? Center(
                       child: Text(
-                        'Nessun centro trovato nelle vicinanze.',
+                        'Nessun centro trovato.',
                         style: TextStyle(color: Colors.grey.shade500),
                       ),
                     )
@@ -584,5 +633,61 @@ class _RicercaCentriPageState extends ConsumerState<RicercaCentriPage> {
     if (dataConfronto == oggi.add(const Duration(days: 1))) return 'Domani';
 
     return '${data.day}/${data.month}';
+  }
+
+  void _mostraSelezionaProvincia(BuildContext context) {
+    final province = ['Tutte le province', ..._provinceDisponibili];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E2026),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: ListView.separated(
+            shrinkWrap: true,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            itemCount: province.length,
+            separatorBuilder: (_, _) =>
+                const Divider(color: Colors.white12, height: 1),
+            itemBuilder: (context, index) {
+              final provincia = province[index];
+              final selezionata = provincia == _provinciaSelezionata;
+
+              return ListTile(
+                title: Text(
+                  provincia,
+                  style: TextStyle(
+                    color: selezionata ? AppTheme.neonOrange : Colors.white,
+                    fontWeight: selezionata
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                ),
+                trailing: selezionata
+                    ? const Icon(
+                        Icons.check_circle_rounded,
+                        color: AppTheme.neonOrange,
+                      )
+                    : null,
+                onTap: () async {
+                  Navigator.pop(context);
+
+                  setState(() {
+                    _provinciaSelezionata = provincia;
+                  });
+
+                  await ref
+                      .read(creazionePartitaProvider.notifier)
+                      .impostaProvincia(provincia);
+                },
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 }

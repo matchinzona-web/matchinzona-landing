@@ -5,8 +5,8 @@ class Notifica {
   final String messaggio;
   final bool letto;
   final String? tipo;
+  final String? idPartita;
   final DateTime createdAt;
-
   Notifica({
     required this.id,
     required this.idUtente,
@@ -14,6 +14,7 @@ class Notifica {
     required this.messaggio,
     required this.letto,
     this.tipo,
+    this.idPartita,
     required this.createdAt,
   });
 
@@ -25,6 +26,7 @@ class Notifica {
       messaggio: json['messaggio'] as String,
       letto: json['letto'] as bool? ?? false,
       tipo: json['tipo'] as String?,
+      idPartita: json['id_partita'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }

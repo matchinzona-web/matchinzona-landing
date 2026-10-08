@@ -240,6 +240,101 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
     );
   }
 
+  Future<void> _mostraDialogPasswordDimenticata() async {
+    final emailController = TextEditingController(
+      text: _emailController.text.trim(),
+    );
+
+    final email = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.cardBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppTheme.cardBorder),
+        ),
+        title: const Text(
+          'Reimposta password',
+          style: TextStyle(
+            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: TextField(
+          controller: emailController,
+          keyboardType: TextInputType.emailAddress,
+          style: const TextStyle(color: AppTheme.textPrimary),
+          decoration: _buildCapsuleDecoration('Email', Icons.email_outlined),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text(
+              'Annulla',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final value = emailController.text.trim();
+
+              if (value.isEmpty ||
+                  !value.contains('@') ||
+                  !value.contains('.')) {
+                return;
+              }
+
+              Navigator.pop(ctx, value);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.accent,
+              foregroundColor: AppTheme.darkBg,
+            ),
+            child: const Text(
+              'INVIA LINK',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (email == null || email.isEmpty) return;
+
+    LoadingOverlay.show(context, testo: 'Invio link in corso...');
+
+    try {
+      await supabase.auth.resetPasswordForEmail(
+        email,
+        redirectTo: 'myapp://reset-password',
+      );
+
+      if (!mounted) return;
+
+      LoadingOverlay.hide(context);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Ti abbiamo inviato un link per reimpostare la password.\n'
+            'Se non lo trovi, controlla anche la cartella Spam.',
+            style: TextStyle(
+              color: AppTheme.darkBg,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          backgroundColor: AppTheme.statoSuccesso,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      LoadingOverlay.hide(context);
+
+      _mostraErrore('Non è stato possibile inviare il link. Riprova.');
+    }
+  }
+
   void _mostraErrore(String messaggio) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -550,6 +645,21 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
                                     }
                                     return null;
                                   },
+                                ),
+
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton(
+                                    onPressed: _mostraDialogPasswordDimenticata,
+                                    child: const Text(
+                                      'Password dimenticata?',
+                                      style: TextStyle(
+                                        color: AppTheme.accent,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
                                 ),
 
                                 const SizedBox(height: 32),

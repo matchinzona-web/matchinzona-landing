@@ -69,6 +69,41 @@ class _StatisticheGuadagniState extends ConsumerState<StatisticheGuadagni> {
                       );
                     }).toList(),
                   ),
+
+                  if (state.periodoSelezionato == 'Anno' &&
+                      state.anniDisponibili.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+
+                    SizedBox(
+                      height: 42,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: state.anniDisponibili.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final anno = state.anniDisponibili[index];
+                          final selezionato = state.annoAttivo == anno;
+
+                          return ChoiceChip(
+                            label: Text(anno.toString()),
+                            selected: selezionato,
+                            selectedColor: AppTheme.neonOrange,
+                            backgroundColor: AppTheme.cardBg,
+                            labelStyle: TextStyle(
+                              color: selezionato ? Colors.black : Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            onSelected: (_) {
+                              ref
+                                  .read(statisticheProvider.notifier)
+                                  .impostaAnno(anno);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+
                   const SizedBox(height: 25),
 
                   Card(
@@ -103,7 +138,7 @@ class _StatisticheGuadagniState extends ConsumerState<StatisticheGuadagni> {
                           ),
                           const SizedBox(height: 5),
                           Text(
-                            '${state.partiteFiltrate.length} partite giocate',
+                            '${state.numeroPartiteVisualizzate} partite giocate',
                             style: const TextStyle(
                               color: Colors.white70,
                               fontSize: 12,

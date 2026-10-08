@@ -10,7 +10,7 @@ import 'package:app_campi/features/prenotazione/presentation/widget/fade_slide_i
 import 'package:app_campi/features/home/application/preferiti_provider.dart';
 import 'package:app_campi/features/auth/application/auth_provider.dart';
 import 'package:app_campi/core/shared_widget/selezione_livello_dialog.dart';
-
+import 'package:app_campi/core/models/campo.dart';
 import 'creazione_partita_page.dart';
 
 class ListaCampiCentroPage extends ConsumerWidget {
@@ -220,7 +220,7 @@ class ListaCampiCentroPage extends ConsumerWidget {
                 child: _buildCampoCard(
                   context,
                   ref,
-                  state.campiTrovati[index],
+                  state.campiTrovati[index] as Campo,
                   controller,
                   state.sportSelezionato,
                 ),
@@ -261,7 +261,7 @@ class ListaCampiCentroPage extends ConsumerWidget {
   Widget _buildCampoCard(
     BuildContext context,
     WidgetRef ref,
-    dynamic campo,
+    Campo campo,
     dynamic controller,
     String sportSelezionato,
   ) {
@@ -271,19 +271,10 @@ class ListaCampiCentroPage extends ConsumerWidget {
     final String sportRichiesto = sportSelezionato.trim().toLowerCase();
 
     for (final t in campo.tariffeSport) {
-      final String sportTariffa =
-          (t is Map ? t['sport'] : t.sport)?.toString().trim().toLowerCase() ??
-          '';
+      final String sportTariffa = t.sport.trim().toLowerCase();
 
       if (sportTariffa == sportRichiesto) {
-        final double? prezzoTariffa = t is Map
-            ? (t['prezzo'] as num?)?.toDouble()
-            : (t.prezzo as num?)?.toDouble();
-
-        if (prezzoTariffa != null) {
-          prezzoTotale = prezzoTariffa;
-        }
-
+        prezzoTotale = t.prezzo;
         break;
       }
     }
@@ -298,6 +289,10 @@ class ListaCampiCentroPage extends ConsumerWidget {
     final fallbackImage = _immagineFallbackCampo(campo);
 
     final String sportCampo = _sportRealeCampo(campo, sportSelezionato);
+    final List<String> sportLivelliCampo = campo.tariffeSport
+        .map((tariffa) => tariffa.sport.trim().toLowerCase())
+        .where((sport) => sport.isNotEmpty)
+        .toList();
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -334,7 +329,7 @@ class ListaCampiCentroPage extends ConsumerWidget {
                 context: context,
                 userId: utente.id,
                 livelliSportAttuali: utente.livelliSport,
-                sport: sportCampo,
+                sports: sportLivelliCampo,
                 onCompletato: () {
                   // 🚀 AGGIUNGI QUESTA RIGA: Forza l'app a ricaricare l'utente con i nuovi livelli!
                   ref.invalidate(utenteCorrenteProvider);
@@ -482,12 +477,7 @@ class ListaCampiCentroPage extends ConsumerWidget {
     final Set<String> sport = {};
 
     for (final tariffa in campo.tariffeSport) {
-      final String valore =
-          (tariffa is Map ? tariffa['sport'] : tariffa.sport)
-              ?.toString()
-              .trim()
-              .toLowerCase() ??
-          '';
+      final String valore = tariffa.sport.trim().toLowerCase();
 
       if (valore == 'tennis_singolo' || valore == 'tennis_doppio') {
         sport.add('Tennis');
@@ -510,7 +500,15 @@ class ListaCampiCentroPage extends ConsumerWidget {
       }
     }
 
-    return sport.join(' • ');
+    final lista = sport.toList();
+
+    if (lista.length <= 2) {
+      return lista.join(' • ');
+    }
+
+    final altri = lista.length - 2;
+
+    return '${lista.take(2).join(' • ')}  +$altri';
   }
 
   IconData _iconaSportCampo(dynamic campo) {
@@ -520,12 +518,7 @@ class ListaCampiCentroPage extends ConsumerWidget {
 
     final primo = campo.tariffeSport.first;
 
-    final String sport =
-        (primo is Map ? primo['sport'] : primo.sport)
-            ?.toString()
-            .trim()
-            .toLowerCase() ??
-        '';
+    final String sport = primo.sport.trim().toLowerCase();
 
     if (sport.startsWith('calcio_')) {
       return Icons.sports_soccer_rounded;
@@ -561,12 +554,16 @@ class ListaCampiCentroPage extends ConsumerWidget {
         children: [
           Icon(icon, color: AppTheme.textSecondary, size: 12),
           const SizedBox(width: 4),
-          Text(
-            text,
-            style: const TextStyle(
-              color: AppTheme.textSecondary,
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],

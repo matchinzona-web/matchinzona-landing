@@ -119,6 +119,17 @@ class PremiumMatchCard extends ConsumerWidget {
         ? partita.orarioInizio.substring(0, 5)
         : partita.orarioInizio;
 
+    double prezzoCampo = partita.campo.prezzo;
+
+    final sportPartita = (partita.sport ?? '').trim().toLowerCase();
+
+    for (final tariffa in partita.campo.tariffeSport) {
+      if (tariffa.sport.trim().toLowerCase() == sportPartita) {
+        prezzoCampo = tariffa.prezzo;
+        break;
+      }
+    }
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
@@ -296,13 +307,28 @@ class PremiumMatchCard extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: AppTheme.cardBorder),
                         ),
-                        child: Text(
-                          "${partita.quotaSingolaGiocatore.toStringAsFixed(2)}€",
-                          style: const TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 14,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const Text(
+                              "PREZZO CAMPO",
+                              style: TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              "${prezzoCampo.toStringAsFixed(2)} €",
+                              style: const TextStyle(
+                                color: AppTheme.textPrimary,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDMVaseGGhmFghDBQ6l2jElRXAYtUFaTiY',
-    appId: '1:48542052597:android:e6e6e44dd69ab7f1d495bc',
+    appId: '1:48542052597:android:9244dc133a4ac861d495bc',
     messagingSenderId: '48542052597',
     projectId: 'matchly-app-2026-efd7e',
     storageBucket: 'matchly-app-2026-efd7e.firebasestorage.app',

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:app_campi/features/home/presentation/home_page.dart';
 import 'package:app_campi/core/services/location_provider.dart';
 import 'package:app_campi/core/theme/app_theme.dart';
 import 'package:app_campi/features/prenotazione/presentation/pages/ricerca_centri_page.dart';
@@ -9,7 +9,6 @@ import 'package:app_campi/core/models/partita.dart';
 import 'package:app_campi/core/shared_widget/gps_banner.dart';
 import 'package:app_campi/features/prenotazione/presentation/pages/lista_campi_centro_page.dart';
 import 'package:app_campi/features/prenotazione/application/creazione_partita_controller.dart';
-
 import 'package:app_campi/features/home/presentation/widgets/promo_banner.dart';
 import 'package:app_campi/features/home/presentation/widgets/match_card.dart';
 import 'package:app_campi/features/home/presentation/widgets/auth_bottom_sheet.dart';
@@ -372,7 +371,11 @@ class _PlayerDashboard extends ConsumerWidget {
                 const SizedBox(height: 15),
                 FadeSlideIn(
                   delay: 170,
-                  child: _buildProssimoMatchSection(miePartiteAsync),
+                  child: _buildProssimoMatchSection(
+                    context,
+                    ref,
+                    miePartiteAsync,
+                  ),
                 ),
                 const SizedBox(height: 40),
               ] else ...[
@@ -412,12 +415,39 @@ class _PlayerDashboard extends ConsumerWidget {
     );
   }
 
-  Widget _buildProssimoMatchSection(AsyncValue<List<Partita>> miePartiteAsync) {
+  Widget _buildProssimoMatchSection(
+    BuildContext context,
+    WidgetRef ref,
+    AsyncValue<List<Partita>> miePartiteAsync,
+  ) {
     return miePartiteAsync.when(
       data: (partite) {
         if (partite.isNotEmpty) {
           partite.sort((a, b) => a.dataPartita.compareTo(b.dataPartita));
-          return CompactMatchCard(partita: partite.first);
+          final partita = partite.first;
+
+          final service = ref.read(partitaServiceProvider);
+          final statoReale = service.getStatoRealePartita(partita);
+
+          return CompactMatchCard(
+            partita: partita,
+            onTap: () {
+              ref
+                  .read(filtroPartitaProvider.notifier)
+                  .impostaFiltro(
+                    statoReale == 'completa'
+                        ? FiltroPartita.complete
+                        : FiltroPartita.aperte,
+                  );
+
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (_) => const HomePage(initialIndex: 2),
+                ),
+                (route) => false,
+              );
+            },
+          );
         } else {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),

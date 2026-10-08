@@ -74,9 +74,10 @@ Deno.serve(async (req) => {
     }
 
     const idUtente = record.id_utente;
-    const titolo = record.titolo ?? "Matchly";
+    const titolo = record.titolo ?? "MatchInZona";
     const messaggio = record.messaggio ?? "Hai una nuova notifica.";
     const tipo = record.tipo ?? "notifica";
+    const idPartita = record.id_partita ?? "";
 
     if (!idUtente) {
       return new Response(
@@ -141,6 +142,7 @@ Deno.serve(async (req) => {
               data: {
                 tipo: String(tipo),
                 notifica_id: String(record.id ?? ""),
+                id_partita: String(idPartita),
               },
 
               android: {

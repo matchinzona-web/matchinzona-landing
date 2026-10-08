@@ -45,11 +45,11 @@ class SuccessoPrenotazionePage extends StatelessWidget {
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: AppTheme.neonGreen.withOpacity(0.1),
@@ -57,10 +57,10 @@ class SuccessoPrenotazionePage extends StatelessWidget {
                 child: const Icon(
                   Icons.check_circle_outline,
                   color: AppTheme.neonGreen,
-                  size: 100,
+                  size: 72,
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 16),
               const Text(
                 "MATCH CONFERMATO!",
                 style: TextStyle(
@@ -70,7 +70,7 @@ class SuccessoPrenotazionePage extends StatelessWidget {
                   letterSpacing: 2,
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               Text(
                 isPrivata
                     ? "Hai prenotato $nomeCampo\npresso $nomeSocieta\nil $dataFormattata alle $ora."
@@ -165,7 +165,7 @@ class SuccessoPrenotazionePage extends StatelessWidget {
                             ),
                           )
                         : Text(
-                            "La partita è visibile nella bacheca pubblica e altri giocatori potranno iscriversi. Se il match non raggiunge il numero necessario entro 2 ore dall'inizio, verrà annullato. Inoltre, se nel frattempo il campo viene prenotato per intero da un altro utente, il match verrà annullato automaticamente.",
+                            "Altri giocatori potranno iscriversi al match. Se il match non raggiunge il numero necessario entro 2 ore dall'inizio, verrà annullato. Se il campo viene prenotato per intero, il match verrà annullato.",
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.grey.shade400,
@@ -234,10 +234,10 @@ class SuccessoPrenotazionePage extends StatelessWidget {
                             "📅 $dataFormattata alle $ora\n\n"
                             "Ci vediamo in campo!"
                       : "$emoji *CERCHIAMO GIOCATORI!*\n\n"
-                            "Ho aperto un match su Matchly presso:\n"
+                            "Ho aperto un match su MatchInZona presso:\n"
                             "🏟️ *$nomeSocieta*\n"
                             "📅 $dataFormattata alle $ora\n\n"
-                            "Unisciti alla partita su Matchly!";
+                            "Unisciti alla partita su MatchInZona!";
 
                   final urlAndroid =
                       "whatsapp://send?text=${Uri.encodeComponent(testoMessaggio)}";

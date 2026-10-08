@@ -30,6 +30,7 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
   final _chiusuraRepo = ChiusuraStraordinariaRepository();
 
   TipoRicerca filtroCorrente = TipoRicerca.tutti;
+  String? provinciaSelezionata;
   static const _chiaveUltimoSport = 'ultimo_sport_prenotazione';
 
   @override
@@ -37,6 +38,18 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
     _caricaUltimoSport();
 
     return CreazionePartitaState(dataSelezionata: DateTime.now());
+  }
+
+  Future<List<String>> caricaProvinceDisponibili() {
+    return _societaRepo.getProvinceDisponibili();
+  }
+
+  Future<void> impostaProvincia(String? provincia) async {
+    provinciaSelezionata = provincia == null || provincia == 'Tutte le province'
+        ? null
+        : provincia;
+
+    await applicaFiltri();
   }
 
   void impostaFiltroRicerca(TipoRicerca filtro) {
@@ -583,6 +596,7 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
       final risultati = await _societaRepo.cercaSocietaEPrezziPerSport(
         sport: state.sportSelezionato,
         giornoSettimana: giornoSettimana,
+        provincia: provinciaSelezionata,
       );
 
       final List<Societa> listaSocieta = [];

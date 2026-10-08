@@ -28,7 +28,7 @@ class PrivacyAssistenzaGestore extends StatelessWidget {
   }) async {
     final uri = Uri(
       scheme: 'mailto',
-      path: 'matchly.assistenza@gmail.com',
+      path: 'matchinzona@gmail.com',
       queryParameters: {'subject': oggetto},
     );
 
@@ -166,7 +166,7 @@ class PrivacyAssistenzaGestore extends StatelessWidget {
             subtitle: 'Scopri come vengono trattati i tuoi dati',
             onTap: () => _apriUrl(
               context,
-              'https://matchlyassistenza-web.github.io/matchly-privacy/',
+              'https://matchinzona-web.github.io/matchinzona-privacy/',
             ),
           ),
 
@@ -174,10 +174,10 @@ class PrivacyAssistenzaGestore extends StatelessWidget {
             icon: Icons.description_outlined,
             color: AppTheme.neonPurple,
             title: 'Termini e Condizioni',
-            subtitle: 'Consulta le condizioni di utilizzo di Matchly',
+            subtitle: 'Consulta le condizioni di utilizzo di MatchInZona',
             onTap: () => _apriUrl(
               context,
-              'https://matchlyassistenza-web.github.io/matchly-privacy/termini.html',
+              'https://matchinzona-web.github.io/matchinzona-privacy/termini.html',
             ),
           ),
 
@@ -188,7 +188,7 @@ class PrivacyAssistenzaGestore extends StatelessWidget {
             subtitle: 'Informazioni sulla cancellazione del tuo account',
             onTap: () => _apriUrl(
               context,
-              'https://matchlyassistenza-web.github.io/matchly-privacy/elimina-account.html',
+              'https://matchinzona-web.github.io/matchinzona-privacy/elimina-account.html',
             ),
           ),
 
@@ -212,7 +212,7 @@ class PrivacyAssistenzaGestore extends StatelessWidget {
             title: 'Contatta assistenza',
             subtitle: 'Scrivici per domande o richieste',
             onTap: () =>
-                _inviaEmail(context, oggetto: 'Assistenza Gestore Matchly'),
+                _inviaEmail(context, oggetto: 'Assistenza Gestore MatchInZona'),
           ),
 
           _buildTile(
@@ -222,7 +222,7 @@ class PrivacyAssistenzaGestore extends StatelessWidget {
             subtitle: 'Segnalaci malfunzionamenti o difficoltà',
             onTap: () => _inviaEmail(
               context,
-              oggetto: 'Segnalazione problema Gestore Matchly',
+              oggetto: 'Segnalazione problema Gestore MatchInZona',
             ),
           ),
 
@@ -238,7 +238,7 @@ class PrivacyAssistenzaGestore extends StatelessWidget {
             child: const Column(
               children: [
                 Text(
-                  'MATCHLY',
+                  'MatchInZona',
                   style: TextStyle(
                     color: AppTheme.neonOrange,
                     fontSize: 16,
@@ -253,7 +253,7 @@ class PrivacyAssistenzaGestore extends StatelessWidget {
                 ),
                 SizedBox(height: 12),
                 Text(
-                  'matchly.assistenza@gmail.com',
+                  'matchinzona@gmail.com',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
                 ),

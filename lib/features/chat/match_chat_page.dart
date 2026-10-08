@@ -257,7 +257,7 @@ class _MatchChatPageState extends State<MatchChatPage> {
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           content: Text(
-            'Non vedrai più i messaggi di $nomeUtente nelle chat Matchly.',
+            'Non vedrai più i messaggi di $nomeUtente nelle chat MatchInZona.',
             style: const TextStyle(color: Colors.white70),
           ),
           actions: [

@@ -1,20 +1,30 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'core/utils/connessione_provider.dart';
+import 'core/shared_widget/connessione_assente_overlay.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app_links/app_links.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_localizations/syncfusion_localizations.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:firebase_core/firebase_core.dart';
+
 import 'core/theme/app_theme.dart';
+import 'core/services/push_notification_service.dart';
+
 import 'features/home/presentation/home_page.dart';
 import 'features/auth/presentation/widgets/auth_gate.dart';
 import 'features/auth/presentation/pages/login_utente.dart';
 import 'features/auth/presentation/pages/registrazione_utente.dart';
 import 'features/home/presentation/views/onboarding_screen.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
-import 'package:app_campi/features/admin/presentation/pages/configurazione_orari.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'features/auth/presentation/pages/reset_password_page.dart';
+
+import 'features/chat/match_chat_page.dart';
+
 import 'firebase_options.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -52,6 +62,7 @@ class PrenotaCampoApp extends StatefulWidget {
 class _PrenotaCampoAppState extends State<PrenotaCampoApp>
     with WidgetsBindingObserver {
   final AppLinks _appLinks = AppLinks();
+  StreamSubscription<Map<String, String>>? _pushTapSubscription;
 
   @override
   void initState() {
@@ -61,6 +72,29 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
 
     initDeepLinks();
 
+    _pushTapSubscription = PushNotificationService.notificationTapStream.listen(
+      (data) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _gestisciTapPush(data);
+        });
+      },
+    );
+
+    Future.microtask(() async {
+      // Qui inizializziamo subito il listener del TAP.
+      // Se l'utente non è ancora disponibile, il token verrà
+      // inizializzato successivamente da AuthGate.
+      await PushNotificationService.inizializza();
+
+      final pending = PushNotificationService.prendiTapPendente();
+
+      if (pending != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _gestisciTapPush(pending);
+        });
+      }
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _controllaCheckoutPending();
     });
@@ -69,6 +103,9 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+
+    _pushTapSubscription?.cancel();
+
     super.dispose();
   }
 
@@ -76,6 +113,14 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _controllaCheckoutPending();
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final pending = PushNotificationService.prendiTapPendente();
+
+        if (pending != null) {
+          _gestisciTapPush(pending);
+        }
+      });
     }
   }
 
@@ -88,9 +133,107 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
     });
   }
 
+  Future<void> _gestisciTapPush(Map<String, String> data) async {
+    final tipo = data['tipo'] ?? '';
+    final idPartita = data['id_partita'] ?? '';
+
+    debugPrint('Navigazione push -> tipo=$tipo, idPartita=$idPartita');
+
+    final navigator = navigatorKey.currentState;
+
+    if (navigator == null) {
+      return;
+    }
+
+    switch (tipo) {
+      case 'giocatore_unito':
+      case 'giocatore_abbandonato':
+      case 'match_completo':
+      case 'completa':
+      case 'match_a_rischio':
+      case 'aperta_a_rischio':
+      case 'match_annullato':
+      case 'annullata':
+        navigator.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomePage(initialIndex: 2)),
+          (route) => false,
+        );
+        return;
+
+      case 'messaggio_chat':
+        if (idPartita.isEmpty) {
+          return;
+        }
+
+        try {
+          final partita = await Supabase.instance.client
+              .from('partite')
+              .select('''
+              campo:campi(
+                societa(
+                  nome_societa
+                )
+              )
+            ''')
+              .eq('id', idPartita)
+              .maybeSingle();
+
+          final nomeSocieta =
+              partita?['campo']?['societa']?['nome_societa']?.toString() ??
+              'Centro Sportivo';
+
+          navigator.push(
+            MaterialPageRoute(
+              builder: (_) =>
+                  MatchChatPage(matchId: idPartita, nomeSocieta: nomeSocieta),
+            ),
+          );
+        } catch (e) {
+          debugPrint('Errore apertura chat da push: $e');
+        }
+
+        return;
+
+      case 'prenotazione_gestore':
+      case 'prenotazione_annullata_gestore':
+        navigator.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AuthGate()),
+          (route) => false,
+        );
+        return;
+
+      default:
+        return;
+    }
+  }
+
   Future<void> _gestisciLink(Uri uri) async {
     debugPrint("Link ricevuto: $uri");
 
+    // =========================================================
+    // RESET PASSWORD SUPABASE
+    // =========================================================
+    final isResetPassword =
+        uri.scheme == 'myapp' && uri.host == 'reset-password';
+
+    if (isResetPassword) {
+      debugPrint('Deep link reset password ricevuto.');
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+
+        navigatorKey.currentState?.pushNamedAndRemoveUntil(
+          '/reset-password',
+          (route) => false,
+        );
+      });
+
+      return;
+    }
+
+    // =========================================================
+    // RITORNO CHECKOUT STRIPE ABBONAMENTO
+    // =========================================================
     final isAbbonamentoStripe =
         uri.scheme == 'myapp' && uri.host == 'abbonamento';
 
@@ -181,13 +324,19 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: 'Matchly',
+      title: 'MatchInZona',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkNeonTheme,
       builder: (context, child) {
-        return ScrollConfiguration(
-          behavior: NoGlowScrollBehavior(),
-          child: child!,
+        return Stack(
+          children: [
+            ScrollConfiguration(
+              behavior: NoGlowScrollBehavior(),
+              child: child ?? const SizedBox.shrink(),
+            ),
+
+            const Positioned.fill(child: ConnessioneAssenteOverlay()),
+          ],
         );
       },
 
@@ -197,6 +346,7 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
         '/onboarding': (context) => const OnboardingScreen(),
         '/login': (context) => const LoginUtente(),
         '/registrazione': (context) => const RegistrazioneUtente(),
+        '/reset-password': (context) => const ResetPasswordPage(),
       },
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

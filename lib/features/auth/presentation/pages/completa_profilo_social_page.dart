@@ -241,7 +241,7 @@ class _CompletaProfiloSocialPageState
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Profilo completato! Benvenuto in Matchly.'),
+          content: Text('Profilo completato! Benvenuto in MatchInZona.'),
           backgroundColor: AppTheme.statoSuccesso,
         ),
       );
@@ -319,7 +319,7 @@ class _CompletaProfiloSocialPageState
                   const SizedBox(height: 10),
 
                   const Text(
-                    'Ci servono ancora pochi dati per personalizzare Matchly e permetterti di giocare.',
+                    'Ci servono ancora pochi dati per personalizzare MatchInZona e permetterti di giocare.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppTheme.textSecondary,
@@ -473,7 +473,7 @@ class _CompletaProfiloSocialPageState
                                     ),
                                     recognizer: TapGestureRecognizer()
                                       ..onTap = () => _apriUrlLegale(
-                                        'https://matchlyassistenza-web.github.io/matchly-privacy/',
+                                        'https://matchinzona-web.github.io/matchinzona-privacy/',
                                       ),
                                   ),
 
@@ -488,7 +488,7 @@ class _CompletaProfiloSocialPageState
                                     ),
                                     recognizer: TapGestureRecognizer()
                                       ..onTap = () => _apriUrlLegale(
-                                        'https://matchlyassistenza-web.github.io/matchly-privacy/termini.html',
+                                        'https://matchinzona-web.github.io/matchinzona-privacy/termini.html',
                                       ),
                                   ),
 

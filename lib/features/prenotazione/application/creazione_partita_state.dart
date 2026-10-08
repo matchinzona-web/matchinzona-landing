@@ -37,7 +37,7 @@ class CreazionePartitaState {
     this.mieiMatchApertiPerSlot = const {},
     this.oraInizioSelezionata,
     this.ospitiExtra = 0,
-    this.isPartitaPrivata = false,
+    this.isPartitaPrivata = true,
     this.sportSelezionato = 'calcio_5',
     this.fasciaOraria = 'tutto',
     this.prezziPerSocieta = const {},

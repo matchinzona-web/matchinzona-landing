@@ -251,7 +251,7 @@ class _SchermataAbbonamentoState extends ConsumerState<SchermataAbbonamento> {
                   Text(
                     state.stripeCustomerId == null ||
                             state.stripeCustomerId!.isEmpty
-                        ? 'Stai utilizzando Matchly con un accesso gratuito. '
+                        ? 'Stai utilizzando MatchInZona con un accesso gratuito. '
                               'Puoi attivare in qualsiasi momento un abbonamento per continuare '
                               'a utilizzare il servizio anche dopo la fine del periodo gratuito.'
                         : state.piano == 'NESSUNO'

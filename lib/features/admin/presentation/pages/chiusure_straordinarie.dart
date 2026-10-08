@@ -33,13 +33,17 @@ class _ChiusureStraordinarieState extends State<ChiusureStraordinarie> {
           .gte('data_fine', oggiStr)
           .order('data_inizio', ascending: true);
 
-      setState(() {
-        _chiusure = data;
-      });
+      if (mounted) {
+        setState(() {
+          _chiusure = data;
+        });
+      }
     } catch (e) {
       debugPrint("Errore: $e");
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -276,16 +280,48 @@ class _ChiusureStraordinarieState extends State<ChiusureStraordinarie> {
                     final String dataInizioStr = _formattaDataDb(dataInizio);
                     final String dataFineStr = _formattaDataDb(dataFine);
 
+                    final String inizioStrCheck = interoGiorno
+                        ? "00:00"
+                        : "${oraInizio.hour.toString().padLeft(2, '0')}:${oraInizio.minute.toString().padLeft(2, '0')}";
+
+                    final String fineStrCheck = interoGiorno
+                        ? "23:59"
+                        : "${oraFine.hour.toString().padLeft(2, '0')}:${oraFine.minute.toString().padLeft(2, '0')}";
+
+                    int toMinuti(String valore) {
+                      final parti = valore.split(':');
+                      return int.parse(parti[0]) * 60 + int.parse(parti[1]);
+                    }
+
+                    if (!interoGiorno &&
+                        toMinuti(fineStrCheck) <= toMinuti(inizioStrCheck)) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              'L’orario di fine deve essere successivo all’orario di inizio.',
+                            ),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                      }
+
+                      return;
+                    }
+
                     final sovrapposta = await _esisteSovrapposizione(
                       dataInizioStr,
                       dataFineStr,
+                      inizioStrCheck,
+                      fineStrCheck,
                     );
+
                     if (sovrapposta) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(
-                              'Esiste già una chiusura in questo periodo.',
+                              'Esiste già una chiusura che si sovrappone a questo periodo.',
                             ),
                             backgroundColor: Colors.orange,
                           ),
@@ -294,19 +330,13 @@ class _ChiusureStraordinarieState extends State<ChiusureStraordinarie> {
                       return;
                     }
 
-                    final String inizioStrCheck = interoGiorno
-                        ? "00:00"
-                        : "${oraInizio.hour.toString().padLeft(2, '0')}:${oraInizio.minute.toString().padLeft(2, '0')}";
-                    final String fineStrCheck = interoGiorno
-                        ? "23:59"
-                        : "${oraFine.hour.toString().padLeft(2, '0')}:${oraFine.minute.toString().padLeft(2, '0')}";
-
                     final valido = await _orarioValido(
                       dataInizio,
                       dataFine,
                       inizioStrCheck,
                       fineStrCheck,
                     );
+
                     if (!valido) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -330,33 +360,82 @@ class _ChiusureStraordinarieState extends State<ChiusureStraordinarie> {
                           : "${oraFine.hour.toString().padLeft(2, '0')}:${oraFine.minute.toString().padLeft(2, '0')}:00";
 
                       // 1. Inserimento chiusura
-                      await Supabase.instance.client
-                          .from('chiusure_straordinarie')
-                          .insert({
-                            'id_societa': widget.idSocieta,
-                            'data_inizio': dataInizioStr,
-                            'data_fine': dataFineStr,
-                            'orario_inizio': inizioStr,
-                            'orario_fine': fineStr,
-                          });
+                      try {
+                        final String inizioStr = interoGiorno
+                            ? "00:00:00"
+                            : "${oraInizio.hour.toString().padLeft(2, '0')}:${oraInizio.minute.toString().padLeft(2, '0')}:00";
 
-                      await Supabase.instance.client.rpc(
-                        'annulla_partite_chiusura',
-                        params: {
-                          'p_id_societa': widget.idSocieta,
-                          'p_data_inizio': dataInizioStr,
-                          'p_data_fine': dataFineStr,
-                          'p_ora_inizio': inizioStr,
-                          'p_ora_fine': fineStr,
-                        },
-                      );
+                        final String fineStr = interoGiorno
+                            ? "23:59:59"
+                            : "${oraFine.hour.toString().padLeft(2, '0')}:${oraFine.minute.toString().padLeft(2, '0')}:00";
+
+                        // 1. Salva la chiusura e recupera l'id
+                        final chiusuraCreata = await Supabase.instance.client
+                            .from('chiusure_straordinarie')
+                            .insert({
+                              'id_societa': widget.idSocieta,
+                              'data_inizio': dataInizioStr,
+                              'data_fine': dataFineStr,
+                              'orario_inizio': inizioStr,
+                              'orario_fine': fineStr,
+                            })
+                            .select('id')
+                            .single();
+
+                        try {
+                          // 2. Annulla le partite coinvolte
+                          await Supabase.instance.client.rpc(
+                            'annulla_partite_chiusura',
+                            params: {
+                              'p_id_societa': widget.idSocieta,
+                              'p_data_inizio': dataInizioStr,
+                              'p_data_fine': dataFineStr,
+                              'p_ora_inizio': inizioStr,
+                              'p_ora_fine': fineStr,
+                            },
+                          );
+                        } catch (e) {
+                          // Se l'annullamento fallisce, togli anche la chiusura appena creata
+                          await Supabase.instance.client
+                              .from('chiusure_straordinarie')
+                              .delete()
+                              .eq('id', chiusuraCreata['id']);
+
+                          rethrow;
+                        }
+
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Chiusura salvata con successo!'),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+
+                          _scaricaChiusure();
+                          Navigator.pop(context);
+                        }
+                      } catch (e) {
+                        debugPrint(
+                          "Errore salvataggio chiusura straordinaria: $e",
+                        );
+
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Impossibile salvare la chiusura straordinaria. Riprova tra poco.',
+                              ),
+                              backgroundColor: Colors.redAccent,
+                            ),
+                          );
+                        }
+                      }
 
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text(
-                              'Chiusura salvata e partite annullate con successo!',
-                            ),
+                            content: Text('Chiusura salvata con successo!'),
                             backgroundColor: Colors.green,
                           ),
                         );
@@ -504,18 +583,48 @@ class _ChiusureStraordinarieState extends State<ChiusureStraordinarie> {
   Future<bool> _esisteSovrapposizione(
     String dataInizioStr,
     String dataFineStr,
+    String oraInizioStr,
+    String oraFineStr,
   ) async {
     try {
       final result = await Supabase.instance.client
           .from('chiusure_straordinarie')
-          .select('id')
+          .select('id, data_inizio, data_fine, orario_inizio, orario_fine')
           .eq('id_societa', widget.idSocieta)
+          // Prima filtriamo le chiusure che si sovrappongono come date
           .lte('data_inizio', dataFineStr)
           .gte('data_fine', dataInizioStr);
-      return (result as List).isNotEmpty;
+
+      int strToMinuti(String valore) {
+        final parti = valore.substring(0, 5).split(':');
+
+        return int.parse(parti[0]) * 60 + int.parse(parti[1]);
+      }
+
+      final nuovoInizio = strToMinuti(oraInizioStr);
+      final nuovaFine = strToMinuti(oraFineStr);
+
+      for (final chiusura in result) {
+        final vecchioInizio = chiusura['orario_inizio']?.toString() ?? '00:00';
+
+        final vecchiaFine = chiusura['orario_fine']?.toString() ?? '23:59';
+
+        final vecchioInizioMin = strToMinuti(vecchioInizio);
+        final vecchiaFineMin = strToMinuti(vecchiaFine);
+
+        // Sovrapposizione reale degli orari
+        if (nuovoInizio < vecchiaFineMin && nuovaFine > vecchioInizioMin) {
+          return true;
+        }
+      }
+
+      return false;
     } catch (e) {
       debugPrint("Errore controllo sovrapposizione: $e");
-      return false;
+
+      // In caso di errore meglio impedire il salvataggio,
+      // invece di rischiare doppie chiusure.
+      return true;
     }
   }
 

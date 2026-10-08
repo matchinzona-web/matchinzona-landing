@@ -36,6 +36,7 @@ class _ModificaProfiloScreenState extends ConsumerState<ModificaProfiloScreen> {
   bool _nascondiPassword = true;
   bool _dataNascitaFocused = false;
   String? _erroreDataNascita;
+  late Map<String, dynamic> _livelliSport;
 
   @override
   void initState() {
@@ -46,6 +47,7 @@ class _ModificaProfiloScreenState extends ConsumerState<ModificaProfiloScreen> {
       text: widget.utente.telefono ?? '',
     );
     _dataNascitaSelezionata = widget.utente.dataNascita;
+    _livelliSport = Map<String, dynamic>.from(widget.utente.livelliSport ?? {});
   }
 
   @override
@@ -90,6 +92,11 @@ class _ModificaProfiloScreenState extends ConsumerState<ModificaProfiloScreen> {
 
   Future<void> _salvaDati() async {
     FocusScope.of(context).unfocus();
+
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+
     LoadingOverlay.show(context, testo: "Salvataggio in corso...");
 
     try {
@@ -102,6 +109,7 @@ class _ModificaProfiloScreenState extends ConsumerState<ModificaProfiloScreen> {
             telefono: _telefonoController.text.trim(),
             dataNascita: _dataNascitaSelezionata!,
             nuovaPassword: _passwordController.text.trim(),
+            livelliSport: _livelliSport,
           );
 
       if (mounted) {
@@ -258,14 +266,110 @@ class _ModificaProfiloScreenState extends ConsumerState<ModificaProfiloScreen> {
 
                     NeonFormField(
                       controller: _telefonoController,
-                      label: 'Telefono (Opzionale)',
+                      label: 'Telefono',
                       icon: Icons.phone,
                       coloreTema: AppTheme.accent,
                       keyboardType: TextInputType.phone,
-                      validator: AppValidators.validaTelefonoOpzionale,
+                      validator: (val) {
+                        final telefono =
+                            val?.replaceAll(RegExp(r'\s+'), '') ?? '';
+
+                        if (telefono.isEmpty) {
+                          return 'Il telefono è obbligatorio';
+                        }
+
+                        if (!RegExp(r'^\d{10}$').hasMatch(telefono)) {
+                          return 'Inserisci un numero di 10 cifre';
+                        }
+
+                        return null;
+                      },
                       autovalidateMode: AutovalidateMode.onUnfocus,
                     ),
+
                     const SizedBox(height: 32),
+
+                    if (_livelliSport.isNotEmpty) ...[
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'LIVELLI SPORTIVI',
+                          style: TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      ..._livelliSport.entries.map((entry) {
+                        final sport = entry.key;
+                        final livello = entry.value.toString();
+
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () => _modificaLivelloSport(sport, livello),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 16,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.cardBg,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: AppTheme.cardBorder),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.sports_rounded,
+                                    color: AppTheme.accent,
+                                    size: 22,
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _nomeSportProfilo(sport),
+                                          style: const TextStyle(
+                                            color: AppTheme.textPrimary,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          livello,
+                                          style: const TextStyle(
+                                            color: AppTheme.textSecondary,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Icon(
+                                    Icons.edit_rounded,
+                                    color: AppTheme.textSecondary,
+                                    size: 20,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+
+                      const SizedBox(height: 20),
+                    ],
 
                     const Divider(color: AppTheme.cardBorder),
                     const SizedBox(height: 16),
@@ -419,6 +523,237 @@ class _ModificaProfiloScreenState extends ConsumerState<ModificaProfiloScreen> {
         ],
       ),
     );
+  }
+
+  String _nomeSportProfilo(String sport) {
+    switch (sport.trim().toLowerCase()) {
+      case 'calcio_5':
+        return 'Calcio a 5';
+      case 'calcio_6':
+        return 'Calcio a 6';
+      case 'calcio_7':
+        return 'Calcio a 7';
+      case 'calcio_8':
+        return 'Calcio a 8';
+      case 'calcio_11':
+        return 'Calcio a 11';
+      case 'calcio':
+        return 'Calcio';
+      case 'tennis':
+        return 'Tennis';
+      case 'tennis_singolo':
+        return 'Tennis';
+      case 'tennis_doppio':
+        return 'Tennis';
+      case 'padel':
+        return 'Padel';
+      case 'basket':
+        return 'Basket';
+      case 'volley':
+      case 'pallavolo':
+        return 'Pallavolo';
+      default:
+        return sport;
+    }
+  }
+
+  Future<void> _modificaLivelloSport(
+    String sport,
+    String livelloAttuale,
+  ) async {
+    final livelliDisponibili = [
+      {
+        'titolo': 'Principiante',
+        'descrizione': 'Ho appena iniziato o gioco molto raramente.',
+      },
+      {
+        'titolo': 'Amatoriale',
+        'descrizione': 'Conosco le regole base e gioco ogni tanto.',
+      },
+      {
+        'titolo': 'Intermedio',
+        'descrizione': 'Gioco con continuità e ho una buona visione di gioco.',
+      },
+      {
+        'titolo': 'Avanzato',
+        'descrizione': 'Ritmo alto, ottima tecnica e padronanza del gioco.',
+      },
+      {
+        'titolo': 'Esperto / Agonista',
+        'descrizione': 'Livello competitivo elevato o tesserato agonista.',
+      },
+    ];
+
+    final livelloScelto = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(sheetContext).size.height * 0.78,
+          ),
+          decoration: const BoxDecoration(
+            color: AppTheme.cardBg,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 38,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accent.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.sports_rounded,
+                        color: AppTheme.accent,
+                        size: 24,
+                      ),
+                    ),
+
+                    const SizedBox(width: 12),
+
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Livello ${_nomeSportProfilo(sport)}',
+                            style: const TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                          const SizedBox(height: 2),
+
+                          const Text(
+                            'Seleziona il livello che ti rappresenta meglio.',
+                            style: TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: livelliDisponibili.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final item = livelliDisponibili[index];
+
+                      final titolo = item['titolo']!;
+                      final descrizione = item['descrizione']!;
+
+                      final selezionato =
+                          titolo.trim().toLowerCase() ==
+                          livelloAttuale.trim().toLowerCase();
+
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () {
+                          Navigator.pop(sheetContext, titolo);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: selezionato
+                                ? AppTheme.accent.withOpacity(0.10)
+                                : Colors.white.withOpacity(0.04),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: selezionato
+                                  ? AppTheme.accent
+                                  : Colors.white.withOpacity(0.08),
+                              width: selezionato ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      titolo,
+                                      style: TextStyle(
+                                        color: selezionato
+                                            ? AppTheme.accent
+                                            : AppTheme.textPrimary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+
+                                    const SizedBox(height: 3),
+
+                                    Text(
+                                      descrizione,
+                                      style: const TextStyle(
+                                        color: AppTheme.textSecondary,
+                                        fontSize: 12,
+                                        height: 1.3,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              const SizedBox(width: 10),
+
+                              Icon(
+                                selezionato
+                                    ? Icons.check_circle_rounded
+                                    : Icons.chevron_right_rounded,
+                                color: selezionato
+                                    ? AppTheme.accent
+                                    : AppTheme.textSecondary,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (livelloScelto == null) return;
+
+    setState(() {
+      _livelliSport[sport] = livelloScelto;
+    });
   }
 
   String? _validaMinLunghezza(String? val, String campo) {

@@ -8,6 +8,19 @@ class SocietaRepository {
   SocietaRepository({SupabaseClient? supabaseClient})
     : _supabase = supabaseClient ?? Supabase.instance.client;
 
+  bool _iniziaUnaParola(String testo, String query) {
+    final queryPulita = query.trim().toLowerCase();
+
+    if (queryPulita.isEmpty) return true;
+
+    final parole = testo
+        .toLowerCase()
+        .split(RegExp(r'[^a-zA-ZÀ-ÿ0-9]+'))
+        .where((parola) => parola.isNotEmpty);
+
+    return parole.any((parola) => parola.startsWith(queryPulita));
+  }
+
   Future<List<Societa>> cercaSocietaPerNome(String query) async {
     try {
       final response = await _supabase
@@ -15,7 +28,17 @@ class SocietaRepository {
           .select()
           .ilike('nome_societa', '%$query%');
 
-      return (response as List).map((json) => Societa.fromJson(json)).toList();
+      final risultati = (response as List)
+          .where((json) {
+            return _iniziaUnaParola(
+              json['nome_societa']?.toString() ?? '',
+              query,
+            );
+          })
+          .map((json) => Societa.fromJson(json))
+          .toList();
+
+      return risultati;
     } catch (e) {
       debugPrint("Errore in cercaSocietaPerNome: $e");
       return [];
@@ -33,7 +56,16 @@ class SocietaRepository {
             'indirizzo.ilike.%$query%',
           );
 
-      return (response as List).map((json) => Societa.fromJson(json)).toList();
+      final risultati = (response as List)
+          .where((json) {
+            return _iniziaUnaParola(json['comune']?.toString() ?? '', query) ||
+                _iniziaUnaParola(json['provincia']?.toString() ?? '', query) ||
+                _iniziaUnaParola(json['indirizzo']?.toString() ?? '', query);
+          })
+          .map((json) => Societa.fromJson(json))
+          .toList();
+
+      return risultati;
     } catch (e) {
       debugPrint("Errore in cercaSocietaPerCitta: $e");
       return [];
@@ -53,7 +85,21 @@ class SocietaRepository {
             'indirizzo.ilike.%$query%',
           );
 
-      return (response as List).map((json) => Societa.fromJson(json)).toList();
+      final risultati = (response as List)
+          .where((json) {
+            return _iniziaUnaParola(
+                  json['nome_societa']?.toString() ?? '',
+                  query,
+                ) ||
+                _iniziaUnaParola(json['via']?.toString() ?? '', query) ||
+                _iniziaUnaParola(json['comune']?.toString() ?? '', query) ||
+                _iniziaUnaParola(json['provincia']?.toString() ?? '', query) ||
+                _iniziaUnaParola(json['indirizzo']?.toString() ?? '', query);
+          })
+          .map((json) => Societa.fromJson(json))
+          .toList();
+
+      return risultati;
     } catch (e) {
       debugPrint("Errore in cercaSocietaGlobale: $e");
       return [];
@@ -75,33 +121,60 @@ class SocietaRepository {
     }
   }
 
+  Future<List<String>> getProvinceDisponibili() async {
+    try {
+      final response = await _supabase
+          .from('societa')
+          .select('provincia')
+          .not('provincia', 'is', null);
+
+      final province = (response as List)
+          .map((row) => row['provincia']?.toString().trim() ?? '')
+          .where((provincia) => provincia.isNotEmpty)
+          .toSet()
+          .toList();
+
+      province.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+      return province;
+    } catch (e) {
+      debugPrint('Errore caricamento province: $e');
+      return [];
+    }
+  }
+
   Future<List<Map<String, dynamic>>> cercaSocietaEPrezziPerSport({
     required String sport,
     required int giornoSettimana,
+    String? provincia,
   }) async {
     try {
       debugPrint("Cerco società per sport: $sport e giorno: $giornoSettimana");
 
       // 1. Trova i CAMPI che supportano lo sport richiesto,
       // insieme alla società e agli orari.
-      final response = await _supabase
+      final query = _supabase
           .from('campi')
           .select('''
-          id,
-          id_societa,
-          created_at,
-          tariffe_sport,
-          societa!inner(
-            *,
-            orari_societa!inner(
-              giorno_settimana,
-              is_chiuso
-            )
-          )
-        ''')
+    id,
+    id_societa,
+    created_at,
+    tariffe_sport,
+    societa!inner(
+      *,
+      orari_societa!inner(
+        giorno_settimana,
+        is_chiuso
+      )
+    )
+  ''')
           .filter('tariffe_sport', 'cs', '[{"sport":"$sport"}]')
           .eq('societa.orari_societa.giorno_settimana', giornoSettimana)
           .eq('societa.orari_societa.is_chiuso', false);
+
+      final response = provincia != null && provincia.trim().isNotEmpty
+          ? await query.eq('societa.provincia', provincia.trim())
+          : await query;
 
       final List<dynamic> righeSport = response as List;
 
