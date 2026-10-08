@@ -28,7 +28,7 @@ function App() {
         <div className="hero-glow hero-glow-orange"></div>
 
         <div className="hero-text">
-          <div className="badge">LO SPORT INIZIaaaaaaaA DA QUI</div>
+          <div className="badge">LO SPORT INIZIaaaaaaaaA DA QUI</div>
 
           <h1>
             Trova.
