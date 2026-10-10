@@ -3,18 +3,21 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app_campi/core/models/notifica.dart';
 import 'package:app_campi/features/auth/application/auth_provider.dart';
 
-final notificheStreamProvider = FutureProvider<List<Notifica>>((ref) async {
+final notificheStreamProvider = StreamProvider<List<Notifica>>((ref) {
   final utente = ref.watch(utenteCorrenteProvider).value;
 
   if (utente == null) {
-    return [];
+    return Stream.value(<Notifica>[]);
   }
 
-  final response = await Supabase.instance.client
+  return Supabase.instance.client
       .from('notifiche')
-      .select()
+      .stream(primaryKey: ['id'])
       .eq('id_utente', utente.id)
-      .order('created_at', ascending: false);
-
-  return (response as List).map((json) => Notifica.fromJson(json)).toList();
+      .order('created_at', ascending: false)
+      .map(
+        (rows) => rows
+            .map((json) => Notifica.fromJson(Map<String, dynamic>.from(json)))
+            .toList(),
+      );
 });

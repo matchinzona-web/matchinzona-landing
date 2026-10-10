@@ -12,6 +12,7 @@ class WidgetCalendarioGestore extends StatelessWidget {
   final Function(ViewChangedDetails) onViewChanged;
   final ScrollController? mainScrollController;
   final bool giornoChiuso;
+  final DateTime minDate;
 
   const WidgetCalendarioGestore({
     super.key,
@@ -24,6 +25,7 @@ class WidgetCalendarioGestore extends StatelessWidget {
     required this.onViewChanged,
     this.mainScrollController,
     required this.giornoChiuso,
+    required this.minDate,
   });
 
   @override
@@ -71,11 +73,7 @@ class WidgetCalendarioGestore extends StatelessWidget {
                   backgroundColor: AppTheme.cardBg,
                   viewNavigationMode: ViewNavigationMode.none,
 
-                  minDate: DateTime(
-                    DateTime.now().year,
-                    DateTime.now().month,
-                    DateTime.now().day,
-                  ),
+                  minDate: minDate,
 
                   maxDate: DateTime(
                     DateTime.now().year,
@@ -365,7 +363,7 @@ class _AppointmentCard extends StatelessWidget {
         .difference(appointment.startTime)
         .inMinutes;
 
-    final bool compatta = durataMinuti < 30;
+    final bool compatta = durataMinuti <= 60;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -515,7 +513,7 @@ class _GiornoChiusoOverlay extends StatelessWidget {
               const SizedBox(height: 7),
 
               Text(
-                'Nessun orario disponibile per oggi',
+                'Nessun orario disponibile per questa giornata',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.grey.shade500,

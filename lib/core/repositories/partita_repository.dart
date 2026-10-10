@@ -185,6 +185,14 @@ class PartitaRepository {
       }
       return {'id': response.toString(), 'status': 'success'};
     } on PostgrestException catch (e) {
+      final bool slotOccupato =
+          e.code == '23P01' ||
+          e.message.contains('nessuna_sovrapposizione_partite_complete');
+
+      if (slotOccupato) {
+        throw Exception('SLOT_GIA_OCCUPATO');
+      }
+
       throw Exception('Errore database: ${e.message}');
     } catch (e) {
       throw Exception('Impossibile completare la creazione in questo momento.');
@@ -350,12 +358,20 @@ class PartitaRepository {
       final partiteData = await _supabase
           .from('partite')
           .select('''
-            *,
-            campo:campi(*),
-            organizzatore:utenti!partite_id_organizzatore_fkey(
-              nome, cognome, email, telefono
-            )
-          ''')
+      *,
+      campo:campi(*),
+      organizzatore:utenti!partite_id_organizzatore_fkey(
+        nome, cognome, email, telefono
+      ),
+      giocatori_partita(
+        id_utente,
+        ospiti_extra,
+        utenti(
+          nome,
+          cognome
+        )
+      )
+    ''')
           .inFilter('id_campo', idCampi);
 
       return List<Map<String, dynamic>>.from(partiteData);
@@ -368,48 +384,42 @@ class PartitaRepository {
     String idCampo,
     DateTime data,
   ) async {
-    final dataStr = _formatData(data);
-    final idUtenteCorrente = _supabase.auth.currentUser?.id;
+    try {
+      final dataStr = _formatData(data);
 
-    final response = await _supabase
-        .from('partite')
-        .select('id, orario_inizio, stato_partita, id_organizzatore')
-        .eq('id_campo', idCampo)
-        .eq('data_partita', dataStr)
-        .neq('stato_partita', 'annullata');
+      final response = await _supabase.rpc(
+        'get_stato_slot_campo',
+        params: {'p_id_campo': idCampo, 'p_data': dataStr},
+      );
 
-    final List<Map<String, dynamic>> partite = List<Map<String, dynamic>>.from(
-      response,
-    );
-    final Map<String, Map<String, dynamic>> mappaStati = {};
+      final List<Map<String, dynamic>> righe = List<Map<String, dynamic>>.from(
+        response as List,
+      );
 
-    for (var p in partite) {
-      String ora = (p['orario_inizio'] as String).substring(0, 5);
-      String stato = p['stato_partita'] as String;
+      final Map<String, Map<String, dynamic>> mappaStati = {};
 
-      if (!mappaStati.containsKey(ora)) {
-        mappaStati[ora] = {'occupato_fisso': false, 'aperte': 0};
+      for (final riga in righe) {
+        final String orarioCompleto = riga['orario_inizio'].toString();
+
+        final String ora = orarioCompleto.length >= 5
+            ? orarioCompleto.substring(0, 5)
+            : orarioCompleto;
+
         mappaStati[ora] = {
-          'occupato_fisso': false,
-          'aperte': 0,
-          'mio_match_aperto_id': null,
+          'occupato_fisso': riga['occupato_fisso'] == true,
+          'aperte': (riga['aperte'] as num?)?.toInt() ?? 0,
+          'mio_match_aperto_id': riga['mio_match_aperto_id']?.toString(),
         };
       }
 
-      if (stato == 'completa') {
-        mappaStati[ora]!['occupato_fisso'] = true;
-      } else if (stato == 'aperta_a_rischio') {
-        mappaStati[ora]!['aperte'] = (mappaStati[ora]!['aperte'] as int) + 1;
-
-        final idOrganizzatore = p['id_organizzatore']?.toString();
-
-        if (idUtenteCorrente != null && idOrganizzatore == idUtenteCorrente) {
-          mappaStati[ora]!['mio_match_aperto_id'] = p['id']?.toString();
-        }
-      }
+      return mappaStati;
+    } on PostgrestException catch (e) {
+      debugPrint('Errore getStatoOrariGiorno RPC: ${e.message}');
+      throw Exception('Impossibile verificare la disponibilità degli orari.');
+    } catch (e) {
+      debugPrint('Errore getStatoOrariGiorno: $e');
+      throw Exception('Impossibile verificare la disponibilità degli orari.');
     }
-
-    return mappaStati;
   }
 
   Future<List<Map<String, dynamic>>> getPartiteUtente(String idUtente) async {
@@ -604,6 +614,22 @@ class PartitaRepository {
       }).toSet();
     } catch (e) {
       throw Exception('Impossibile verificare gli slot già prenotati.');
+    }
+  }
+
+  Future<void> abbandonaPartitaRpc({
+    required String idPartita,
+    required String idUtente,
+  }) async {
+    try {
+      await _supabase.rpc(
+        'abbandona_partita',
+        params: {'p_id_partita': idPartita, 'p_id_utente': idUtente},
+      );
+    } on PostgrestException catch (e) {
+      throw Exception('Errore database: ${e.message}');
+    } catch (e) {
+      throw Exception('Impossibile abbandonare la partita.');
     }
   }
 }

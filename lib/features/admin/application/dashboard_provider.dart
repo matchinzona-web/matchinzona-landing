@@ -209,6 +209,69 @@ class DashboardNotifier extends Notifier<DashboardState> {
   }
 
   void _calcolaOrariGriglia(DateTime giorno) {
+    // ==========================================================
+    // CHIUSURA STRAORDINARIA PER TUTTO IL GIORNO
+    // ==========================================================
+
+    final DateTime giornoSoloData = DateTime(
+      giorno.year,
+      giorno.month,
+      giorno.day,
+    );
+
+    final bool chiusoStraordinariamenteTuttoIlGiorno = state
+        .chiusureStraordinarie
+        .any((c) {
+          try {
+            final DateTime? dataInizioRaw = DateTime.tryParse(
+              c['data_inizio'].toString(),
+            );
+
+            final DateTime? dataFineRaw = DateTime.tryParse(
+              c['data_fine'].toString(),
+            );
+
+            if (dataInizioRaw == null || dataFineRaw == null) {
+              return false;
+            }
+
+            final DateTime dataInizio = DateTime(
+              dataInizioRaw.year,
+              dataInizioRaw.month,
+              dataInizioRaw.day,
+            );
+
+            final DateTime dataFine = DateTime(
+              dataFineRaw.year,
+              dataFineRaw.month,
+              dataFineRaw.day,
+            );
+
+            final String oraInizio =
+                c['orario_inizio']?.toString().substring(0, 5) ?? '';
+
+            final String oraFine =
+                c['orario_fine']?.toString().substring(0, 5) ?? '';
+
+            final bool comprendeGiorno =
+                !giornoSoloData.isBefore(dataInizio) &&
+                !giornoSoloData.isAfter(dataFine);
+
+            final bool interoGiorno =
+                oraInizio == '00:00' &&
+                (oraFine == '23:59' || oraFine == '24:00');
+
+            return comprendeGiorno && interoGiorno;
+          } catch (_) {
+            return false;
+          }
+        });
+
+    if (chiusoStraordinariamenteTuttoIlGiorno) {
+      state = state.copyWith(startHour: 8.0, endHour: 11.0, giornoChiuso: true);
+
+      return;
+    }
     if (state.orariSocieta.isEmpty) {
       state = state.copyWith(startHour: 8.0, endHour: 24.0, giornoChiuso: true);
       return;
@@ -335,10 +398,31 @@ class DashboardNotifier extends Notifier<DashboardState> {
               ? '📞 $nomeClienteManuale'
               : '📞 Prenotazione manuale';
         } else {
-          nomeVisualizzato = p['organizzatore'] != null
-              ? '${p['organizzatore']['nome']} '
-                    '${p['organizzatore']['cognome']}'
-              : 'Utente Sconosciuto';
+          if (p['organizzatore'] != null) {
+            nomeVisualizzato =
+                '${p['organizzatore']['nome']} '
+                '${p['organizzatore']['cognome']}';
+          } else {
+            final giocatori = p['giocatori_partita'];
+
+            if (giocatori is List && giocatori.isNotEmpty) {
+              final primoGiocatore = giocatori.first;
+              final utente = primoGiocatore['utenti'];
+
+              if (utente != null) {
+                nomeVisualizzato =
+                    '${utente['nome'] ?? ''} ${utente['cognome'] ?? ''}'.trim();
+
+                if (nomeVisualizzato.isEmpty) {
+                  nomeVisualizzato = 'Partecipante partita';
+                }
+              } else {
+                nomeVisualizzato = 'Partecipante partita';
+              }
+            } else {
+              nomeVisualizzato = 'Partecipante partita';
+            }
+          }
         }
         final String idPartita = p['id']?.toString() ?? '';
         tempAppointments.add(

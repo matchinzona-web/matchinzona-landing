@@ -391,7 +391,7 @@ class _MatchCtaButton extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       child: const Text(
-        "UNISCITI AL MATCH",
+        "CONFIGURA PARTECIPAZIONE",
         style: TextStyle(
           fontWeight: FontWeight.w900,
           fontSize: 14,

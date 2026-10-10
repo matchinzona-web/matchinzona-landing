@@ -553,32 +553,10 @@ class PartitaService {
             '$minutiLimiteAbbandono minuti all\'inizio.';
       }
 
-      final int ospitiExtra = await _repository.getOspitiExtraGiocatore(
-        partita.id,
-        giocatoreDaRimuovere.id,
+      await _repository.abbandonaPartitaRpc(
+        idPartita: partita.id,
+        idUtente: giocatoreDaRimuovere.id,
       );
-
-      await _repository.rimuoviGiocatorePartita(
-        partita.id,
-        giocatoreDaRimuovere.id,
-      );
-
-      final int nuovoTotale =
-          (partita.numeroGiocatoriPrenotati - (1 + ospitiExtra)).clamp(0, 99);
-
-      if (nuovoTotale <= 0) {
-        await _repository.aggiornaGiocatoriEStato(
-          idPartita: partita.id,
-          nuovoTotale: nuovoTotale,
-          nuovoStato: 'annullata',
-        );
-      } else {
-        await _repository.aggiornaGiocatoriEStato(
-          idPartita: partita.id,
-          nuovoTotale: nuovoTotale,
-          nuovoStato: 'aperta_a_rischio',
-        );
-      }
 
       return null;
     } catch (e) {

@@ -47,6 +47,10 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
     return DateTime(now.year, now.month, now.day);
   }
 
+  DateTime get _dataMinimaCalendario {
+    return _oggi.subtract(const Duration(days: 15));
+  }
+
   DateTime get _dataMassimaCalendario {
     return _oggi.add(const Duration(days: 13));
   }
@@ -1179,7 +1183,7 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                               dataAttuale.day,
                             );
 
-                            if (!giornoAttuale.isAfter(_oggi)) {
+                            if (!giornoAttuale.isAfter(_dataMinimaCalendario)) {
                               return;
                             }
 
@@ -1193,7 +1197,7 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                               initialDate:
                                   _calendarController.displayDate ??
                                   DateTime.now(),
-                              firstDate: _oggi,
+                              firstDate: _dataMinimaCalendario,
                               lastDate: _dataMassimaCalendario,
                               builder: (context, child) {
                                 return Theme(
@@ -1292,6 +1296,7 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                       startHour: state.startHour,
                       endHour: state.endHour,
                       giornoChiuso: state.giornoChiuso,
+                      minDate: _dataMinimaCalendario,
                       onTap: _gestisciClickCalendario,
                       mainScrollController: _scrollController,
                       onViewChanged: (details) {
