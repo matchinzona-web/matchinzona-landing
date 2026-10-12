@@ -350,8 +350,16 @@ class PartitaService {
 
       return RisultatoCreazionePartita.successo(idPartitaGenerata);
     } catch (e) {
+      final errore = e.toString();
+
+      if (errore.contains('SLOT_GIA_OCCUPATO') ||
+          errore.contains('23P01') ||
+          errore.contains('nessuna_sovrapposizione_partite_complete')) {
+        return RisultatoCreazionePartita.fallimento('SLOT_GIA_OCCUPATO');
+      }
+
       return RisultatoCreazionePartita.fallimento(
-        'Errore durante la creazione',
+        errore.replaceFirst('Exception: ', ''),
       );
     }
   }

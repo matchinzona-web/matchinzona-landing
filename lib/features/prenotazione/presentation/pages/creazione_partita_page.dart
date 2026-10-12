@@ -1633,12 +1633,20 @@ class _BuildStickyBottomBar extends ConsumerWidget {
       // 🟢 SE L'UTENTE SCEGLIE DI PAGARE IN APP (Valido solo per Campo Intero/Privata):
       if (state.isPartitaPrivata &&
           state.metodoPagamentoScelto == MetodoPagamento.pagaOra) {
+        // Ricontrollo lo slot immediatamente prima di iniziare il pagamento.
+        final bool slotOccupato = await controller.slotAttualeOccupato();
+
+        if (slotOccupato) {
+          throw Exception('SLOT_GIA_OCCUPATO');
+        }
+
         if (!isMaggiorenne) {
           throw Exception(
             'Il pagamento online è disponibile solo per utenti maggiorenni. '
             'Puoi pagare direttamente al centro sportivo.',
           );
         }
+
         if (!state.pagamentiOnlineDisponibili) {
           throw Exception('Il centro sportivo non accetta pagamenti online.');
         }
@@ -1757,8 +1765,7 @@ class _BuildStickyBottomBar extends ConsumerWidget {
 
     if (erroreStr.contains('SLOT_GIA_OCCUPATO')) {
       titolo = "Orario Occupato";
-      descrizione =
-          "Il campo è già stato prenotato per intero in questo orario.";
+      descrizione = "Questo slot è già occupato da una partita completa.";
     }
 
     showDialog(

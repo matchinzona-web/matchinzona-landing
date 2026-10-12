@@ -142,6 +142,7 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
     );
   }
 
+  /*
   void _mostraDialogUpsell() {
     final state = ref.read(dashboardProvider);
     showDialog(
@@ -208,6 +209,57 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
             child: const Text(
               'Esegui Upgrade',
               style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  */
+  void _mostraDialogUpsell() {
+    final state = ref.read(dashboardProvider);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.cardBg,
+        shape: RoundedRectangleBorder(
+          side: const BorderSide(color: AppTheme.neonOrange, width: 2),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.rocket_launch, color: AppTheme.neonOrange),
+            SizedBox(width: 10),
+            Text(
+              'Limite Raggiunto',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Hai raggiunto il limite massimo di campi previsti dal tuo piano attuale '
+          '(${state.limiteCampiConsentiti} campi).\n\n'
+          'Per aumentare il numero di campi disponibili, contatta MatchInZona a:\n'
+          'matchinzona@gmail.com',
+          style: TextStyle(
+            color: Colors.grey.shade300,
+            fontSize: 15,
+            height: 1.4,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Chiudi',
+              style: TextStyle(
+                color: AppTheme.neonOrange,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -619,6 +671,7 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                     ),
                   ),
                 ),
+                /*
                 const PopupMenuItem(
                   value: 'pagamenti',
                   child: ListTile(
@@ -636,6 +689,9 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                   ),
                 ),
                 const PopupMenuDivider(color: Colors.grey),
+                */
+
+                /*
                 const PopupMenuItem(
                   value: 'gestione_piano',
                   child: ListTile(
@@ -646,6 +702,7 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                     ),
                   ),
                 ),
+                */
                 const PopupMenuItem(
                   value: 'privacy_assistenza',
                   child: ListTile(

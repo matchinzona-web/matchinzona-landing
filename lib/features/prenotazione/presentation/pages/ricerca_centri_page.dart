@@ -17,9 +17,14 @@ class _RicercaCentriPageState extends ConsumerState<RicercaCentriPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final controller = ref.read(creazionePartitaProvider.notifier);
 
+    final controller = ref.read(creazionePartitaProvider.notifier);
+
+    // Sincronizza il valore visualizzato con quello già usato dal filtro.
+    _provinciaSelezionata =
+        controller.provinciaSelezionata ?? 'Tutte le province';
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       controller.applicaFiltri();
 
       final province = await controller.caricaProvinceDisponibili();

@@ -13,6 +13,7 @@ import 'package:app_campi/core/repositories/chiusura_straordinaria_repository.da
 import 'package:app_campi/core/models/orario_societa.dart';
 import 'package:app_campi/core/repositories/societa_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 enum TipoRicerca { tutti, societa, citta }
 
@@ -32,10 +33,12 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
   TipoRicerca filtroCorrente = TipoRicerca.tutti;
   String? provinciaSelezionata;
   static const _chiaveUltimoSport = 'ultimo_sport_prenotazione';
+  static const _chiaveUltimaProvincia = 'ultima_provincia_prenotazione';
 
   @override
   CreazionePartitaState build() {
     _caricaUltimoSport();
+    _caricaUltimaProvincia();
 
     return CreazionePartitaState(dataSelezionata: DateTime.now());
   }
@@ -48,6 +51,14 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
     provinciaSelezionata = provincia == null || provincia == 'Tutte le province'
         ? null
         : provincia;
+
+    final prefs = await SharedPreferences.getInstance();
+
+    if (provinciaSelezionata == null) {
+      await prefs.remove(_chiaveUltimaProvincia);
+    } else {
+      await prefs.setString(_chiaveUltimaProvincia, provinciaSelezionata!);
+    }
 
     await applicaFiltri();
   }
@@ -371,6 +382,35 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
     state = state.copyWith(metodoPagamentoScelto: metodo);
   }
 
+  Future<bool> slotAttualeOccupato() async {
+    if (state.campoSelezionato == null || state.oraInizioSelezionata == null) {
+      return true;
+    }
+
+    final data = state.dataSelezionata;
+
+    final dataStr =
+        "${data.year}-"
+        "${data.month.toString().padLeft(2, '0')}-"
+        "${data.day.toString().padLeft(2, '0')}";
+
+    final orarioInizio = "${state.oraInizioSelezionata}:00";
+
+    final orarioFine = _calcolaOrarioFine(state.oraInizioSelezionata!);
+
+    final response = await Supabase.instance.client.rpc(
+      'slot_occupato_reale',
+      params: {
+        'p_id_campo': state.campoSelezionato!.id,
+        'p_data': dataStr,
+        'p_inizio': orarioInizio,
+        'p_fine': orarioFine,
+      },
+    );
+
+    return response == true;
+  }
+
   Future<String> confermaMatch(
     Utente organizzatore, {
     String? stripePaymentIntentId,
@@ -663,5 +703,18 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
     }
 
     state = state.copyWith(sportSelezionato: ultimoSport);
+  }
+
+  Future<void> _caricaUltimaProvincia() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final ultimaProvincia = prefs.getString(_chiaveUltimaProvincia);
+
+    if (ultimaProvincia == null || ultimaProvincia.trim().isEmpty) {
+      provinciaSelezionata = null;
+      return;
+    }
+
+    provinciaSelezionata = ultimaProvincia;
   }
 }
