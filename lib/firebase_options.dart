@@ -50,19 +50,18 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDMVaseGGhmFghDBQ6l2jElRXAYtUFaTiY',
+    apiKey: 'AIzaSyCyjH7govwW6tkQcbMlSA8Hnc-u3pPs5S4',
     appId: '1:48542052597:android:9244dc133a4ac861d495bc',
     messagingSenderId: '48542052597',
     projectId: 'matchly-app-2026-efd7e',
     storageBucket: 'matchly-app-2026-efd7e.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyCVRfUzqfEIcd0HNETHJiS9wZ9qTcMnkTs',
-    appId: '1:48542052597:ios:680599af2e8732b0d495bc',
+    appId: '1:48542052597:ios:441618346f975efbd495bc',
     messagingSenderId: '48542052597',
     projectId: 'matchly-app-2026-efd7e',
     storageBucket: 'matchly-app-2026-efd7e.firebasestorage.app',
-    iosBundleId: 'com.example.appCampi',
+    iosBundleId: 'com.matchinzona.app',
   );
 }

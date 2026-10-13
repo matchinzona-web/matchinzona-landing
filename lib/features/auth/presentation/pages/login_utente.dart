@@ -8,6 +8,7 @@ import 'package:app_campi/features/auth/application/auth_provider.dart';
 import 'package:app_campi/core/theme/app_theme.dart';
 import 'package:app_campi/core/utils/loading_overlay.dart';
 import 'package:app_campi/features/auth/data/auth_repository.dart';
+import 'dart:io';
 
 class LoginUtente extends ConsumerStatefulWidget {
   const LoginUtente({super.key});
@@ -67,6 +68,22 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
       final authService = AuthService();
 
       await authService.accediConGoogle();
+    } catch (e) {
+      _attesaLoginSocial = false;
+
+      if (!mounted) return;
+
+      _mostraErrore(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _accediConApple() async {
+    try {
+      _attesaLoginSocial = true;
+
+      final authService = AuthService();
+
+      await authService.accediConApple();
     } catch (e) {
       _attesaLoginSocial = false;
 
@@ -512,11 +529,56 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
                                 ),
                                 const SizedBox(height: 32),
 
+                                if (Platform.isIOS) ...[
+                                  const SizedBox(height: 12),
+
+                                  SizedBox(
+                                    height: 56,
+                                    width: double.infinity,
+                                    child: OutlinedButton(
+                                      onPressed: _accediConApple,
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppTheme.textPrimary,
+                                        backgroundColor: AppTheme.cardBg,
+                                        side: const BorderSide(
+                                          color: AppTheme.cardBorder,
+                                          width: 1.2,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                        ),
+                                      ),
+                                      child: const Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.apple,
+                                            color: Colors.white,
+                                            size: 24,
+                                          ),
+                                          SizedBox(width: 12),
+                                          Text(
+                                            'CONTINUA CON APPLE',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: 0.6,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+
                                 SizedBox(
                                   height: 56,
                                   width: double.infinity,
                                   child: OutlinedButton(
-                                    onPressed: _accediConGoogle,
+                                    onPressed: _accediConApple,
                                     style: OutlinedButton.styleFrom(
                                       foregroundColor: AppTheme.textPrimary,
                                       backgroundColor: AppTheme.cardBg,
@@ -532,17 +594,14 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       children: [
-                                        Text(
-                                          'G',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 22,
-                                            fontWeight: FontWeight.w900,
-                                          ),
+                                        Icon(
+                                          Icons.apple,
+                                          color: Colors.white,
+                                          size: 24,
                                         ),
                                         SizedBox(width: 12),
                                         Text(
-                                          'CONTINUA CON GOOGLE',
+                                          'CONTINUA CON APPLE',
                                           style: TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w900,

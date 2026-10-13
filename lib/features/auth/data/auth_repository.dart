@@ -1,5 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app_campi/core/models/utente.dart';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class AuthService {
   final SupabaseClient _supabase;
@@ -314,15 +317,35 @@ class AuthService {
 
   Future<void> accediConApple() async {
     try {
-      final avviato = await _supabase.auth.signInWithOAuth(
-        OAuthProvider.apple,
-        redirectTo: 'myapp://login-callback',
-        authScreenLaunchMode: LaunchMode.externalApplication,
+      final rawNonce = _supabase.auth.generateRawNonce();
+
+      final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
+
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: hashedNonce,
       );
 
-      if (!avviato) {
-        throw Exception('Impossibile avviare l’accesso con Apple.');
+      final idToken = credential.identityToken;
+
+      if (idToken == null) {
+        throw Exception('Apple non ha restituito un token valido.');
       }
+
+      await _supabase.auth.signInWithIdToken(
+        provider: OAuthProvider.apple,
+        idToken: idToken,
+        nonce: rawNonce,
+      );
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        return;
+      }
+
+      throw Exception('Impossibile accedere con Apple.');
     } on AuthException catch (e) {
       throw Exception('Errore accesso Apple: ${e.message}');
     } catch (e) {

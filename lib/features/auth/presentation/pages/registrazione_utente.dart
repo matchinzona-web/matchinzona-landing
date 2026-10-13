@@ -4,7 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
+import 'dart:io';
 import 'package:app_campi/core/theme/app_theme.dart';
 import 'package:app_campi/features/auth/application/auth_provider.dart';
 import 'package:app_campi/features/auth/data/auth_repository.dart';
@@ -70,6 +70,35 @@ class _RegistrazioneUtenteState extends ConsumerState<RegistrazioneUtente> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Non è stato possibile continuare con Google.'),
+          backgroundColor: AppTheme.statoErrore,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _accediConApple() async {
+    if (_isLoading) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      _attesaLoginSocial = true;
+
+      final authService = AuthService();
+
+      await authService.accediConApple();
+    } catch (e) {
+      _attesaLoginSocial = false;
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Non è stato possibile continuare con Apple.'),
           backgroundColor: AppTheme.statoErrore,
         ),
       );
@@ -237,6 +266,48 @@ class _RegistrazioneUtenteState extends ConsumerState<RegistrazioneUtente> {
                                       ),
                               ),
                             ),
+
+                            if (Platform.isIOS) ...[
+                              const SizedBox(height: 12),
+
+                              SizedBox(
+                                height: 56,
+                                width: double.infinity,
+                                child: OutlinedButton(
+                                  onPressed: _accediConApple,
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppTheme.textPrimary,
+                                    backgroundColor: AppTheme.cardBg,
+                                    side: const BorderSide(
+                                      color: AppTheme.cardBorder,
+                                      width: 1.2,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.apple,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                      SizedBox(width: 12),
+                                      Text(
+                                        'CONTINUA CON APPLE',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 0.6,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
 
                             const SizedBox(height: 28),
 
