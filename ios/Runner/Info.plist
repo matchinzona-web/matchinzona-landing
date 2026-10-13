@@ -47,6 +47,8 @@
             </array>
         </dict>
     </dict>
+    <key>NSCameraUsageDescription</key>
+<string>MatchInZona utilizza la fotocamera per consentirti di scattare e caricare immagini del profilo e altri contenuti dell'app.</string>
     <key>UIApplicationSupportsIndirectInputEvents</key>
     <true/>
     <key>UILaunchStoryboardName</key>
