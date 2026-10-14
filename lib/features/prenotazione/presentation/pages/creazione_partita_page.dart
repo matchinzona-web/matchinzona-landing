@@ -1739,6 +1739,7 @@ class _BuildStickyBottomBar extends ConsumerWidget {
             data: data,
             ora: ora,
             isPrivata: isPrivata,
+            isCompleta: isCompleta,
           ),
         ),
         (route) => route.isFirst,

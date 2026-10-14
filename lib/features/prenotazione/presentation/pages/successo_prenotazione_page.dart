@@ -12,6 +12,7 @@ class SuccessoPrenotazionePage extends StatelessWidget {
   final DateTime data;
   final String ora;
   final bool isPrivata;
+  final bool isCompleta;
 
   const SuccessoPrenotazionePage({
     super.key,
@@ -22,6 +23,7 @@ class SuccessoPrenotazionePage extends StatelessWidget {
     required this.data,
     required this.ora,
     required this.isPrivata,
+    required this.isCompleta,
   });
 
   String _emojiSport(String sport) {
@@ -213,6 +215,7 @@ class SuccessoPrenotazionePage extends StatelessWidget {
               ],
 
               // BOTTONE CONDIVIDI WHATSAPP
+              /*
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 56),
@@ -223,21 +226,32 @@ class SuccessoPrenotazionePage extends StatelessWidget {
                   foregroundColor: AppTheme.neonGreen,
                 ),
                 icon: const Icon(Icons.share),
-                label: const Text(
-                  "INVITA AMICI SU WHATSAPP",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                label: Text(
+                  isCompleta
+                      ? "AVVISA GLI AMICI SU WHATSAPP"
+                      : "INVITA AMICI SU WHATSAPP",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
                 onPressed: () async {
                   final emoji = _emojiSport(sport);
-                  final String testoMessaggio = isPrivata
-                      ? "$emoji Ho prenotato *$nomeCampo* presso *$nomeSocieta*\n"
+
+                  final String linkInvito =
+                      "https://matchinzona-landing.vercel.app/match/$idPartita";
+
+                  final String testoMessaggio = isCompleta
+                      ? "$emoji Partita confermata su MatchInZona!\n\n"
+                            "🏟️ *$nomeSocieta*\n"
                             "📅 $dataFormattata alle $ora\n\n"
                             "Ci vediamo in campo!"
                       : "$emoji *CERCHIAMO GIOCATORI!*\n\n"
                             "Ho aperto un match su MatchInZona presso:\n"
                             "🏟️ *$nomeSocieta*\n"
                             "📅 $dataFormattata alle $ora\n\n"
-                            "Unisciti alla partita su MatchInZona!";
+                            "Unisciti alla partita su MatchInZona:\n"
+                            "$linkInvito";
 
                   final urlAndroid =
                       "whatsapp://send?text=${Uri.encodeComponent(testoMessaggio)}";
@@ -277,6 +291,7 @@ class SuccessoPrenotazionePage extends StatelessWidget {
                   }
                 },
               ),
+              */
               const SizedBox(height: 12),
 
               TextButton(

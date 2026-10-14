@@ -63,6 +63,7 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
     with WidgetsBindingObserver {
   final AppLinks _appLinks = AppLinks();
   StreamSubscription<Map<String, String>>? _pushTapSubscription;
+  StreamSubscription<AuthState>? _passwordRecoverySubscription;
 
   @override
   void initState() {
@@ -71,6 +72,31 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
     WidgetsBinding.instance.addObserver(this);
 
     initDeepLinks();
+
+    _passwordRecoverySubscription = Supabase
+        .instance
+        .client
+        .auth
+        .onAuthStateChange
+        .listen((data) {
+          if (data.event != AuthChangeEvent.passwordRecovery) {
+            return;
+          }
+
+          debugPrint('Sessione password recovery confermata da Supabase.');
+
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+
+            navigatorKey.currentState?.pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (_) =>
+                    const ResetPasswordPage(isRecoverySession: true),
+              ),
+              (route) => false,
+            );
+          });
+        });
 
     _pushTapSubscription = PushNotificationService.notificationTapStream.listen(
       (data) {
@@ -105,6 +131,7 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
     WidgetsBinding.instance.removeObserver(this);
 
     _pushTapSubscription?.cancel();
+    _passwordRecoverySubscription?.cancel();
 
     super.dispose();
   }
@@ -217,16 +244,30 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
         uri.scheme == 'myapp' && uri.host == 'reset-password';
 
     if (isResetPassword) {
-      debugPrint('Deep link reset password ricevuto.');
+      debugPrint(
+        'Deep link reset password ricevuto. '
+        'Attendo la conferma passwordRecovery di Supabase.',
+      );
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
+      return;
+    }
 
-        navigatorKey.currentState?.pushNamedAndRemoveUntil(
-          '/reset-password',
-          (route) => false,
-        );
-      });
+    // =========================================================
+    // INVITO MATCH DA WHATSAPP / APP LINK
+    // =========================================================
+
+    final isMatchInvite =
+        uri.scheme == 'https' &&
+        uri.host == 'matchinzona-landing.vercel.app' &&
+        uri.pathSegments.length >= 2 &&
+        uri.pathSegments.first == 'match';
+
+    if (isMatchInvite) {
+      final idPartita = uri.pathSegments[1];
+
+      debugPrint('Invito match ricevuto: $idPartita');
+
+      await _gestisciInvitoMatch(idPartita);
 
       return;
     }
@@ -266,6 +307,48 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
     }
 
     await _verificaCheckoutENaviga(sessionId: sessionId);
+  }
+
+  Future<void> _gestisciInvitoMatch(String idPartita) async {
+    final navigator = navigatorKey.currentState;
+
+    if (navigator == null || idPartita.isEmpty) {
+      return;
+    }
+
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user == null) {
+      navigator.pushNamed('/login');
+      return;
+    }
+
+    try {
+      final iscrizione = await Supabase.instance.client
+          .from('giocatori_partita')
+          .select('id_partita')
+          .eq('id_partita', idPartita)
+          .eq('id_utente', user.id)
+          .maybeSingle();
+
+      final giaIscritto = iscrizione != null;
+
+      if (giaIscritto) {
+        navigator.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomePage(initialIndex: 2)),
+          (route) => false,
+        );
+
+        return;
+      }
+
+      navigator.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomePage(initialIndex: 1)),
+        (route) => false,
+      );
+    } catch (e) {
+      debugPrint('Errore gestione invito match: $e');
+    }
   }
 
   bool _stoNavigandoDopoCheckout = false;
@@ -346,7 +429,6 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
         '/onboarding': (context) => const OnboardingScreen(),
         '/login': (context) => const LoginUtente(),
         '/registrazione': (context) => const RegistrazioneUtente(),
-        '/reset-password': (context) => const ResetPasswordPage(),
       },
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

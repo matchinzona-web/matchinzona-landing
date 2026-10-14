@@ -4,7 +4,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app_campi/core/theme/app_theme.dart';
 
 class ResetPasswordPage extends StatefulWidget {
-  const ResetPasswordPage({super.key});
+  final bool isRecoverySession;
+
+  const ResetPasswordPage({super.key, this.isRecoverySession = false});
 
   @override
   State<ResetPasswordPage> createState() => _ResetPasswordPageState();
@@ -28,6 +30,16 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   }
 
   Future<void> _salvaPassword() async {
+    if (!widget.isRecoverySession) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Link di recupero non valido o scaduto.'),
+          backgroundColor: AppTheme.statoErrore,
+        ),
+      );
+
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
@@ -36,6 +48,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       await Supabase.instance.client.auth.updateUser(
         UserAttributes(password: _passwordController.text),
       );
+      await Supabase.instance.client.auth.signOut();
 
       if (!mounted) return;
 

@@ -333,8 +333,8 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Ti abbiamo inviato un link per reimpostare la password.\n'
-            'Se non lo trovi, controlla anche la cartella Spam.',
+            'Se esiste un account associato a questa email, riceverai un link per reimpostare la password.\n'
+            'Controlla anche la cartella Spam.',
             style: TextStyle(
               color: AppTheme.darkBg,
               fontWeight: FontWeight.bold,
@@ -529,6 +529,47 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
                                 ),
                                 const SizedBox(height: 32),
 
+                                // GOOGLE - visibile sia su Android che su iOS
+                                SizedBox(
+                                  height: 56,
+                                  width: double.infinity,
+                                  child: OutlinedButton(
+                                    onPressed: _accediConGoogle,
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppTheme.textPrimary,
+                                      backgroundColor: AppTheme.cardBg,
+                                      side: const BorderSide(
+                                        color: AppTheme.cardBorder,
+                                        width: 1.2,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.g_mobiledata_rounded,
+                                          color: Colors.white,
+                                          size: 30,
+                                        ),
+                                        SizedBox(width: 12),
+                                        Text(
+                                          'CONTINUA CON GOOGLE',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 0.6,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
+                                // APPLE - visibile solo su iPhone/iPad
                                 if (Platform.isIOS) ...[
                                   const SizedBox(height: 12),
 
@@ -574,44 +615,7 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
                                   ),
                                 ],
 
-                                SizedBox(
-                                  height: 56,
-                                  width: double.infinity,
-                                  child: OutlinedButton(
-                                    onPressed: _accediConApple,
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: AppTheme.textPrimary,
-                                      backgroundColor: AppTheme.cardBg,
-                                      side: const BorderSide(
-                                        color: AppTheme.cardBorder,
-                                        width: 1.2,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
-                                    child: const Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.apple,
-                                          color: Colors.white,
-                                          size: 24,
-                                        ),
-                                        SizedBox(width: 12),
-                                        Text(
-                                          'CONTINUA CON APPLE',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w900,
-                                            letterSpacing: 0.6,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
+                                const SizedBox(height: 24),
 
                                 const SizedBox(height: 24),
 
