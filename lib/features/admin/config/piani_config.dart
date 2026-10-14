@@ -3,7 +3,7 @@ class PianiConfig {
     {
       'titolo': 'BASE',
       'sottotitolo': 'Perfetto per iniziare',
-      'prezzo': '19,99',
+      'prezzo': '24,90',
       'nome': 'BASE',
       'limiti': 'Fino a 2 campi',
       'descrizione':
@@ -13,7 +13,7 @@ class PianiConfig {
     {
       'titolo': 'PRO',
       'sottotitolo': 'Per strutture con più campi',
-      'prezzo': '29,99',
+      'prezzo': '44,90',
       'nome': 'PRO',
       'limiti': 'Fino a 5 campi',
       'descrizione':
@@ -23,7 +23,7 @@ class PianiConfig {
     {
       'titolo': 'BUSINESS',
       'sottotitolo': 'Per centri più strutturati',
-      'prezzo': '44,99',
+      'prezzo': '69,90',
       'nome': 'BUSINESS',
       'limiti': 'Da 6 campi in su',
       'descrizione':

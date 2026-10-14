@@ -28,7 +28,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 context,
                 title: "SEI UN GIOCATORE?",
                 description:
-                    "Trova match in zona, prenota campi in un tap e scala le classifiche.",
+                    "Trova match in zona, prenota campi in un tap e gioca quando vuoi.",
                 buttonText: "ESPLORA L'ARENA",
                 color: AppTheme.accent,
                 imagePath: 'assets/images/giocatore.png',
@@ -53,19 +53,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   );
                 },
-                secondaryAction: TextButton(
-                  onPressed: () => _controller.previousPage(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.ease,
-                  ),
-                  child: const Text(
-                    "Non sei un gestore? Torna indietro",
-                    style: TextStyle(
-                      color: AppTheme.textSecondary,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                ),
               ),
             ],
           ),

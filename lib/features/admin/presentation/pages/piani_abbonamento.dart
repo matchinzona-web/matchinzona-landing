@@ -51,7 +51,7 @@ class _PianiAbbonamentoScreenState extends State<PianiAbbonamentoScreen> {
             border: Border.all(color: AppTheme.neonOrange.withOpacity(0.5)),
           ),
           child: const Text(
-            'ABBONAMENTI MatchInZona',
+            'Abbonamenti MatchInZona',
             style: TextStyle(
               color: AppTheme.neonOrange,
               fontWeight: FontWeight.w800,
@@ -62,7 +62,7 @@ class _PianiAbbonamentoScreenState extends State<PianiAbbonamentoScreen> {
         ),
         const SizedBox(height: 20),
         const Text(
-          'Scegli il piano giusto\nper il tuo centro sportivo',
+          'Approfitta del PERIODO GRATUITO.',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: Colors.white,
@@ -73,7 +73,7 @@ class _PianiAbbonamentoScreenState extends State<PianiAbbonamentoScreen> {
         ),
         const SizedBox(height: 16),
         Text(
-          'Gestisci prenotazioni, partite aperte e clienti in modo semplice.\nNessun costo di attivazione, solo il piano più adatto alla tua struttura.',
+          'Gestisci prenotazioni, partite e clienti in modo semplice. Trova il piano giusto per il tuo centro sportivo e porta subito la tua struttura su MatchInZona.',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: Colors.grey.shade400,
@@ -422,7 +422,6 @@ class _PianiAbbonamentoScreenState extends State<PianiAbbonamentoScreen> {
           _policyItem(
             'Se in futuro aumentano i tuoi campi, potrai passare al piano superiore.',
           ),
-          _policyItem('I prezzi indicati sono mensili e IVA esclusa.'),
         ],
       ),
     );

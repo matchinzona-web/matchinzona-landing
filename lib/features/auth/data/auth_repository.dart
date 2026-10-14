@@ -220,12 +220,7 @@ class AuthService {
         .eq('id', user.id)
         .maybeSingle();
 
-    if (esistente != null) {
-      return;
-    }
-
-    await _supabase.from('utenti').insert({
-      'id': user.id,
+    final datiProfilo = {
       'nome': nome.trim(),
       'cognome': cognome.trim(),
       'email': user.email ?? '',
@@ -235,7 +230,13 @@ class AuthService {
           '${dataNascita.day.toString().padLeft(2, '0')}',
       'telefono': telefonoPulito,
       'tipo': 0,
-    });
+    };
+
+    if (esistente != null) {
+      await _supabase.from('utenti').update(datiProfilo).eq('id', user.id);
+    } else {
+      await _supabase.from('utenti').insert({'id': user.id, ...datiProfilo});
+    }
   }
 
   Future<void> accediConGoogle() async {
@@ -335,11 +336,27 @@ class AuthService {
         throw Exception('Apple non ha restituito un token valido.');
       }
 
-      await _supabase.auth.signInWithIdToken(
+      final response = await _supabase.auth.signInWithIdToken(
         provider: OAuthProvider.apple,
         idToken: idToken,
         nonce: rawNonce,
       );
+
+      final nome = credential.givenName?.trim() ?? '';
+      final cognome = credential.familyName?.trim() ?? '';
+
+      if (response.user != null && (nome.isNotEmpty || cognome.isNotEmpty)) {
+        await _supabase.auth.updateUser(
+          UserAttributes(
+            data: {
+              if (nome.isNotEmpty) 'given_name': nome,
+              if (cognome.isNotEmpty) 'family_name': cognome,
+              if (nome.isNotEmpty || cognome.isNotEmpty)
+                'full_name': '$nome $cognome'.trim(),
+            },
+          ),
+        );
+      }
     } on SignInWithAppleAuthorizationException catch (e) {
       if (e.code == AuthorizationErrorCode.canceled) {
         return;

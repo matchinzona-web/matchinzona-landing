@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app_campi/core/theme/app_theme.dart';
 import 'package:app_campi/core/theme/app_styles.dart';
 import 'package:app_campi/features/auth/data/auth_repository.dart';
@@ -34,6 +34,8 @@ class _CompletaProfiloSocialPageState
   bool _caricamentoIniziale = true;
   bool _terminiAccettati = false;
   bool _mostraErroreTermini = false;
+  bool _nomeDaSocial = false;
+  bool _cognomeDaSocial = false;
 
   String? _erroreDataNascita;
 
@@ -55,9 +57,14 @@ class _CompletaProfiloSocialPageState
     try {
       final dati = _authService.datiSocialUtenteCorrente();
 
-      _nomeController.text = (dati['nome'] ?? '').toString();
+      final nome = (dati['nome'] ?? '').toString().trim();
+      final cognome = (dati['cognome'] ?? '').toString().trim();
 
-      _cognomeController.text = (dati['cognome'] ?? '').toString();
+      _nomeController.text = nome;
+      _cognomeController.text = cognome;
+
+      _nomeDaSocial = nome.isNotEmpty;
+      _cognomeDaSocial = cognome.isNotEmpty;
     } catch (e) {
       debugPrint('Errore caricamento dati social: $e');
     }
@@ -278,6 +285,25 @@ class _CompletaProfiloSocialPageState
 
     return Scaffold(
       backgroundColor: AppTheme.darkBg,
+      appBar: AppBar(
+        backgroundColor: AppTheme.darkBg,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: AppTheme.textPrimary,
+          ),
+          onPressed: () async {
+            await Supabase.instance.client.auth.signOut();
+
+            if (!mounted) return;
+
+            Navigator.of(
+              context,
+            ).pushNamedAndRemoveUntil('/login', (route) => false);
+          },
+        ),
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -332,6 +358,7 @@ class _CompletaProfiloSocialPageState
 
                   TextFormField(
                     controller: _nomeController,
+                    readOnly: _nomeDaSocial,
                     textCapitalization: TextCapitalization.words,
                     style: const TextStyle(
                       color: AppTheme.textPrimary,
@@ -342,13 +369,16 @@ class _CompletaProfiloSocialPageState
                       Icons.person_outline_rounded,
                       coloreTema: AppTheme.accent,
                     ),
-                    validator: (value) => _validaNome(value, 'Nome'),
+                    validator: _nomeDaSocial
+                        ? null
+                        : (value) => _validaNome(value, 'Nome'),
                   ),
 
                   const SizedBox(height: 18),
 
                   TextFormField(
                     controller: _cognomeController,
+                    readOnly: _cognomeDaSocial,
                     textCapitalization: TextCapitalization.words,
                     style: const TextStyle(
                       color: AppTheme.textPrimary,
@@ -359,7 +389,9 @@ class _CompletaProfiloSocialPageState
                       Icons.badge_outlined,
                       coloreTema: AppTheme.accent,
                     ),
-                    validator: (value) => _validaNome(value, 'Cognome'),
+                    validator: _cognomeDaSocial
+                        ? null
+                        : (value) => _validaNome(value, 'Cognome'),
                   ),
 
                   const SizedBox(height: 18),
