@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
+import 'package:url_launcher/url_launcher.dart';
 import 'package:app_campi/core/theme/app_theme.dart';
 
 class RichiediAccessoGestorePage extends StatefulWidget {
@@ -146,6 +146,17 @@ class _RichiediAccessoGestorePageState
           'Richiedi accesso gestore',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Assistenza',
+            onPressed: _mostraAssistenza,
+            icon: const Icon(
+              Icons.help_outline_rounded,
+              color: AppTheme.neonOrange,
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -355,6 +366,127 @@ class _RichiediAccessoGestorePageState
         }
 
         return null;
+      },
+    );
+  }
+
+  Future<void> _apriWhatsApp() async {
+    const numero = '393758620817';
+
+    const messaggio = 'Ciao, ti scrivo per avere informazioni su MatchInZona.';
+
+    final uri = Uri.parse(
+      'https://wa.me/$numero?text=${Uri.encodeComponent(messaggio)}',
+    );
+
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _apriEmail() async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: 'matchinzona@gmail.com',
+      queryParameters: {'subject': 'Informazioni su MatchInZona'},
+    );
+
+    try {
+      final aperto = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+      if (!aperto && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Nessuna app email disponibile su questo dispositivo.',
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossibile aprire l’app email.')),
+        );
+      }
+    }
+  }
+
+  void _mostraAssistenza() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AppTheme.cardBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.support_agent_rounded, color: AppTheme.neonOrange),
+              SizedBox(width: 10),
+              Text(
+                'Hai bisogno di aiuto?',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Per assistenza o informazioni sull’attivazione del tuo centro puoi contattarci:',
+                style: TextStyle(color: Colors.white70, height: 1.4),
+              ),
+              SizedBox(height: 20),
+
+              TextButton.icon(
+                onPressed: _apriEmail,
+                icon: const Icon(
+                  Icons.email_rounded,
+                  color: AppTheme.neonOrange,
+                ),
+                label: const Text(
+                  'Scrivici per email',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+
+              SizedBox(height: 14),
+              TextButton.icon(
+                onPressed: _apriWhatsApp,
+                icon: const Icon(
+                  Icons.chat_rounded,
+                  color: AppTheme.neonOrange,
+                ),
+                label: const Text(
+                  'Scrivici su WhatsApp',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'CHIUDI',
+                style: TextStyle(
+                  color: AppTheme.neonOrange,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
       },
     );
   }
