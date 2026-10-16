@@ -12,7 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_localizations/syncfusion_localizations.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:firebase_core/firebase_core.dart';
-
+import 'features/home/presentation/landing_gestore_web_page.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/app_update_service.dart';
@@ -436,7 +436,7 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
         );
       },
 
-      home: const AuthGate(),
+      home: const LandingGestoreWebPage(),
       routes: {
         '/home': (context) => const HomePage(),
         '/onboarding': (context) => const OnboardingScreen(),
