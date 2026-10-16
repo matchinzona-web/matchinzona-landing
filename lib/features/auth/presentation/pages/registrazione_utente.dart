@@ -4,10 +4,11 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:io';
 import 'package:app_campi/core/theme/app_theme.dart';
 import 'package:app_campi/features/auth/application/auth_provider.dart';
 import 'package:app_campi/features/auth/data/auth_repository.dart';
+
+import 'package:app_campi/features/admin/presentation/pages/piani_abbonamento.dart';
 
 import 'registrazione_email_page.dart';
 
@@ -267,48 +268,6 @@ class _RegistrazioneUtenteState extends ConsumerState<RegistrazioneUtente> {
                               ),
                             ),
 
-                            if (Platform.isIOS) ...[
-                              const SizedBox(height: 12),
-
-                              SizedBox(
-                                height: 56,
-                                width: double.infinity,
-                                child: OutlinedButton(
-                                  onPressed: _accediConApple,
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: AppTheme.textPrimary,
-                                    backgroundColor: AppTheme.cardBg,
-                                    side: const BorderSide(
-                                      color: AppTheme.cardBorder,
-                                      width: 1.2,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                  ),
-                                  child: const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.apple,
-                                        color: Colors.white,
-                                        size: 24,
-                                      ),
-                                      SizedBox(width: 12),
-                                      Text(
-                                        'CONTINUA CON APPLE',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w900,
-                                          letterSpacing: 0.6,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-
                             const SizedBox(height: 28),
 
                             Row(
@@ -358,6 +317,85 @@ class _RegistrazioneUtenteState extends ConsumerState<RegistrazioneUtente> {
                                     fontSize: 14,
                                     fontWeight: FontWeight.w900,
                                     letterSpacing: 0.6,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(24),
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const PianiAbbonamentoScreen(),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF16161E),
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: AppTheme.neonPurple.withOpacity(
+                                        0.45,
+                                      ),
+                                      width: 1.2,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(14),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.neonPurple
+                                              .withOpacity(0.12),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.stadium_rounded,
+                                          color: AppTheme.neonPurple,
+                                          size: 28,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      const Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Gestisco un Centro',
+                                              style: TextStyle(
+                                                fontSize: 17,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.textPrimary,
+                                              ),
+                                            ),
+                                            SizedBox(height: 6),
+                                            Text(
+                                              'Digitalizza il tuo impianto e ricevi prenotazioni.',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                color: AppTheme.textSecondary,
+                                                height: 1.4,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      const Icon(
+                                        Icons.arrow_forward_ios_rounded,
+                                        color: Colors.white38,
+                                        size: 16,
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),

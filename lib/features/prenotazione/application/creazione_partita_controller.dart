@@ -35,6 +35,9 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
   static const _chiaveUltimoSport = 'ultimo_sport_prenotazione';
   static const _chiaveUltimaProvincia = 'ultima_provincia_prenotazione';
 
+  String _testoRicerca = '';
+  int _idRichiestaFiltri = 0;
+
   @override
   CreazionePartitaState build() {
     _caricaUltimoSport();
@@ -68,31 +71,24 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
   }
 
   Future<void> cercaSocieta(String queryText) async {
-    if (queryText.isEmpty) return;
-    state = state.copyWith(isLoading: true, societaTrovate: []);
+    final nuovoTesto = queryText.trim();
+    final vecchioTesto = _testoRicerca;
 
-    try {
-      List<Societa> risultati = [];
-      if (filtroCorrente == TipoRicerca.societa) {
-        risultati = await _societaRepo.cercaSocietaPerNome(queryText);
-      } else if (filtroCorrente == TipoRicerca.citta) {
-        risultati = await _societaRepo.cercaSocietaPerCitta(queryText);
-      } else {
-        risultati = await _societaRepo.cercaSocietaGlobale(queryText);
-      }
+    _testoRicerca = nuovoTesto;
 
-      final Map<String, Societa> mappaUnivoca = {
-        for (var s in risultati) s.id: s,
-      };
+    // Se il testo passa da meno di 3 lettere ad almeno 3,
+    // oppure viceversa, aggiorna i risultati.
+    final primaValida = vecchioTesto.length >= 3;
+    final nuovaValida = nuovoTesto.length >= 3;
 
-      state = state.copyWith(
-        isLoading: false,
-        societaTrovate: mappaUnivoca.values.toList(),
-      );
-    } catch (e) {
-      state = state.copyWith(isLoading: false);
-      debugPrint("Errore ricerca società: $e");
+    if (primaValida != nuovaValida ||
+        (nuovaValida && vecchioTesto != nuovoTesto)) {
+      await applicaFiltri();
     }
+  }
+
+  void azzeraTestoRicerca() {
+    _testoRicerca = '';
   }
 
   Future<void> caricaCampiSocieta(String idSocieta) async {
@@ -627,26 +623,37 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
   }
 
   Future<void> applicaFiltri() async {
+    final int idRichiesta = ++_idRichiestaFiltri;
+
+    // Una ricerca troppo corta non restringe ancora i risultati.
+    final testo = _testoRicerca.trim();
+    final String? query = testo.length >= 3 ? testo : null;
+
     state = state.copyWith(isLoading: true);
 
     try {
-      // dataSelezionata.weekday restituisce 1 per Lunedì, 2 per Martedì... 7 per Domenica
       final int giornoSettimana = state.dataSelezionata.weekday;
 
       final risultati = await _societaRepo.cercaSocietaEPrezziPerSport(
         sport: state.sportSelezionato,
         giornoSettimana: giornoSettimana,
         provincia: provinciaSelezionata,
+        testoRicerca: query,
       );
+
+      // Ignora le risposte vecchie se nel frattempo è cambiato un filtro
+      // o l'utente ha continuato a scrivere.
+      if (idRichiesta != _idRichiestaFiltri) return;
 
       final List<Societa> listaSocieta = [];
       final Map<String, double> mappaPrezzi = {};
 
-      for (var item in risultati) {
-        final Societa s = item['societa'];
-        final double p = item['prezzo'];
-        listaSocieta.add(s);
-        mappaPrezzi[s.id] = p;
+      for (final item in risultati) {
+        final Societa societa = item['societa'] as Societa;
+        final double prezzo = item['prezzo'] as double;
+
+        listaSocieta.add(societa);
+        mappaPrezzi[societa.id] = prezzo;
       }
 
       state = state.copyWith(
@@ -655,8 +662,10 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
         prezziPerSocieta: mappaPrezzi,
       );
     } catch (e) {
+      if (idRichiesta != _idRichiestaFiltri) return;
+
       state = state.copyWith(isLoading: false);
-      debugPrint("Errore applicazione filtri: $e");
+      debugPrint('Errore applicazione filtri: $e');
     }
   }
 

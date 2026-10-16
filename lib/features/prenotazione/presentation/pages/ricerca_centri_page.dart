@@ -25,6 +25,10 @@ class _RicercaCentriPageState extends ConsumerState<RicercaCentriPage> {
         controller.provinciaSelezionata ?? 'Tutte le province';
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Azzera la ricerca testuale precedente.
+      controller.azzeraTestoRicerca();
+
+      // Applica i filtri mantenendo sport, provincia e giorno.
       controller.applicaFiltri();
 
       final province = await controller.caricaProvinceDisponibili();
@@ -43,7 +47,6 @@ class _RicercaCentriPageState extends ConsumerState<RicercaCentriPage> {
   List<String> _provinceDisponibili = [];
 
   Timer? _debounceTimer;
-  bool _ricercaAttiva = false;
 
   final List<Map<String, dynamic>> _sports = [
     {'id': 'calcio_5', 'label': 'Calcio 5', 'icon': Icons.sports_soccer},
@@ -402,19 +405,9 @@ class _RicercaCentriPageState extends ConsumerState<RicercaCentriPage> {
                     controller: searchCtrl,
                     style: const TextStyle(color: Colors.white),
                     onChanged: (val) {
-                      final testo = val.trim();
-
-                      setState(() => _ricercaAttiva = testo.length >= 3);
-
-                      if (testo.length >= 3) {
-                        ref
-                            .read(creazionePartitaProvider.notifier)
-                            .cercaSocieta(testo);
-                      } else {
-                        ref
-                            .read(creazionePartitaProvider.notifier)
-                            .applicaFiltri();
-                      }
+                      ref
+                          .read(creazionePartitaProvider.notifier)
+                          .cercaSocieta(val);
                     },
                     decoration: InputDecoration(
                       hintText: 'Cerca per centro o città...',
@@ -440,80 +433,18 @@ class _RicercaCentriPageState extends ConsumerState<RicercaCentriPage> {
             ),
 
             // BARRA FILTRI POPUP (SOLO SPORT E GIORNO)
-            if (!_ricercaAttiva)
-              SizedBox(
-                height: 48,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    // 1. TENDINA SPORT
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8.0),
-                      child: FilterChip(
-                        avatar: const Icon(
-                          Icons.sports_soccer_rounded,
-                          size: 16,
-                          color: AppTheme.neonOrange,
-                        ),
-                        label: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _getEtichettaSport(state.sportSelezionato),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              color: Colors.white54,
-                              size: 18,
-                            ),
-                          ],
-                        ),
-                        selected: false,
-                        backgroundColor: const Color(0xFF1E2026),
-                        onSelected: (_) => _mostraSelezionaSport(context),
-                      ),
-                    ),
-
-                    // 2. TENDINA GIORNO
-                    FilterChip(
+            SizedBox(
+              height: 48,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  // 1. TENDINA SPORT
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: FilterChip(
                       avatar: const Icon(
-                        Icons.calendar_today_rounded,
-                        size: 15,
-                        color: AppTheme.neonOrange,
-                      ),
-                      label: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _formattaDataFiltro(state.dataSelezionata),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            color: Colors.white54,
-                            size: 18,
-                          ),
-                        ],
-                      ),
-                      selected: false,
-                      backgroundColor: const Color(0xFF1E2026),
-                      onSelected: (_) => _selezionaGiorno(context),
-                    ),
-                    const SizedBox(width: 8),
-
-                    FilterChip(
-                      avatar: const Icon(
-                        Icons.location_on_outlined,
+                        Icons.sports_soccer_rounded,
                         size: 16,
                         color: AppTheme.neonOrange,
                       ),
@@ -521,7 +452,7 @@ class _RicercaCentriPageState extends ConsumerState<RicercaCentriPage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            _provinciaSelezionata,
+                            _getEtichettaSport(state.sportSelezionato),
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -537,11 +468,72 @@ class _RicercaCentriPageState extends ConsumerState<RicercaCentriPage> {
                       ),
                       selected: false,
                       backgroundColor: const Color(0xFF1E2026),
-                      onSelected: (_) => _mostraSelezionaProvincia(context),
+                      onSelected: (_) => _mostraSelezionaSport(context),
                     ),
-                  ],
-                ),
+                  ),
+
+                  // 2. TENDINA GIORNO
+                  FilterChip(
+                    avatar: const Icon(
+                      Icons.calendar_today_rounded,
+                      size: 15,
+                      color: AppTheme.neonOrange,
+                    ),
+                    label: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _formattaDataFiltro(state.dataSelezionata),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: Colors.white54,
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                    selected: false,
+                    backgroundColor: const Color(0xFF1E2026),
+                    onSelected: (_) => _selezionaGiorno(context),
+                  ),
+                  const SizedBox(width: 8),
+
+                  FilterChip(
+                    avatar: const Icon(
+                      Icons.location_on_outlined,
+                      size: 16,
+                      color: AppTheme.neonOrange,
+                    ),
+                    label: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _provinciaSelezionata,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: Colors.white54,
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                    selected: false,
+                    backgroundColor: const Color(0xFF1E2026),
+                    onSelected: (_) => _mostraSelezionaProvincia(context),
+                  ),
+                ],
               ),
+            ),
 
             const SizedBox(height: 16),
 

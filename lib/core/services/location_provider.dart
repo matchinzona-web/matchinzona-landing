@@ -141,8 +141,8 @@ final matchInZonaProvider = FutureProvider<List<Map<String, dynamic>>>((
     );
 
     return datiGrezzi;
-  } catch (e) {
+  } catch (e, stackTrace) {
     debugPrint('Errore caricamento Match in Zona: $e');
-    return [];
+    Error.throwWithStackTrace(e, stackTrace);
   }
 });

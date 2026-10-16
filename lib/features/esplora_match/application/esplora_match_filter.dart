@@ -37,7 +37,15 @@ List<PartitaConDati> filtraEOrdina(
 
   final filtrate = normalizzate.where((item) {
     if (isGiaIscritto(item.partita, utenteLoggato)) return false;
-    final distanza = (item.raw['distanza_km'] as num?)?.toDouble() ?? 0.0;
+
+    final distanzaRaw = item.raw['distanza_km'];
+
+    if (distanzaRaw is! num) {
+      return false;
+    }
+
+    final distanza = distanzaRaw.toDouble();
+
     return switch (filtro) {
       FiltroDistanza.vicini => distanza <= MatchThresholds.distanzaVicino,
       FiltroDistanza.estesa => distanza <= MatchThresholds.distanzaEstesa,

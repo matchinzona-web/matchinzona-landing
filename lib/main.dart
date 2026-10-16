@@ -1,5 +1,5 @@
 import 'dart:async';
-
+import 'package:flutter/foundation.dart'; // per kIsWeb
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -15,7 +15,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/services/push_notification_service.dart';
-
+import 'core/services/app_update_service.dart';
 import 'features/home/presentation/home_page.dart';
 import 'features/auth/presentation/widgets/auth_gate.dart';
 import 'features/auth/presentation/pages/login_utente.dart';
@@ -31,10 +31,11 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  Stripe.publishableKey =
-      "pk_test_51TgQ7WFxZCOuiQIAWEPNT2Kc7Lz9nfU8kTdNDoy36EfKi8zBcGt4r6GiNVbWI3mlYfTe2F1Y3dFCZ9k6hRdavFCH00Kbrz8a7q";
-  await Stripe.instance.applySettings();
-
+  if (!kIsWeb) {
+    Stripe.publishableKey =
+        "pk_test_51TgQ7WFxZCOuiQIAWEPNT2Kc7Lz9nfU8kTdNDoy36EfKi8zBcGt4r6GiNVbWI3mlYfTe2F1Y3dFCZ9k6hRdavFCH00Kbrz8a7q";
+    await Stripe.instance.applySettings();
+  }
   await initializeDateFormatting('it_IT', null);
 
   try {
@@ -47,7 +48,11 @@ Future<void> main() async {
     debugPrint("Errore fatale inizializzazione Supabase: $e");
   }
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  if (!kIsWeb) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
 
   runApp(const ProviderScope(child: PrenotaCampoApp()));
 }
@@ -98,31 +103,34 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
           });
         });
 
-    _pushTapSubscription = PushNotificationService.notificationTapStream.listen(
-      (data) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _gestisciTapPush(data);
-        });
-      },
-    );
+    if (!kIsWeb) {
+      _pushTapSubscription = PushNotificationService.notificationTapStream
+          .listen((data) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _gestisciTapPush(data);
+            });
+          });
 
-    Future.microtask(() async {
-      // Qui inizializziamo subito il listener del TAP.
-      // Se l'utente non è ancora disponibile, il token verrà
-      // inizializzato successivamente da AuthGate.
-      await PushNotificationService.inizializza();
+      Future.microtask(() async {
+        await PushNotificationService.inizializza();
 
-      final pending = PushNotificationService.prendiTapPendente();
+        final pending = PushNotificationService.prendiTapPendente();
+        if (pending != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _gestisciTapPush(pending);
+          });
+        }
+      });
+    }
 
-      if (pending != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _gestisciTapPush(pending);
-        });
-      }
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _controllaCheckoutPending();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _controllaCheckoutPending();
+      if (!mounted) return;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _controllaAggiornamentoApp();
+      });
     });
   }
 
@@ -148,10 +156,15 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
           _gestisciTapPush(pending);
         }
       });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _controllaAggiornamentoApp();
+      });
     }
   }
 
   Future<void> initDeepLinks() async {
+    if (kIsWeb) return;
     final uri = await _appLinks.getInitialLink();
     if (uri != null) _gestisciLink(uri);
 
@@ -439,6 +452,31 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
       supportedLocales: const [Locale('it', 'IT')],
       locale: const Locale('it', 'IT'),
     );
+  }
+
+  bool _controlloAggiornamentoInCorso = false;
+
+  Future<void> _controllaAggiornamentoApp() async {
+    if (kIsWeb) return;
+    if (_controlloAggiornamentoInCorso || !mounted) {
+      return;
+    }
+
+    final context = navigatorKey.currentContext;
+
+    if (context == null) {
+      return;
+    }
+
+    _controlloAggiornamentoInCorso = true;
+
+    try {
+      await checkForAppUpdate(context);
+    } catch (e) {
+      debugPrint('Errore controllo aggiornamento app: $e');
+    } finally {
+      _controlloAggiornamentoInCorso = false;
+    }
   }
 
   bool _stoControllandoCheckout = false;

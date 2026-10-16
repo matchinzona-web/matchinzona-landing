@@ -9,16 +9,40 @@ class SocietaRepository {
     : _supabase = supabaseClient ?? Supabase.instance.client;
 
   bool _iniziaUnaParola(String testo, String query) {
-    final queryPulita = query.trim().toLowerCase();
+    final queryParole = query
+        .trim()
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((parola) => parola.isNotEmpty)
+        .toList();
 
-    if (queryPulita.isEmpty) return true;
+    if (queryParole.isEmpty) return true;
 
-    final parole = testo
+    final paroleTesto = testo
         .toLowerCase()
         .split(RegExp(r'[^a-zA-ZÀ-ÿ0-9]+'))
-        .where((parola) => parola.isNotEmpty);
+        .where((parola) => parola.isNotEmpty)
+        .toList();
 
-    return parole.any((parola) => parola.startsWith(queryPulita));
+    // Ogni parola digitata deve corrispondere all'inizio
+    // di almeno una parola del testo.
+    return queryParole.every(
+      (queryParola) =>
+          paroleTesto.any((parola) => parola.startsWith(queryParola)),
+    );
+  }
+
+  bool _societaCorrispondeAllaRicerca(
+    Map<String, dynamic> societa,
+    String? query,
+  ) {
+    if (query == null || query.trim().isEmpty) return true;
+
+    return _iniziaUnaParola(societa['nome_societa']?.toString() ?? '', query) ||
+        _iniziaUnaParola(societa['via']?.toString() ?? '', query) ||
+        _iniziaUnaParola(societa['comune']?.toString() ?? '', query) ||
+        _iniziaUnaParola(societa['provincia']?.toString() ?? '', query) ||
+        _iniziaUnaParola(societa['indirizzo']?.toString() ?? '', query);
   }
 
   Future<List<Societa>> cercaSocietaPerNome(String query) async {
@@ -147,6 +171,7 @@ class SocietaRepository {
     required String sport,
     required int giornoSettimana,
     String? provincia,
+    String? testoRicerca,
   }) async {
     try {
       debugPrint("Cerco società per sport: $sport e giorno: $giornoSettimana");
@@ -260,11 +285,15 @@ class SocietaRepository {
           continue;
         }
 
-        if (row['societa'] == null) continue;
+        final datiSocieta = row['societa'] as Map<String, dynamic>?;
 
-        final societa = Societa.fromJson(
-          row['societa'] as Map<String, dynamic>,
-        );
+        if (datiSocieta == null) continue;
+
+        if (!_societaCorrispondeAllaRicerca(datiSocieta, testoRicerca)) {
+          continue;
+        }
+
+        final societa = Societa.fromJson(datiSocieta);
 
         double prezzoMinimo = 0.0;
 

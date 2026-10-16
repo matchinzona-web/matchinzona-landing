@@ -118,17 +118,6 @@ class EsploraMatchPage extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
-                      _SportChip(
-                        label: 'Tutti',
-                        selected: sportSelezionato == 'tutti',
-                        onTap: () {
-                          ref.read(filtroSportProvider.notifier).state =
-                              'tutti';
-                        },
-                      ),
-
-                      const SizedBox(width: 8),
-
                       _SportDropdownChip(
                         label: _labelCalcio(sportSelezionato),
                         selected:

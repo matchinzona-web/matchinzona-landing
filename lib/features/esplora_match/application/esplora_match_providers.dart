@@ -19,7 +19,7 @@ final filtroDistanzaProvider =
 
 class FiltroSportNotifier extends Notifier<String> {
   @override
-  String build() => 'tutti';
+  String build() => 'calcio';
 
   void impostaSport(String nuovoSport) {
     state = nuovoSport;

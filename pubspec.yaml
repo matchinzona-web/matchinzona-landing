@@ -2,7 +2,7 @@ name: app_campi
 description: "App per Prenotazione e gestione dei Campi Sportivi"
 publish_to: "none"
 
-version: 1.0.0+4
+version: 1.0.1+5
 
 environment:
   sdk: ^3.11.4
@@ -11,6 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   supabase_flutter: ^2.12.4
+  package_info_plus: ^10.2.2
   intl_phone_field: ^3.2.0
   cupertino_icons: ^1.0.8
   image_picker: ^1.2.2
@@ -23,7 +24,7 @@ dependencies:
   geolocator: ^14.0.2
   cached_network_image: ^3.4.1
   smooth_page_indicator: ^2.0.1
-  shared_preferences: ^2.5.5
+  shared_preferences: ^2.5.6
   geocoding: ^4.0.0
   syncfusion_localizations: ^33.2.7
   flutter_map: ^8.2.2

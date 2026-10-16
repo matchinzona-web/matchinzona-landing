@@ -63,7 +63,7 @@ class _PianiAbbonamentoScreenState extends State<PianiAbbonamentoScreen> {
         ),
         const SizedBox(height: 20),
         const Text(
-          'Approfitta del PERIODO GRATUITO.',
+          'Gratis per tutto il 2026.',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: Colors.white,
