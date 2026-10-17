@@ -436,7 +436,24 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
         );
       },
 
-      home: const LandingGestoreWebPage(),
+      home: kIsWeb
+          ? StreamBuilder<AuthState>(
+              stream: Supabase.instance.client.auth.onAuthStateChange,
+              builder: (context, snapshot) {
+                final session = Supabase.instance.client.auth.currentSession;
+
+                // Nessun utente autenticato:
+                // mostra la vetrina pubblica dei gestori.
+                if (session == null) {
+                  return const LandingGestoreWebPage();
+                }
+
+                // Utente autenticato:
+                // passa al sistema che riconosce il suo ruolo.
+                return const AuthGate();
+              },
+            )
+          : const LandingGestoreWebPage(),
       routes: {
         '/home': (context) => const HomePage(),
         '/onboarding': (context) => const OnboardingScreen(),

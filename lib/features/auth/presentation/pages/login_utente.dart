@@ -703,38 +703,6 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
                                 ),
 
                                 const SizedBox(height: 40),
-
-                                // LINK ALLA REGISTRAZIONE
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Text(
-                                      "Non hai un account?",
-                                      style: TextStyle(
-                                        color: AppTheme.textSecondary,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    TextButton(
-                                      onPressed: () {
-                                        Navigator.of(
-                                          context,
-                                        ).pushReplacementNamed(
-                                          '/registrazione',
-                                        );
-                                      },
-                                      child: const Text(
-                                        "Registrati",
-                                        style: TextStyle(
-                                          color: AppTheme.accent,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          decoration: TextDecoration.underline,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
                               ],
                             ),
                           ),

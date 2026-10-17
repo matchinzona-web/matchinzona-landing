@@ -9,6 +9,8 @@ import 'package:app_campi/features/home/presentation/home_page.dart';
 import 'package:app_campi/features/home/presentation/views/onboarding_screen.dart';
 import 'package:app_campi/features/auth/presentation/pages/completa_profilo_social_page.dart';
 import 'package:app_campi/core/services/push_notification_service.dart';
+import 'package:app_campi/features/home/presentation/views/onboarding_screen.dart';
+import 'package:flutter/foundation.dart';
 
 class AuthGate extends ConsumerWidget {
   const AuthGate({super.key});
@@ -20,7 +22,11 @@ class AuthGate extends ConsumerWidget {
     // Nessuna sessione Supabase:
     // utente non autenticato.
     if (authUser == null) {
-      return const LandingGestoreWebPage();
+      if (kIsWeb) {
+        return const LandingGestoreWebPage();
+      }
+
+      return const OnboardingScreen();
     }
 
     final utenteAsync = ref.watch(utenteCorrenteProvider);
@@ -79,7 +85,7 @@ class AuthGate extends ConsumerWidget {
             // Solo se il gestore non ha proprio una società collegata
             // torniamo all'onboarding.
             if (datiSocieta == null) {
-              return const LandingGestoreWebPage();
+              return const OnboardingScreen();
             }
 
             return _PushBootstrap(
@@ -186,11 +192,15 @@ class _PushBootstrapState extends State<_PushBootstrap> {
   void initState() {
     super.initState();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      debugPrint('Avvio PushNotificationService dal nuovo login...');
+    if (!kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
 
-      await PushNotificationService.inizializza();
-    });
+        debugPrint('Avvio PushNotificationService dal nuovo login...');
+
+        await PushNotificationService.inizializza();
+      });
+    }
   }
 
   @override
