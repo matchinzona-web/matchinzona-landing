@@ -79,7 +79,7 @@ class AuthGate extends ConsumerWidget {
             // Solo se il gestore non ha proprio una società collegata
             // torniamo all'onboarding.
             if (datiSocieta == null) {
-              return const OnboardingScreen();
+              return const LandingGestoreWebPage();
             }
 
             return _PushBootstrap(
