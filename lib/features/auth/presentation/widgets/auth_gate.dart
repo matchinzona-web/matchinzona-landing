@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
+import 'package:app_campi/features/home/presentation/landing_gestore_web_page.dart';
 import 'package:app_campi/core/theme/app_theme.dart';
 import 'package:app_campi/features/auth/application/auth_provider.dart';
 import 'package:app_campi/features/admin/presentation/pages/dashboard_gestore_page.dart';
@@ -20,7 +20,7 @@ class AuthGate extends ConsumerWidget {
     // Nessuna sessione Supabase:
     // utente non autenticato.
     if (authUser == null) {
-      return const OnboardingScreen();
+      return const LandingGestoreWebPage();
     }
 
     final utenteAsync = ref.watch(utenteCorrenteProvider);

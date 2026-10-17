@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../auth/presentation/pages/login_utente.dart';
-import '../../admin/presentation/pages/piani_abbonamento.dart';
+import 'package:app_campi/features/admin/presentation/pages/piani_abbonamento.dart';
 
 const String googlePlayUrl =
     "https://play.google.com/store/apps/details?id=com.matchly.app";
@@ -72,7 +72,7 @@ class LandingGestoreWebPage extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const PianiAbbonamentoPage(),
+                              builder: (_) => const PianiAbbonamentoScreen(),
                             ),
                           );
                         },
@@ -203,7 +203,7 @@ class LandingGestoreWebPage extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const PianiAbbonamentoPage(),
+                              builder: (_) => const PianiAbbonamentoScreen(),
                             ),
                           );
                         },
