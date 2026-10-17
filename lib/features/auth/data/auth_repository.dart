@@ -1,8 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app_campi/core/models/utente.dart';
-import 'dart:convert';
-import 'package:crypto/crypto.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:flutter/foundation.dart';
 
 class AuthService {
   final SupabaseClient _supabase;
@@ -241,10 +239,17 @@ class AuthService {
 
   Future<void> accediConGoogle() async {
     try {
+      final redirectUrl = kIsWeb
+          ? '${Uri.base.origin}/'
+          : 'myapp://login-callback';
+
       final avviato = await _supabase.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: 'myapp://login-callback',
-        authScreenLaunchMode: LaunchMode.externalApplication,
+        redirectTo: redirectUrl,
+        queryParams: {'prompt': 'select_account'},
+        authScreenLaunchMode: kIsWeb
+            ? LaunchMode.platformDefault
+            : LaunchMode.externalApplication,
       );
 
       if (!avviato) {
@@ -253,7 +258,7 @@ class AuthService {
     } on AuthException catch (e) {
       throw Exception('Errore accesso Google: ${e.message}');
     } catch (e) {
-      throw Exception('Impossibile accedere con Google');
+      throw Exception('Impossibile accedere con Google: $e');
     }
   }
 
@@ -314,59 +319,5 @@ class AuthService {
       'nome': nome,
       'cognome': cognome,
     };
-  }
-
-  Future<void> accediConApple() async {
-    try {
-      final rawNonce = _supabase.auth.generateRawNonce();
-
-      final hashedNonce = sha256.convert(utf8.encode(rawNonce)).toString();
-
-      final credential = await SignInWithApple.getAppleIDCredential(
-        scopes: [
-          AppleIDAuthorizationScopes.email,
-          AppleIDAuthorizationScopes.fullName,
-        ],
-        nonce: hashedNonce,
-      );
-
-      final idToken = credential.identityToken;
-
-      if (idToken == null) {
-        throw Exception('Apple non ha restituito un token valido.');
-      }
-
-      final response = await _supabase.auth.signInWithIdToken(
-        provider: OAuthProvider.apple,
-        idToken: idToken,
-        nonce: rawNonce,
-      );
-
-      final nome = credential.givenName?.trim() ?? '';
-      final cognome = credential.familyName?.trim() ?? '';
-
-      if (response.user != null && (nome.isNotEmpty || cognome.isNotEmpty)) {
-        await _supabase.auth.updateUser(
-          UserAttributes(
-            data: {
-              if (nome.isNotEmpty) 'given_name': nome,
-              if (cognome.isNotEmpty) 'family_name': cognome,
-              if (nome.isNotEmpty || cognome.isNotEmpty)
-                'full_name': '$nome $cognome'.trim(),
-            },
-          ),
-        );
-      }
-    } on SignInWithAppleAuthorizationException catch (e) {
-      if (e.code == AuthorizationErrorCode.canceled) {
-        return;
-      }
-
-      throw Exception('Impossibile accedere con Apple.');
-    } on AuthException catch (e) {
-      throw Exception('Errore accesso Apple: ${e.message}');
-    } catch (e) {
-      throw Exception('Impossibile accedere con Apple');
-    }
   }
 }

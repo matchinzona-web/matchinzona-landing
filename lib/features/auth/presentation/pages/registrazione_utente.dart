@@ -81,41 +81,6 @@ class _RegistrazioneUtenteState extends ConsumerState<RegistrazioneUtente> {
     }
   }
 
-  Future<void> _accediConApple() async {
-    if (_isLoading) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      _attesaLoginSocial = true;
-
-      final authService = AuthService();
-
-      await authService.accediConApple();
-    } catch (e) {
-      _attesaLoginSocial = false;
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Non è stato possibile continuare con Apple.'),
-          backgroundColor: AppTheme.statoErrore,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  void _apriRegistrazioneEmail() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const RegistrazioneEmailPage()));
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -194,7 +159,7 @@ class _RegistrazioneUtenteState extends ConsumerState<RegistrazioneUtente> {
                             const SizedBox(height: 24),
 
                             const Text(
-                              'Crea il tuo Account',
+                              'Portale gestori',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: AppTheme.textPrimary,
@@ -296,31 +261,6 @@ class _RegistrazioneUtenteState extends ConsumerState<RegistrazioneUtente> {
                             ),
 
                             const SizedBox(height: 28),
-
-                            SizedBox(
-                              width: double.infinity,
-                              height: 56,
-                              child: TextButton(
-                                onPressed: _apriRegistrazioneEmail,
-                                style: TextButton.styleFrom(
-                                  foregroundColor: AppTheme.accent,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    side: const BorderSide(
-                                      color: AppTheme.accent,
-                                    ),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'REGISTRATI CON EMAIL',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.6,
-                                  ),
-                                ),
-                              ),
-                            ),
 
                             const SizedBox(height: 20),
 

@@ -5,11 +5,9 @@ import 'package:app_campi/features/home/presentation/landing_gestore_web_page.da
 import 'package:app_campi/core/theme/app_theme.dart';
 import 'package:app_campi/features/auth/application/auth_provider.dart';
 import 'package:app_campi/features/admin/presentation/pages/dashboard_gestore_page.dart';
-import 'package:app_campi/features/home/presentation/home_page.dart';
 import 'package:app_campi/features/home/presentation/views/onboarding_screen.dart';
-import 'package:app_campi/features/auth/presentation/pages/completa_profilo_social_page.dart';
 import 'package:app_campi/core/services/push_notification_service.dart';
-import 'package:app_campi/features/home/presentation/views/onboarding_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart';
 
 class AuthGate extends ConsumerWidget {
@@ -49,15 +47,12 @@ class AuthGate extends ConsumerWidget {
         // Sessione Auth esistente, ma nessun profilo:
         // tipico primo accesso Google/Apple.
         if (utente == null) {
-          return const CompletaProfiloSocialPage();
+          return const _AccessoRiservatoGestori();
         }
 
         // Giocatore normale.
         if (!utente.isGestore) {
-          return _PushBootstrap(
-            key: ValueKey(utente.id),
-            child: const HomePage(),
-          );
+          return const _AccessoRiservatoGestori();
         }
 
         // Gestore: controlliamo soltanto che esista la società.
@@ -124,8 +119,20 @@ class _VerificaProfiloSocial extends StatelessWidget {
 
         // Auth Google/Apple esistente,
         // ma nessun profilo in public.utenti.
+        if (snapshot.hasError) {
+          return const Scaffold(
+            backgroundColor: AppTheme.darkBg,
+            body: Center(
+              child: Text(
+                'Impossibile verificare il profilo. Riprova più tardi.',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          );
+        }
+
         if (snapshot.data == null) {
-          return const CompletaProfiloSocialPage();
+          return const _AccessoRiservatoGestori();
         }
 
         // Il profilo esiste: se siamo qui significa
@@ -206,5 +213,188 @@ class _PushBootstrapState extends State<_PushBootstrap> {
   @override
   Widget build(BuildContext context) {
     return widget.child;
+  }
+}
+
+class _AccessoRiservatoGestori extends StatefulWidget {
+  const _AccessoRiservatoGestori();
+
+  @override
+  State<_AccessoRiservatoGestori> createState() =>
+      _AccessoRiservatoGestoriState();
+}
+
+class _AccessoRiservatoGestoriState extends State<_AccessoRiservatoGestori> {
+  static const String _playStoreUrl =
+      'https://play.google.com/store/apps/details?id=com.matchly.app';
+
+  // LINK PROVVISORIO: sostituire con quello ufficiale.
+  static const String _appStoreUrl = 'https://apps.apple.com/it/';
+
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _mostraPopup();
+      }
+    });
+  }
+
+  Future<void> _apriStore(String indirizzo) async {
+    try {
+      final aperto = await launchUrl(
+        Uri.parse(indirizzo),
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!aperto && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Impossibile aprire lo store.')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossibile aprire lo store.')),
+      );
+    }
+  }
+
+  Future<void> _tornaAllaLanding() async {
+    final navigator = Navigator.of(context, rootNavigator: true);
+
+    try {
+      await Supabase.instance.client.auth.signOut();
+
+      if (!navigator.mounted) return;
+
+      navigator.pushNamedAndRemoveUntil('/', (route) => false);
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossibile uscire. Riprova.')),
+      );
+    }
+  }
+
+  Future<void> _mostraPopup() async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return PopScope(
+          canPop: false,
+          child: AlertDialog(
+            backgroundColor: const Color(0xFF111D18),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
+              side: const BorderSide(color: Color(0xFF33463A)),
+            ),
+            scrollable: true,
+            title: const Column(
+              children: [
+                Icon(
+                  Icons.sports_soccer_rounded,
+                  color: Color(0xFF79FF61),
+                  size: 48,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Sei un giocatore?',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 23,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+            content: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 390),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Questo portale è riservato ai gestori '
+                    'dei centri sportivi.\n\n'
+                    'Se vuoi prenotare campi e organizzare '
+                    'partite, scarica l’app MatchInZona.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFFCFD8D0),
+                      fontSize: 15,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 26),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _apriStore(_playStoreUrl),
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: const Text('GOOGLE PLAY'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF79FF61),
+                        foregroundColor: const Color(0xFF07100D),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _apriStore(_appStoreUrl),
+                      icon: const Icon(Icons.apple),
+                      label: const Text('APP STORE'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: const BorderSide(color: Color(0xFF647568)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  TextButton(
+                    onPressed: _tornaAllaLanding,
+                    child: const Text(
+                      'TORNA ALLA LANDING',
+                      style: TextStyle(
+                        color: Color(0xFFCFD8D0),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Color(0xFF07100D),
+      body: Center(child: CircularProgressIndicator(color: Color(0xFF79FF61))),
+    );
   }
 }

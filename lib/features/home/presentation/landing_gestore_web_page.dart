@@ -125,26 +125,45 @@ class LandingGestoreWebPage extends StatelessWidget {
   }
 
   Widget _brand({double size = 27}) {
-    return RichText(
-      text: TextSpan(
-        style: TextStyle(
-          fontSize: size,
-          fontWeight: FontWeight.w900,
-          letterSpacing: -1.2,
-          color: Colors.white,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Image.asset(
+            'assets/icon/logo_app.png',
+            width: 42,
+            height: 42,
+            fit: BoxFit.contain,
+          ),
         ),
-        children: const [
-          TextSpan(text: 'Match'),
-          TextSpan(
-            text: 'In',
-            style: TextStyle(color: _orange),
+
+        const SizedBox(width: 12),
+
+        Flexible(
+          child: RichText(
+            text: TextSpan(
+              style: TextStyle(
+                fontSize: size,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -1.2,
+                color: Colors.white,
+              ),
+              children: const [
+                TextSpan(text: 'Match'),
+                TextSpan(
+                  text: 'In',
+                  style: TextStyle(color: _orange),
+                ),
+                TextSpan(
+                  text: 'Zona',
+                  style: TextStyle(color: _green),
+                ),
+              ],
+            ),
           ),
-          TextSpan(
-            text: 'Zona',
-            style: TextStyle(color: _green),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

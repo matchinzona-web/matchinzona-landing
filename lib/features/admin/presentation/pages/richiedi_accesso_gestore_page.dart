@@ -55,7 +55,9 @@ class _RichiediAccessoGestorePageState
       });
 
       try {
-        await Supabase.instance.client.functions.invoke(
+        debugPrint('EMAIL GESTORE: avvio Edge Function');
+
+        final risposta = await Supabase.instance.client.functions.invoke(
           'invia-richiesta-gestore',
           body: {
             'nome_cognome': _nomeController.text.trim(),
@@ -66,8 +68,26 @@ class _RichiediAccessoGestorePageState
             'piano_scelto': widget.pianoScelto,
           },
         );
-      } catch (e) {
-        debugPrint('Errore invio email richiesta gestore: $e');
+
+        debugPrint('EMAIL GESTORE: risposta ricevuta');
+        debugPrint('EMAIL GESTORE: status ${risposta.status}');
+        debugPrint('EMAIL GESTORE: dati ${risposta.data}');
+      } catch (e, stackTrace) {
+        debugPrint('EMAIL GESTORE: ERRORE $e');
+        debugPrintStack(stackTrace: stackTrace);
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Richiesta salvata, ma si è verificato un problema '
+              'con la notifica email.',
+            ),
+            backgroundColor: AppTheme.statoErrore,
+            duration: Duration(seconds: 6),
+          ),
+        );
       }
 
       if (!mounted) return;

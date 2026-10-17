@@ -61,34 +61,38 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
   }
 
   Future<void> _accediConGoogle() async {
+    debugPrint('GOOGLE TEST 1: pulsante premuto');
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Avvio accesso Google...'),
+        duration: Duration(seconds: 3),
+      ),
+    );
+
     try {
       _attesaLoginSocial = true;
 
+      debugPrint('GOOGLE TEST 2: creazione AuthService');
+
       final authService = AuthService();
+
+      debugPrint('GOOGLE TEST 3: chiamata a Supabase OAuth');
 
       await authService.accediConGoogle();
-    } catch (e) {
+
+      debugPrint('GOOGLE TEST 4: chiamata OAuth completata');
+    } catch (e, stackTrace) {
       _attesaLoginSocial = false;
+
+      debugPrint('GOOGLE ERRORE: $e');
+      debugPrintStack(stackTrace: stackTrace);
 
       if (!mounted) return;
 
-      _mostraErrore(e.toString().replaceFirst('Exception: ', ''));
-    }
-  }
-
-  Future<void> _accediConApple() async {
-    try {
-      _attesaLoginSocial = true;
-
-      final authService = AuthService();
-
-      await authService.accediConApple();
-    } catch (e) {
-      _attesaLoginSocial = false;
-
-      if (!mounted) return;
-
-      _mostraErrore(e.toString().replaceFirst('Exception: ', ''));
+      _mostraErrore(
+        'Errore Google: ${e.toString().replaceFirst('Exception: ', '')}',
+      );
     }
   }
 

@@ -3,8 +3,6 @@ import 'package:flutter/foundation.dart'; // per kIsWeb
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'core/utils/connessione_provider.dart';
-import 'core/shared_widget/connessione_assente_overlay.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app_links/app_links.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -15,7 +13,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'features/home/presentation/landing_gestore_web_page.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/push_notification_service.dart';
-import 'core/services/app_update_service.dart';
 import 'features/home/presentation/home_page.dart';
 import 'features/auth/presentation/widgets/auth_gate.dart';
 import 'features/auth/presentation/pages/login_utente.dart';
@@ -125,12 +122,6 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _controllaCheckoutPending();
-
-      if (!mounted) return;
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _controllaAggiornamentoApp();
-      });
     });
   }
 
@@ -155,10 +146,6 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
         if (pending != null) {
           _gestisciTapPush(pending);
         }
-      });
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _controllaAggiornamentoApp();
       });
     }
   }
@@ -424,32 +411,29 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkNeonTheme,
       builder: (context, child) {
-        return Stack(
-          children: [
-            ScrollConfiguration(
-              behavior: NoGlowScrollBehavior(),
-              child: child ?? const SizedBox.shrink(),
-            ),
-
-            const Positioned.fill(child: ConnessioneAssenteOverlay()),
-          ],
+        return ScrollConfiguration(
+          behavior: NoGlowScrollBehavior(),
+          child: child ?? const SizedBox.shrink(),
         );
       },
 
       home: kIsWeb
           ? StreamBuilder<AuthState>(
               stream: Supabase.instance.client.auth.onAuthStateChange,
+
               builder: (context, snapshot) {
                 final session = Supabase.instance.client.auth.currentSession;
 
-                // Nessun utente autenticato:
-                // mostra la vetrina pubblica dei gestori.
+                debugPrint('========== CONTROLLO LOGIN WEB ==========');
+                debugPrint('Evento Supabase: ${snapshot.data?.event}');
+                debugPrint('Sessione presente: ${session != null}');
+                debugPrint('Utente autenticato: ${session?.user.email}');
+                debugPrint('=========================================');
+
                 if (session == null) {
                   return const LandingGestoreWebPage();
                 }
 
-                // Utente autenticato:
-                // passa al sistema che riconosce il suo ruolo.
                 return const AuthGate();
               },
             )
@@ -469,31 +453,6 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
       supportedLocales: const [Locale('it', 'IT')],
       locale: const Locale('it', 'IT'),
     );
-  }
-
-  bool _controlloAggiornamentoInCorso = false;
-
-  Future<void> _controllaAggiornamentoApp() async {
-    if (kIsWeb) return;
-    if (_controlloAggiornamentoInCorso || !mounted) {
-      return;
-    }
-
-    final context = navigatorKey.currentContext;
-
-    if (context == null) {
-      return;
-    }
-
-    _controlloAggiornamentoInCorso = true;
-
-    try {
-      await checkForAppUpdate(context);
-    } catch (e) {
-      debugPrint('Errore controllo aggiornamento app: $e');
-    } finally {
-      _controlloAggiornamentoInCorso = false;
-    }
   }
 
   bool _stoControllandoCheckout = false;
