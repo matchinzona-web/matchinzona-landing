@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
   supabase_flutter: ^2.12.4
   package_info_plus: ^10.2.2
   intl_phone_field: ^3.2.0
