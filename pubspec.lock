@@ -265,6 +265,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.12"
+  dlibphonenumber:
+    dependency: transitive
+    description:
+      name: dlibphonenumber
+      sha256: "806d04448ce36516b3197b3502ba59bf9923990cec316465e53b361ea8102094"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.74"
+  equatable:
+    dependency: transitive
+    description:
+      name: equatable
+      sha256: "3bce007a596ff8b3119c45d68aaef631272537c03d30e5d4534dd24bf4c5eaa2"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.0"
   fake_async:
     dependency: transitive
     description:
@@ -797,6 +813,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.2.0"
+  intl_phone_number_input:
+    dependency: "direct main"
+    description:
+      name: intl_phone_number_input
+      sha256: "9d4d7f174cfc3a85b238e0b465ec0e7232fc0815a779e5a58fbf118dee26dfa0"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.7.5"
   io:
     dependency: transitive
     description:
@@ -1101,6 +1125,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.0"
+  protobuf:
+    dependency: transitive
+    description:
+      name: protobuf
+      sha256: "13b6717366aa7ec3792dd62c19c7d33a785708224365f2db23c5ca01f1c1a0f2"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.1.0"
   pub_semver:
     dependency: transitive
     description:

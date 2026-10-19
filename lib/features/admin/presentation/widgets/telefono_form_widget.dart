@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:app_campi/core/theme/app_theme.dart';
+import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 
 class TelefonoFormWidget extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode? focusNode;
   final String label;
   final bool mostraErrore;
+  final String numeroIniziale;
+  final ValueChanged<String> onNumeroCambiato;
+  final ValueChanged<bool> onValiditaCambiata;
 
   const TelefonoFormWidget({
     super.key,
@@ -13,21 +17,44 @@ class TelefonoFormWidget extends StatelessWidget {
     this.focusNode,
     this.label = 'Cellulare *',
     this.mostraErrore = false,
+    this.numeroIniziale = '',
+    required this.onNumeroCambiato,
+    required this.onValiditaCambiata,
   });
 
   @override
   Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller,
-      focusNode: focusNode,
+    return InternationalPhoneNumberInput(
+      onInputChanged: (PhoneNumber numero) {
+        final completo = (numero.phoneNumber ?? '').replaceAll(
+          RegExp(r'[^\d+]'),
+          '',
+        );
+
+        onNumeroCambiato(completo);
+      },
+      onInputValidated: (bool valido) {
+        onValiditaCambiata(valido);
+      },
+      selectorConfig: const SelectorConfig(
+        selectorType: PhoneInputSelectorType.BOTTOM_SHEET,
+        showFlags: true,
+        setSelectorButtonAsPrefixIcon: true,
+      ),
+      initialValue: PhoneNumber(
+        isoCode: 'IT',
+        phoneNumber: numeroIniziale.isEmpty ? null : numeroIniziale,
+      ),
+      textFieldController: controller,
+      autoValidateMode: AutovalidateMode.onUserInteraction,
+      ignoreBlank: false,
+      formatInput: true,
       keyboardType: TextInputType.phone,
-      maxLength: 10,
-      style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(
+      selectorTextStyle: const TextStyle(color: Colors.white),
+      textStyle: const TextStyle(color: Colors.white),
+      inputDecoration: InputDecoration(
         labelText: label,
-        counterText: '',
         labelStyle: TextStyle(color: Colors.grey.shade400),
-        prefixIcon: const Icon(Icons.phone_android, color: AppTheme.neonOrange),
         filled: true,
         fillColor: AppTheme.cardBg,
         errorStyle: const TextStyle(
@@ -51,21 +78,6 @@ class TelefonoFormWidget extends StatelessWidget {
           borderSide: const BorderSide(color: Colors.redAccent, width: 2.5),
         ),
       ),
-      validator: (val) {
-        if (!mostraErrore) {
-          return null;
-        }
-
-        if (val == null || val.trim().isEmpty) {
-          return 'Inserisci il numero';
-        }
-
-        if (!RegExp(r'^\d{10}$').hasMatch(val.trim())) {
-          return 'Inserisci esattamente 10 cifre';
-        }
-
-        return null;
-      },
     );
   }
 }

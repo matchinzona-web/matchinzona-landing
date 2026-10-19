@@ -31,6 +31,8 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
   late final TextEditingController _cognomeController;
   final TextEditingController _nomeSocietaController = TextEditingController();
   final TextEditingController _telefonoController = TextEditingController();
+  String _telefonoIniziale = '';
+  bool _telefonoValido = false;
   final TextEditingController _telefonoFissoController =
       TextEditingController();
   final TextEditingController _viaController = TextEditingController();
@@ -69,13 +71,28 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
           .caricaDatiSocieta(widget.utenteLoggato.id);
 
       final state = ref.read(profiloProvider);
-      _telefonoController.text = state.telefonoCompleto;
+
+      final numeroDb = state.telefonoCompleto.trim();
+
+      final numeroIniziale = numeroDb.isEmpty
+          ? ''
+          : numeroDb.startsWith('+')
+          ? numeroDb
+          : '+39$numeroDb';
+
+      ref.read(profiloProvider.notifier).setTelefono(numeroIniziale);
+
+      if (!mounted) return;
+
+      setState(() {
+        _telefonoIniziale = numeroIniziale;
+        _telefonoValido = RegExp(r'^\+[1-9]\d{6,14}$').hasMatch(numeroIniziale);
+      });
 
       final data = await _caricaDatiExtra();
 
       if (data != null && mounted) {
         _nomeSocietaController.text = data['nome_societa']?.toString() ?? '';
-        _telefonoController.text = data['cellulare']?.toString() ?? '';
 
         _telefonoFissoController.text = data['telefono']?.toString() ?? '';
 
@@ -201,13 +218,13 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
 
   Future<void> _salvaProfilo() async {
     if (!_formKey.currentState!.validate()) return;
-    final cellulare = _telefonoController.text.trim();
+    final cellulare = ref.read(profiloProvider).telefonoCompleto.trim();
 
-    if (!RegExp(r'^\d{10}$').hasMatch(cellulare)) {
+    if (!_telefonoValido || !RegExp(r'^\+[1-9]\d{6,14}$').hasMatch(cellulare)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Il numero di cellulare deve contenere esattamente 10 cifre.',
+            'Inserisci un numero di cellulare internazionale valido.',
           ),
           backgroundColor: Colors.redAccent,
         ),
@@ -268,7 +285,7 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
         .from('societa')
         .update({
           'nome_societa': _nomeSocietaController.text.trim(),
-          'cellulare': _telefonoController.text.trim(),
+          'cellulare': cellulare,
         })
         .eq('id_utente', widget.utenteLoggato.id);
 
@@ -307,24 +324,25 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
     return InputDecoration(
       labelText: label,
       counterText: '',
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
       labelStyle: TextStyle(color: Colors.grey.shade400),
       prefixIcon: icon != null ? Icon(icon, color: AppTheme.neonOrange) : null,
       filled: true,
       fillColor: AppTheme.cardBg,
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: Colors.grey.shade700),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: AppTheme.neonOrange, width: 2),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Colors.redAccent),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Colors.redAccent, width: 2),
       ),
     );
@@ -351,400 +369,508 @@ class _ProfiloGestoreState extends ConsumerState<ProfiloGestore> {
     );
   }
 
+  // Riquadro di sezione: contenuto invariato, presentazione da portale web.
+  Widget _sezioneWeb({
+    required String titolo,
+    required IconData icona,
+    required List<Widget> children,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icona, color: AppTheme.neonOrange, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  titolo,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          ...children,
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(profiloProvider);
-    debugPrint("isLoading: ${state.isLoading}");
+    final isDesktop = MediaQuery.sizeOf(context).width >= 960;
+
+    final fotoSocieta = _sezioneWeb(
+      titolo: 'Foto Società',
+      icona: Icons.add_photo_alternate_outlined,
+      children: [
+        Container(
+          width: double.infinity,
+          height: 140,
+          decoration: BoxDecoration(
+            color: AppTheme.cardBg,
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(
+              color: state.haImmagine
+                  ? AppTheme.neonOrange
+                  : Colors.grey.shade700,
+              width: 1.5,
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(13),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (state.fotoBytesLocali != null)
+                  Image.memory(state.fotoBytesLocali!, fit: BoxFit.cover)
+                else if (state.urlValido)
+                  Image.network(state.fotoUrl!, fit: BoxFit.cover)
+                else
+                  GestureDetector(
+                    onTap: _selezionaFoto,
+                    behavior: HitTestBehavior.opaque,
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.add_a_photo,
+                          color: AppTheme.neonOrange,
+                          size: 36,
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Carica logo centro',
+                          style: TextStyle(color: Colors.white70, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (state.haImmagine)
+                  Positioned(
+                    bottom: 10,
+                    right: 10,
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: AppTheme.neonOrange,
+                          radius: 18,
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.edit,
+                              size: 18,
+                              color: Colors.black,
+                            ),
+                            onPressed: _selezionaFoto,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        CircleAvatar(
+                          backgroundColor: Colors.redAccent,
+                          radius: 18,
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.delete,
+                              size: 18,
+                              color: Colors.white,
+                            ),
+                            onPressed: () => ref
+                                .read(profiloProvider.notifier)
+                                .rimuoviFoto(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+
+    final datiPersonali = _sezioneWeb(
+      titolo: 'Dati Personali',
+      icona: Icons.badge_outlined,
+      children: [
+        TextFormField(
+          controller: _nomeController,
+          enabled: false,
+          decoration: _stileInput('Nome', Icons.person),
+          style: const TextStyle(color: Colors.grey),
+        ),
+        const SizedBox(height: 15),
+        TextFormField(
+          controller: _cognomeController,
+          enabled: false,
+          decoration: _stileInput('Cognome', Icons.person_outline),
+          style: const TextStyle(color: Colors.grey),
+        ),
+        const SizedBox(height: 15),
+
+        TelefonoFormWidget(
+          key: ValueKey(_telefonoIniziale),
+          controller: _telefonoController,
+          numeroIniziale: _telefonoIniziale,
+          onNumeroCambiato: (numero) {
+            ref.read(profiloProvider.notifier).setTelefono(numero);
+          },
+          onValiditaCambiata: (valido) {
+            _telefonoValido = valido;
+          },
+        ),
+        _buildNeonFormField(
+          controller: _nomeSocietaController,
+          label: 'Nome Società',
+          icon: Icons.business_rounded,
+          campoKey: 'nome_societa',
+          maxLength: 100,
+          validator: (val) {
+            final nomeSocieta = val?.trim() ?? '';
+
+            if (nomeSocieta.isEmpty) {
+              return 'Inserisci il nome della società';
+            }
+
+            if (nomeSocieta.length < 3) {
+              return 'Il nome della società deve avere almeno 3 lettere';
+            }
+
+            return null;
+          },
+        ),
+
+        const SizedBox(height: 15),
+
+        _buildNeonFormField(
+          controller: _telefonoFissoController,
+          label: 'Telefono Fisso',
+          icon: Icons.phone,
+          campoKey: 'fisso',
+          keyboardType: TextInputType.phone,
+        ),
+      ],
+    );
+
+    final indirizzoCentro = _sezioneWeb(
+      titolo: 'Indirizzo Centro Sportivo',
+      icona: Icons.location_on_outlined,
+      children: [
+        IndirizzoFormWidget(
+          viaController: _viaController,
+          civicoController: _civicoController,
+          capController: _capController,
+          cittaController: _cittaController,
+          provinciaController: _provinciaController,
+          viaFocus: _viaFocus,
+          civicoFocus: _civicoFocus,
+          capFocus: _capFocus,
+          cittaFocus: _cittaFocus,
+          provinciaFocus: _provinciaFocus,
+          campiAbbandonati: _campiAbbandonati,
+          onViaControllerReady: (controller) {
+            _viaInternalController = controller;
+            _viaInternalController!.text = _viaController.text;
+          },
+          onCoordinateSelezionate: (coordinate) {
+            _coordinateIndirizzo = coordinate;
+          },
+          onIndirizzoModificato: () {
+            _coordinateIndirizzo = null;
+          },
+        ),
+      ],
+    );
+
+    final cambioPassword = _sezioneWeb(
+      titolo: 'Cambia Password',
+      icona: Icons.lock_outline_rounded,
+      children: [
+        Text(
+          'Lascia vuoto se non vuoi cambiare la password.',
+          style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+        ),
+        const SizedBox(height: 15),
+        TextFormField(
+          controller: _nuovaPasswordController,
+          obscureText: !_mostraPassword,
+          style: const TextStyle(color: Colors.white),
+          decoration: _stileInput('Nuova Password', Icons.lock).copyWith(
+            suffixIcon: IconButton(
+              icon: Icon(
+                _mostraPassword ? Icons.visibility_off : Icons.visibility,
+                color: Colors.grey,
+              ),
+              onPressed: () =>
+                  setState(() => _mostraPassword = !_mostraPassword),
+            ),
+          ),
+          validator: (val) {
+            if (val == null || val.isEmpty) return null;
+            if (val.length < 8) return 'Minimo 8 caratteri';
+            if (!RegExp(r'[A-Z]').hasMatch(val)) {
+              return 'Almeno 1 lettera maiuscola';
+            }
+            if (!RegExp(
+              r'[!@#\$%^&*(),.?":{}|<>_\-+=\[\]\\\/]',
+            ).hasMatch(val)) {
+              return 'Almeno 1 carattere speciale';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 15),
+        TextFormField(
+          controller: _confermaPasswordController,
+          obscureText: !_mostraConfermaPassword,
+          style: const TextStyle(color: Colors.white),
+          decoration: _stileInput('Conferma Nuova Password', Icons.lock_outline)
+              .copyWith(
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _mostraConfermaPassword
+                        ? Icons.visibility_off
+                        : Icons.visibility,
+                    color: Colors.grey,
+                  ),
+                  onPressed: () => setState(
+                    () => _mostraConfermaPassword = !_mostraConfermaPassword,
+                  ),
+                ),
+              ),
+          validator: (val) {
+            if (_nuovaPasswordController.text.isEmpty) {
+              return null;
+            }
+            if (val != _nuovaPasswordController.text) {
+              return 'Le password non coincidono';
+            }
+            return null;
+          },
+        ),
+      ],
+    );
+
+    final salvaModifiche = SizedBox(
+      width: isDesktop ? 260 : double.infinity,
+      child: ElevatedButton(
+        onPressed: state.isSaving ? null : _salvaProfilo,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppTheme.neonOrange,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: state.isSaving
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.black,
+                  strokeWidth: 2,
+                ),
+              )
+            : const Text(
+                'SALVA MODIFICHE',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+      ),
+    );
+
+    final zonaPericolo = Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'ZONA PERICOLO',
+            style: TextStyle(
+              color: Colors.redAccent,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.5,
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          const Text(
+            'L’eliminazione dell’account gestore comporta anche la rimozione '
+            'del centro sportivo, dei campi e dei dati collegati. '
+            'L’operazione non può essere annullata.',
+            style: TextStyle(color: Colors.white60, fontSize: 13, height: 1.4),
+          ),
+
+          const SizedBox(height: 18),
+
+          SizedBox(
+            width: isDesktop ? 240 : double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _eliminaAccount,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.redAccent,
+                side: const BorderSide(color: Colors.redAccent, width: 1.5),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+              ),
+              icon: const Icon(Icons.delete_forever, size: 22),
+              label: const Text(
+                'Elimina Account',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
     return Scaffold(
       backgroundColor: AppTheme.darkBg,
       appBar: AppBar(
-        title: const Text('Profilo e Sicurezza'),
+        toolbarHeight: 72,
         backgroundColor: AppTheme.darkBg,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
         iconTheme: const IconThemeData(color: AppTheme.neonOrange),
+        titleSpacing: 8,
+        title: Row(
+          children: [
+            const Icon(
+              Icons.sports_soccer_rounded,
+              color: AppTheme.neonOrange,
+              size: 26,
+            ),
+            const SizedBox(width: 10),
+            const Flexible(
+              child: Text(
+                'MATCHINZONA',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.1,
+                ),
+              ),
+            ),
+            if (isDesktop) ...[
+              const SizedBox(width: 16),
+              const Text(
+                '/  PROFILO GESTORE',
+                style: TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ],
+        ),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, color: AppTheme.cardBorder),
+        ),
       ),
       body: state.isLoading
           ? const Center(
               child: CircularProgressIndicator(color: AppTheme.neonOrange),
             )
-          : Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
+          : SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 500),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Foto Società',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Container(
-                          width: double.infinity,
-                          height: 140,
-                          decoration: BoxDecoration(
-                            color: AppTheme.cardBg,
-                            borderRadius: BorderRadius.circular(15),
-                            border: Border.all(
-                              color: state.haImmagine
-                                  ? AppTheme.neonOrange
-                                  : Colors.grey.shade700,
-                              width: 1.5,
+                  constraints: const BoxConstraints(maxWidth: 1200),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isDesktop ? 32 : 16,
+                      vertical: isDesktop ? 36 : 22,
+                    ),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Profilo e sicurezza',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(13),
-                            child: Stack(
-                              fit: StackFit.expand,
+                          const SizedBox(height: 26),
+                          if (isDesktop)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                if (state.fotoBytesLocali != null)
-                                  Image.memory(
-                                    state.fotoBytesLocali!,
-                                    fit: BoxFit.cover,
-                                  )
-                                else if (state.urlValido)
-                                  Image.network(
-                                    state.fotoUrl!,
-                                    fit: BoxFit.cover,
-                                  )
-                                else
-                                  GestureDetector(
-                                    onTap: _selezionaFoto,
-                                    behavior: HitTestBehavior.opaque,
-                                    child: const Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.add_a_photo,
-                                          color: AppTheme.neonOrange,
-                                          size: 36,
-                                        ),
-                                        SizedBox(height: 8),
-                                        Text(
-                                          'Carica logo centro',
-                                          style: TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                Expanded(
+                                  child: Column(
+                                    children: [
+                                      fotoSocieta,
+                                      const SizedBox(height: 24),
+                                      datiPersonali,
+                                    ],
                                   ),
-                                if (state.haImmagine)
-                                  Positioned(
-                                    bottom: 10,
-                                    right: 10,
-                                    child: Row(
-                                      children: [
-                                        CircleAvatar(
-                                          backgroundColor: AppTheme.neonOrange,
-                                          radius: 18,
-                                          child: IconButton(
-                                            icon: const Icon(
-                                              Icons.edit,
-                                              size: 18,
-                                              color: Colors.black,
-                                            ),
-                                            onPressed: _selezionaFoto,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        CircleAvatar(
-                                          backgroundColor: Colors.redAccent,
-                                          radius: 18,
-                                          child: IconButton(
-                                            icon: const Icon(
-                                              Icons.delete,
-                                              size: 18,
-                                              color: Colors.white,
-                                            ),
-                                            onPressed: () => ref
-                                                .read(profiloProvider.notifier)
-                                                .rimuoviFoto(),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                ),
+                                const SizedBox(width: 24),
+                                Expanded(
+                                  child: Column(
+                                    children: [
+                                      indirizzoCentro,
+                                      const SizedBox(height: 24),
+                                      cambioPassword,
+                                    ],
                                   ),
+                                ),
                               ],
-                            ),
+                            )
+                          else ...[
+                            fotoSocieta,
+                            const SizedBox(height: 18),
+                            datiPersonali,
+                            const SizedBox(height: 18),
+                            indirizzoCentro,
+                            const SizedBox(height: 18),
+                            cambioPassword,
+                          ],
+                          const SizedBox(height: 28),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: salvaModifiche,
                           ),
-                        ),
-                        const SizedBox(height: 30),
-
-                        const Text(
-                          'Dati Personali',
-                          style: TextStyle(
-                            color: AppTheme.neonOrange,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 15),
-                        TextFormField(
-                          controller: _nomeController,
-                          enabled: false,
-                          decoration: _stileInput('Nome', Icons.person),
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                        const SizedBox(height: 15),
-                        TextFormField(
-                          controller: _cognomeController,
-                          enabled: false,
-                          decoration: _stileInput(
-                            'Cognome',
-                            Icons.person_outline,
-                          ),
-                          style: const TextStyle(color: Colors.grey),
-                        ),
-                        const SizedBox(height: 15),
-
-                        TelefonoFormWidget(controller: _telefonoController),
-                        _buildNeonFormField(
-                          controller: _nomeSocietaController,
-                          label: 'Nome Società',
-                          icon: Icons.business_rounded,
-                          campoKey: 'nome_societa',
-                          maxLength: 100,
-                          validator: (val) {
-                            final nomeSocieta = val?.trim() ?? '';
-
-                            if (nomeSocieta.isEmpty) {
-                              return 'Inserisci il nome della società';
-                            }
-
-                            if (nomeSocieta.length < 3) {
-                              return 'Il nome della società deve avere almeno 3 lettere';
-                            }
-
-                            return null;
-                          },
-                        ),
-
-                        const SizedBox(height: 15),
-                        const SizedBox(height: 15),
-
-                        _buildNeonFormField(
-                          controller: _telefonoFissoController,
-                          label: 'Telefono Fisso',
-                          icon: Icons.phone,
-                          campoKey: 'fisso',
-                          keyboardType: TextInputType.phone,
-                        ),
-                        const SizedBox(height: 30),
-
-                        const Text(
-                          'Indirizzo Centro Sportivo',
-                          style: TextStyle(
-                            color: AppTheme.neonOrange,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 15),
-
-                        IndirizzoFormWidget(
-                          viaController: _viaController,
-                          civicoController: _civicoController,
-                          capController: _capController,
-                          cittaController: _cittaController,
-                          provinciaController: _provinciaController,
-                          viaFocus: _viaFocus,
-                          civicoFocus: _civicoFocus,
-                          capFocus: _capFocus,
-                          cittaFocus: _cittaFocus,
-                          provinciaFocus: _provinciaFocus,
-                          campiAbbandonati: _campiAbbandonati,
-                          onViaControllerReady: (controller) {
-                            _viaInternalController = controller;
-                            _viaInternalController!.text = _viaController.text;
-                          },
-                          onCoordinateSelezionate: (coordinate) {
-                            _coordinateIndirizzo = coordinate;
-                          },
-                          onIndirizzoModificato: () {
-                            _coordinateIndirizzo = null;
-                          },
-                        ),
-                        const SizedBox(height: 30),
-                        const Text(
-                          'Cambia Password',
-                          style: TextStyle(
-                            color: AppTheme.neonOrange,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          'Lascia vuoto se non vuoi cambiare la password.',
-                          style: TextStyle(
-                            color: Colors.grey.shade500,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 15),
-                        TextFormField(
-                          controller: _nuovaPasswordController,
-                          obscureText: !_mostraPassword,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: _stileInput('Nuova Password', Icons.lock)
-                              .copyWith(
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _mostraPassword
-                                        ? Icons.visibility_off
-                                        : Icons.visibility,
-                                    color: Colors.grey,
-                                  ),
-                                  onPressed: () => setState(
-                                    () => _mostraPassword = !_mostraPassword,
-                                  ),
-                                ),
-                              ),
-                          validator: (val) {
-                            if (val == null || val.isEmpty) return null;
-                            if (val.length < 8) return 'Minimo 8 caratteri';
-                            if (!RegExp(r'[A-Z]').hasMatch(val)) {
-                              return 'Almeno 1 lettera maiuscola';
-                            }
-                            if (!RegExp(
-                              r'[!@#\$%^&*(),.?":{}|<>_\-+=\[\]\\\/]',
-                            ).hasMatch(val)) {
-                              return 'Almeno 1 carattere speciale';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 15),
-                        TextFormField(
-                          controller: _confermaPasswordController,
-                          obscureText: !_mostraConfermaPassword,
-                          style: const TextStyle(color: Colors.white),
-                          decoration:
-                              _stileInput(
-                                'Conferma Nuova Password',
-                                Icons.lock_outline,
-                              ).copyWith(
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _mostraConfermaPassword
-                                        ? Icons.visibility_off
-                                        : Icons.visibility,
-                                    color: Colors.grey,
-                                  ),
-                                  onPressed: () => setState(
-                                    () => _mostraConfermaPassword =
-                                        !_mostraConfermaPassword,
-                                  ),
-                                ),
-                              ),
-                          validator: (val) {
-                            if (_nuovaPasswordController.text.isEmpty) {
-                              return null;
-                            }
-                            if (val != _nuovaPasswordController.text) {
-                              return 'Le password non coincidono';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 40),
-
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: state.isSaving ? null : _salvaProfilo,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.neonOrange,
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                            ),
-                            child: state.isSaving
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.black,
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text(
-                                    'Salva Modifiche',
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                        const SizedBox(height: 30),
-
-                        const Divider(color: AppTheme.cardBorder),
-
-                        const SizedBox(height: 16),
-
-                        const Text(
-                          'ZONA PERICOLO',
-                          style: TextStyle(
-                            color: Colors.redAccent,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.5,
-                          ),
-                        ),
-
-                        const SizedBox(height: 10),
-
-                        const Text(
-                          'L’eliminazione dell’account gestore comporta anche la rimozione '
-                          'del centro sportivo, dei campi e dei dati collegati. '
-                          'L’operazione non può essere annullata.',
-                          style: TextStyle(
-                            color: Colors.white60,
-                            fontSize: 13,
-                            height: 1.4,
-                          ),
-                        ),
-
-                        const SizedBox(height: 18),
-
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: _eliminaAccount,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.redAccent,
-                              side: const BorderSide(
-                                color: Colors.redAccent,
-                                width: 1.5,
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                            ),
-                            icon: const Icon(Icons.delete_forever, size: 22),
-                            label: const Text(
-                              'Elimina Account',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                          const SizedBox(height: 36),
+                          zonaPericolo,
+                          const SizedBox(height: 40),
+                        ],
+                      ),
                     ),
                   ),
                 ),

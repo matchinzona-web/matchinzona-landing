@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:app_campi/core/theme/app_theme.dart';
@@ -403,31 +404,31 @@ class _RichiediAccessoGestorePageState
   }
 
   Future<void> _apriEmail() async {
+    const email = 'matchinzona@gmail.com';
+
     final uri = Uri(
       scheme: 'mailto',
-      path: 'matchinzona@gmail.com',
+      path: email,
       queryParameters: {'subject': 'Informazioni su MatchInZona'},
     );
 
     try {
-      final aperto = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final aperto = await launchUrl(uri, mode: LaunchMode.platformDefault);
 
-      if (!aperto && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Nessuna app email disponibile su questo dispositivo.',
-            ),
-          ),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Impossibile aprire l’app email.')),
-        );
-      }
+      if (aperto) return;
+    } catch (e) {
+      debugPrint('Impossibile aprire email: $e');
     }
+
+    await Clipboard.setData(const ClipboardData(text: email));
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Impossibile aprire la posta. Indirizzo email copiato!'),
+      ),
+    );
   }
 
   void _mostraAssistenza() {
@@ -457,7 +458,7 @@ class _RichiediAccessoGestorePageState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Per assistenza o informazioni sull’attivazione del tuo centro puoi contattarci:',
+                'Per assistenza o informazioni sull’attivazione del tuo centro puoi contattarci su whatsapp o a matchinzona@gmail.com:',
                 style: TextStyle(color: Colors.white70, height: 1.4),
               ),
               SizedBox(height: 20),

@@ -443,6 +443,7 @@ class _PrenotaCampoAppState extends State<PrenotaCampoApp>
         '/onboarding': (context) => const OnboardingScreen(),
         '/login': (context) => const LoginUtente(),
         '/registrazione': (context) => const RegistrazioneUtente(),
+        '/reset-password': (context) => const ResetPasswordPage(),
       },
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

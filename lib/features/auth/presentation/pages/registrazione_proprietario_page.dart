@@ -65,8 +65,8 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
   bool _mostraConfermaPassword = false;
   bool _terminiAccettati = false;
   bool _mostraErroreTermini = false;
-  final String _telefonoCompleto = '';
-  final bool _telefonoValido = false;
+  String _telefonoCompleto = '';
+  bool _telefonoValido = false;
 
   final Map<String, bool> _campiAbbandonati = {};
 
@@ -247,6 +247,19 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
       return;
     }
 
+    if (!_telefonoValido ||
+        !RegExp(r'^\+[1-9]\d{6,14}$').hasMatch(_telefonoCompleto)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Inserisci un numero di cellulare internazionale valido.',
+          ),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     if (_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -324,7 +337,7 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
 
           telefonoFisso: _numeroFissoController.text.trim(),
 
-          cellulare: _telefonoController.text.trim(),
+          cellulare: _telefonoCompleto,
 
           latitudine: lat,
           longitudine: lng,
@@ -603,6 +616,12 @@ class _RegistrazioneProprietarioState extends State<RegistrazioneProprietario> {
                     controller: _telefonoController,
                     focusNode: _telefonoFocus,
                     mostraErrore: _campiAbbandonati['telefono'] == true,
+                    onNumeroCambiato: (numero) {
+                      _telefonoCompleto = numero;
+                    },
+                    onValiditaCambiata: (valido) {
+                      _telefonoValido = valido;
+                    },
                   ),
 
                   // TELEFONO FISSO

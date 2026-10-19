@@ -39,6 +39,7 @@ dependencies:
   firebase_messaging: 16.7.0
   sign_in_with_apple: ^7.0.1
   crypto: ^3.0.6
+  intl_phone_number_input: ^0.7.5
 
 dev_dependencies:
   flutter_test:

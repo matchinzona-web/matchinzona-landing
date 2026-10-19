@@ -425,6 +425,12 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
   Widget build(BuildContext context) {
     final state = ref.watch(dashboardProvider);
 
+    final larghezzaSchermo = MediaQuery.sizeOf(context).width;
+
+    final double margineLaterale = larghezzaSchermo >= 800
+        ? (larghezzaSchermo > 1424 ? (larghezzaSchermo - 1360) / 2 : 32.0)
+        : 14.0;
+
     final notificheAsync = ref.watch(notificheStreamProvider);
 
     final numeroNonLette = notificheAsync.maybeWhen(
@@ -751,8 +757,8 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverPadding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14.0,
+              padding: EdgeInsets.symmetric(
+                horizontal: margineLaterale,
                 vertical: 10.0,
               ),
               sliver: SliverList(
@@ -1329,7 +1335,7 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14.0),
+                padding: EdgeInsets.symmetric(horizontal: margineLaterale),
                 child: Container(
                   decoration: BoxDecoration(
                     color: AppTheme.cardBg,

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:app_campi/core/models/utente.dart';
@@ -8,6 +9,7 @@ import 'package:app_campi/features/auth/application/auth_provider.dart';
 import 'package:app_campi/core/theme/app_theme.dart';
 import 'package:app_campi/core/utils/loading_overlay.dart';
 import 'package:app_campi/features/auth/data/auth_repository.dart';
+import 'package:flutter/foundation.dart';
 
 class LoginUtente extends ConsumerStatefulWidget {
   const LoginUtente({super.key});
@@ -326,7 +328,9 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
     try {
       await supabase.auth.resetPasswordForEmail(
         email,
-        redirectTo: 'myapp://reset-password',
+        redirectTo: kIsWeb
+            ? 'https://matchinzona.it/reset-password'
+            : 'myapp://reset-password',
       );
 
       if (!mounted) return;
@@ -478,237 +482,332 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
                         selectionHandleColor: AppTheme.accent,
                       ),
                     ),
-                    child: Center(
-                      child: SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24.0,
-                          vertical: 20.0,
-                        ),
+                    child: SingleChildScrollView(
+                      physics: const ClampingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24.0,
+                        vertical: 20.0,
+                      ),
+                      child: Center(
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 400),
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Center(
+                          constraints: const BoxConstraints(maxWidth: 1100),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              if (MediaQuery.sizeOf(context).width >= 900) ...[
+                                Expanded(
                                   child: Container(
-                                    padding: const EdgeInsets.all(20),
+                                    padding: const EdgeInsets.all(40),
                                     decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: AppTheme.accent.withOpacity(0.05),
+                                      color: AppTheme.cardBg,
+                                      borderRadius: BorderRadius.circular(28),
                                       border: Border.all(
-                                        color: AppTheme.accent.withOpacity(0.2),
-                                      ),
-                                    ),
-                                    child: const Icon(
-                                      Icons.sports_soccer_rounded,
-                                      size: 50,
-                                      color: AppTheme.accent,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 32),
-                                const Text(
-                                  'Bentornato!',
-                                  style: TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w900,
-                                    color: AppTheme.textPrimary,
-                                    letterSpacing: 0.5,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Inserisci le tue credenziali per continuare.',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    color: AppTheme.textSecondary,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 32),
-
-                                // GOOGLE - visibile sia su Android che su iOS
-                                SizedBox(
-                                  height: 56,
-                                  width: double.infinity,
-                                  child: OutlinedButton(
-                                    onPressed: _accediConGoogle,
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: AppTheme.textPrimary,
-                                      backgroundColor: AppTheme.cardBg,
-                                      side: const BorderSide(
                                         color: AppTheme.cardBorder,
-                                        width: 1.2,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
                                       ),
                                     ),
-                                    child: const Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Icon(
-                                          Icons.g_mobiledata_rounded,
-                                          color: Colors.white,
-                                          size: 30,
+                                        const Icon(
+                                          Icons.sports_soccer_rounded,
+                                          size: 64,
+                                          color: AppTheme.accent,
                                         ),
-                                        SizedBox(width: 12),
-                                        Text(
-                                          'CONTINUA CON GOOGLE',
+                                        const SizedBox(height: 28),
+                                        const Text(
+                                          'MATCHINZONA',
                                           style: TextStyle(
-                                            fontSize: 14,
+                                            color: AppTheme.textPrimary,
+                                            fontSize: 34,
                                             fontWeight: FontWeight.w900,
-                                            letterSpacing: 0.6,
+                                            letterSpacing: 2,
                                           ),
+                                        ),
+                                        const SizedBox(height: 18),
+                                        const Text(
+                                          'Il tuo centro sportivo,\nsotto controllo.',
+                                          style: TextStyle(
+                                            color: AppTheme.accent,
+                                            fontSize: 25,
+                                            fontWeight: FontWeight.w800,
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 24),
+                                        const Text(
+                                          'Gestisci campi, prenotazioni e attività '
+                                          'del tuo centro sportivo da un’unica piattaforma.',
+                                          style: TextStyle(
+                                            color: AppTheme.textSecondary,
+                                            fontSize: 16,
+                                            height: 1.6,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 30),
+                                        const Divider(
+                                          color: AppTheme.cardBorder,
+                                        ),
+                                        const SizedBox(height: 20),
+                                        const _VantaggioGestore(
+                                          icona: Icons.calendar_month_rounded,
+                                          testo: 'Organizza le prenotazioni',
+                                        ),
+                                        const SizedBox(height: 18),
+                                        const _VantaggioGestore(
+                                          icona: Icons.sports_soccer_rounded,
+                                          testo: 'Gestisci i tuoi campi',
+                                        ),
+                                        const SizedBox(height: 18),
+                                        const _VantaggioGestore(
+                                          icona: Icons.groups_rounded,
+                                          testo: 'Raggiungi nuovi giocatori',
                                         ),
                                       ],
                                     ),
                                   ),
                                 ),
+                                const SizedBox(width: 64),
+                              ],
+                              Expanded(
+                                child: Form(
+                                  key: _formKey,
 
-                                const SizedBox(height: 24),
-
-                                Row(
-                                  children: [
-                                    const Expanded(
-                                      child: Divider(
-                                        color: AppTheme.cardBorder,
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 14,
-                                      ),
-                                      child: Text(
-                                        'OPPURE',
-                                        style: TextStyle(
-                                          color: AppTheme.textSecondary,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 1,
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Center(
+                                        child: Container(
+                                          padding: const EdgeInsets.all(20),
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: AppTheme.accent.withOpacity(
+                                              0.05,
+                                            ),
+                                            border: Border.all(
+                                              color: AppTheme.accent
+                                                  .withOpacity(0.2),
+                                            ),
+                                          ),
+                                          child: const Icon(
+                                            Icons.sports_soccer_rounded,
+                                            size: 50,
+                                            color: AppTheme.accent,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    const Expanded(
-                                      child: Divider(
-                                        color: AppTheme.cardBorder,
+                                      const SizedBox(height: 32),
+                                      const Text(
+                                        'Bentornato!',
+                                        style: TextStyle(
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.w900,
+                                          color: AppTheme.textPrimary,
+                                          letterSpacing: 0.5,
+                                        ),
+                                        textAlign: TextAlign.center,
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(height: 8),
+                                      const Text(
+                                        'Inserisci le tue credenziali per continuare.',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          color: AppTheme.textSecondary,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: 32),
+
+                                      // GOOGLE - visibile sia su Android che su iOS
+                                      SizedBox(
+                                        height: 56,
+                                        width: double.infinity,
+                                        child: OutlinedButton(
+                                          onPressed: _accediConGoogle,
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor:
+                                                AppTheme.textPrimary,
+                                            backgroundColor: AppTheme.cardBg,
+                                            side: const BorderSide(
+                                              color: AppTheme.cardBorder,
+                                              width: 1.2,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                            ),
+                                          ),
+                                          child: const Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.g_mobiledata_rounded,
+                                                color: Colors.white,
+                                                size: 30,
+                                              ),
+                                              SizedBox(width: 12),
+                                              Text(
+                                                'CONTINUA CON GOOGLE',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w900,
+                                                  letterSpacing: 0.6,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+
+                                      const SizedBox(height: 24),
+
+                                      Row(
+                                        children: [
+                                          const Expanded(
+                                            child: Divider(
+                                              color: AppTheme.cardBorder,
+                                            ),
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 14,
+                                            ),
+                                            child: Text(
+                                              'OPPURE',
+                                              style: TextStyle(
+                                                color: AppTheme.textSecondary,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: 1,
+                                              ),
+                                            ),
+                                          ),
+                                          const Expanded(
+                                            child: Divider(
+                                              color: AppTheme.cardBorder,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+
+                                      const SizedBox(height: 24),
+
+                                      // CAMPO EMAIL
+                                      TextFormField(
+                                        controller: _emailController,
+                                        style: const TextStyle(
+                                          color: AppTheme.textPrimary,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        decoration: _buildCapsuleDecoration(
+                                          'Email',
+                                          Icons.email_outlined,
+                                        ),
+                                        keyboardType:
+                                            TextInputType.emailAddress,
+                                        textInputAction: TextInputAction.next,
+                                        validator: (value) {
+                                          if (value == null ||
+                                              value.trim().isEmpty) {
+                                            return 'Inserisci la tua email';
+                                          }
+                                          if (!value.contains('@') ||
+                                              !value.contains('.')) {
+                                            return 'Formato email non valido';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      const SizedBox(height: 16),
+
+                                      // CAMPO PASSWORD
+                                      TextFormField(
+                                        controller: _passwordController,
+                                        obscureText: _nascondiPassword,
+                                        style: const TextStyle(
+                                          color: AppTheme.textPrimary,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        decoration: _buildCapsuleDecoration(
+                                          'Password',
+                                          Icons.lock_outline_rounded,
+                                          suffixIcon: IconButton(
+                                            icon: Icon(
+                                              _nascondiPassword
+                                                  ? Icons.visibility_rounded
+                                                  : Icons
+                                                        .visibility_off_rounded,
+                                              color: AppTheme.textSecondary,
+                                            ),
+                                            onPressed: () => setState(
+                                              () => _nascondiPassword =
+                                                  !_nascondiPassword,
+                                            ),
+                                          ),
+                                        ),
+                                        textInputAction: TextInputAction.done,
+                                        onFieldSubmitted: (_) => _eseguiLogin(),
+                                        validator: (value) {
+                                          if (value == null || value.isEmpty) {
+                                            return 'Inserisci la password';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: TextButton(
+                                          onPressed:
+                                              _mostraDialogPasswordDimenticata,
+                                          child: const Text(
+                                            'Password dimenticata?',
+                                            style: TextStyle(
+                                              color: AppTheme.accent,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+
+                                      const SizedBox(height: 32),
+                                      // BOTTONE DI ACCESSO
+                                      SizedBox(
+                                        height: 56,
+                                        width: double.infinity,
+                                        child: ElevatedButton(
+                                          onPressed: _eseguiLogin,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppTheme.accent,
+                                            foregroundColor: AppTheme.darkBg,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                            ),
+                                            elevation: 0,
+                                          ),
+                                          child: const Text(
+                                            'ACCEDI AL CAMPO',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: 1.2,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+
+                                      const SizedBox(height: 40),
+                                    ],
+                                  ),
                                 ),
-
-                                const SizedBox(height: 24),
-
-                                // CAMPO EMAIL
-                                TextFormField(
-                                  controller: _emailController,
-                                  style: const TextStyle(
-                                    color: AppTheme.textPrimary,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  decoration: _buildCapsuleDecoration(
-                                    'Email',
-                                    Icons.email_outlined,
-                                  ),
-                                  keyboardType: TextInputType.emailAddress,
-                                  textInputAction: TextInputAction.next,
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return 'Inserisci la tua email';
-                                    }
-                                    if (!value.contains('@') ||
-                                        !value.contains('.')) {
-                                      return 'Formato email non valido';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 16),
-
-                                // CAMPO PASSWORD
-                                TextFormField(
-                                  controller: _passwordController,
-                                  obscureText: _nascondiPassword,
-                                  style: const TextStyle(
-                                    color: AppTheme.textPrimary,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  decoration: _buildCapsuleDecoration(
-                                    'Password',
-                                    Icons.lock_outline_rounded,
-                                    suffixIcon: IconButton(
-                                      icon: Icon(
-                                        _nascondiPassword
-                                            ? Icons.visibility_rounded
-                                            : Icons.visibility_off_rounded,
-                                        color: AppTheme.textSecondary,
-                                      ),
-                                      onPressed: () => setState(
-                                        () => _nascondiPassword =
-                                            !_nascondiPassword,
-                                      ),
-                                    ),
-                                  ),
-                                  textInputAction: TextInputAction.done,
-                                  onFieldSubmitted: (_) => _eseguiLogin(),
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Inserisci la password';
-                                    }
-                                    return null;
-                                  },
-                                ),
-
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton(
-                                    onPressed: _mostraDialogPasswordDimenticata,
-                                    child: const Text(
-                                      'Password dimenticata?',
-                                      style: TextStyle(
-                                        color: AppTheme.accent,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-
-                                const SizedBox(height: 32),
-                                // BOTTONE DI ACCESSO
-                                SizedBox(
-                                  height: 56,
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    onPressed: _eseguiLogin,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.accent,
-                                      foregroundColor: AppTheme.darkBg,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                      elevation: 0,
-                                    ),
-                                    child: const Text(
-                                      'ACCEDI AL CAMPO',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 1.2,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-
-                                const SizedBox(height: 40),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -720,6 +819,33 @@ class _LoginUtenteState extends ConsumerState<LoginUtente> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _VantaggioGestore extends StatelessWidget {
+  final IconData icona;
+  final String testo;
+
+  const _VantaggioGestore({required this.icona, required this.testo});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icona, color: AppTheme.accent, size: 22),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Text(
+            testo,
+            style: const TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
