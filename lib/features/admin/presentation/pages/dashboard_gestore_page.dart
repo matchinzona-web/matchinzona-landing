@@ -1386,25 +1386,6 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                 ),
               ),
             ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                child: Column(
-                  children: [
-                    Center(
-                      child: Text(
-                        '↑ Tira verso il basso per aggiornare il calendario',
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 60),
-                  ],
-                ),
-              ),
-            ),
           ],
         ),
       ),

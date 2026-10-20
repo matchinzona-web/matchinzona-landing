@@ -28,11 +28,13 @@ class AppTheme {
   static const String fontMono = 'monospace';
 
   // TEMA PRINCIPALE DELL'APP
+
   static ThemeData get darkNeonTheme {
     return ThemeData(
       brightness: Brightness.dark,
       scaffoldBackgroundColor: darkBg,
       useMaterial3: true,
+      fontFamily: 'Roboto',
 
       colorScheme: const ColorScheme.dark(
         primary: accent,

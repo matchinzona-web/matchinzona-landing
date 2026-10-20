@@ -2,19 +2,43 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../auth/presentation/pages/login_utente.dart';
 import 'package:app_campi/features/admin/presentation/pages/piani_abbonamento.dart';
+import 'package:app_campi/core/theme/app_theme.dart';
 
 const String googlePlayUrl =
     'https://play.google.com/store/apps/details?id=com.matchly.app';
+
+// Inserisci qui il link della tua app quando sarà pubblicata su App Store.
+// Fino ad allora, il pulsante Apple rimane disabilitato.
+const String appleAppStoreUrl = '';
 
 const Color _bg = Color(0xFF07100D);
 const Color _card = Color(0xFF0D1712);
 const Color _cardBorder = Color(0xFF233129);
 const Color _green = Color(0xFF79FF61);
-const Color _orange = Color(0xFFFF9D3C);
+const Color _orange = AppTheme.neonOrange;
 const Color _secondary = Color(0xFF9CABA3);
 
-class LandingGestoreWebPage extends StatelessWidget {
+class LandingGestoreWebPage extends StatefulWidget {
   const LandingGestoreWebPage({super.key});
+
+  @override
+  State<LandingGestoreWebPage> createState() => _LandingGestoreWebPageState();
+}
+
+class _LandingGestoreWebPageState extends State<LandingGestoreWebPage> {
+  final GlobalKey _giocatoriKey = GlobalKey();
+  final GlobalKey _gestoriKey = GlobalKey();
+
+  void _vaiAllaSezione(GlobalKey key) {
+    final target = key.currentContext;
+    if (target == null) return;
+    Scrollable.ensureVisible(
+      target,
+      duration: const Duration(milliseconds: 750),
+      curve: Curves.easeInOutCubic,
+      alignment: 0.03,
+    );
+  }
 
   Future<void> _apriUrl(String url) async {
     final uri = Uri.parse(url);
@@ -50,11 +74,17 @@ class LandingGestoreWebPage extends StatelessWidget {
             _navbar(context, desktop),
             _hero(context, desktop),
             _sportSection(),
-            _introSection(context),
-            _managerShowcase(context, desktop),
-            _featuresSection(context),
-            _clientAppSection(context, desktop),
+            KeyedSubtree(
+              key: _giocatoriKey,
+              child: _clientAppSection(context, desktop),
+            ),
             _downloadSection(),
+            KeyedSubtree(
+              key: _gestoriKey,
+              child: _managerShowcase(context, desktop),
+            ),
+            _introSection(context),
+            _featuresSection(context),
             _footer(),
           ],
         ),
@@ -66,33 +96,48 @@ class LandingGestoreWebPage extends StatelessWidget {
 
   Widget _navbar(BuildContext context, bool desktop) {
     final actions = Wrap(
-      spacing: desktop ? 18 : 8,
+      spacing: 10,
+      runSpacing: 10,
+      alignment: WrapAlignment.end,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        TextButton(
-          onPressed: () => _apriPiani(context),
-          child: const Text(
-            'Piani Partner',
-            style: TextStyle(
-              color: Colors.white70,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        ElevatedButton(
-          onPressed: () => _accedi(context),
+        ElevatedButton.icon(
+          onPressed: () => _apriUrl(googlePlayUrl),
+          icon: const Icon(Icons.shop_rounded, size: 18),
+          label: const Text('GOOGLE PLAY'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: _orange,
+            backgroundColor: _green,
             foregroundColor: _bg,
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            elevation: 0,
+            textStyle: const TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+            ),
           ),
-          child: const Text(
-            'ACCEDI',
-            style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.8),
+        ),
+        OutlinedButton.icon(
+          // Sostituisci appleAppStoreUrl con il link reale per attivarlo.
+          onPressed: appleAppStoreUrl.isEmpty
+              ? null
+              : () => _apriUrl(appleAppStoreUrl),
+          icon: const Icon(Icons.apple_rounded, size: 18),
+          label: const Text('APP STORE'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.white,
+            disabledForegroundColor: _secondary,
+            side: const BorderSide(color: _cardBorder),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            textStyle: const TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+            ),
           ),
         ),
       ],
@@ -125,45 +170,20 @@ class LandingGestoreWebPage extends StatelessWidget {
   }
 
   Widget _brand({double size = 27}) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Image.asset(
-            'assets/icon/logo_app.png',
-            width: 42,
-            height: 42,
-            fit: BoxFit.contain,
+    return Image.asset(
+      'assets/images/logo_matchinzona_largo.png',
+      width: size == 23 ? 180 : 230,
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) {
+        return const Text(
+          'MatchInZona',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 24,
           ),
-        ),
-
-        const SizedBox(width: 12),
-
-        Flexible(
-          child: RichText(
-            text: TextSpan(
-              style: TextStyle(
-                fontSize: size,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -1.2,
-                color: Colors.white,
-              ),
-              children: const [
-                TextSpan(text: 'Match'),
-                TextSpan(
-                  text: 'In',
-                  style: TextStyle(color: _orange),
-                ),
-                TextSpan(
-                  text: 'Zona',
-                  style: TextStyle(color: _green),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -172,165 +192,149 @@ class LandingGestoreWebPage extends StatelessWidget {
   Widget _hero(BuildContext context, bool desktop) {
     return Stack(
       children: [
-        Positioned(left: -220, top: 60, child: _glow(_green, 400)),
-        Positioned(right: -240, bottom: -60, child: _glow(_orange, 450)),
+        Positioned(left: -220, top: 40, child: _glow(_green, 400)),
+        Positioned(right: -230, bottom: -70, child: _glow(_orange, 450)),
         Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1400),
+            constraints: const BoxConstraints(maxWidth: 1200),
             child: Padding(
               padding: EdgeInsets.symmetric(
-                horizontal: desktop ? 80 : 24,
-                vertical: desktop ? 95 : 60,
+                horizontal: desktop ? 72 : 24,
+                vertical: desktop ? 105 : 65,
               ),
-              child: desktop
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 15,
+                      vertical: 9,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _green.withOpacity(0.09),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: _green.withOpacity(0.25)),
+                    ),
+                    child: const Text(
+                      'LA COMMUNITY DELLO SPORT, NELLA TUA ZONA',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: _green,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.2,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  Text.rich(
+                    const TextSpan(
                       children: [
-                        Expanded(flex: 11, child: _heroText(context, true)),
-                        const SizedBox(width: 40),
-                        Expanded(
-                          flex: 9,
-                          child: Center(
-                            child: _PhoneMockup(
-                              imagePath: '/images/8.jpg',
-                              width: 310,
-                              height: 470,
-                              orange: true,
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                  : Column(
-                      children: [
-                        _heroText(context, false),
-                        const SizedBox(height: 55),
-                        _PhoneMockup(
-                          imagePath: '/images/8.jpg',
-                          width: (MediaQuery.sizeOf(context).width - 64)
-                              .clamp(240.0, 310.0)
-                              .toDouble(),
-                          height: 440,
-                          orange: true,
+                        TextSpan(text: 'Il tuo sport.\n'),
+                        TextSpan(
+                          text: 'La tua zona.',
+                          style: TextStyle(color: _green),
                         ),
                       ],
                     ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _heroText(BuildContext context, bool desktop) {
-    return Column(
-      crossAxisAlignment: desktop
-          ? CrossAxisAlignment.start
-          : CrossAxisAlignment.center,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration(
-            color: _orange.withOpacity(0.10),
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: _orange.withOpacity(0.28)),
-          ),
-          child: const Text(
-            'PORTALE CIRCOLI & CENTRI SPORTIVI',
-            style: TextStyle(
-              color: _orange,
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.4,
-            ),
-          ),
-        ),
-        const SizedBox(height: 28),
-        Text.rich(
-          TextSpan(
-            children: const [
-              TextSpan(text: 'Gestisci.\n'),
-              TextSpan(text: 'Organizza.\n'),
-              TextSpan(
-                text: 'Riempi ogni campo.',
-                style: TextStyle(
-                  color: _green,
-                  shadows: [Shadow(color: Color(0x3379FF61), blurRadius: 30)],
-                ),
-              ),
-            ],
-          ),
-          textAlign: desktop ? TextAlign.left : TextAlign.center,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: desktop ? 66 : 43,
-            height: 0.99,
-            fontWeight: FontWeight.w900,
-            letterSpacing: desktop ? -3.5 : -2,
-          ),
-        ),
-        const SizedBox(height: 26),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 590),
-          child: Text(
-            'Gestisci campi, orari e prenotazioni da un’unica piattaforma. '
-            'Fai conoscere il tuo centro sportivo ai giocatori della tua zona.',
-            textAlign: desktop ? TextAlign.left : TextAlign.center,
-            style: const TextStyle(
-              color: _secondary,
-              fontSize: 17,
-              height: 1.8,
-            ),
-          ),
-        ),
-        const SizedBox(height: 32),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          alignment: desktop ? WrapAlignment.start : WrapAlignment.center,
-          children: [
-            ElevatedButton(
-              onPressed: () => _apriPiani(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _green,
-                foregroundColor: _bg,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 23,
-                  vertical: 18,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                elevation: 0,
-              ),
-              child: const Text(
-                'SCOPRI I PIANI PARTNER',
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 12,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-            OutlinedButton(
-              onPressed: () => _accedi(context),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: const BorderSide(color: _cardBorder),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 23,
-                  vertical: 18,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: const Text(
-                'ACCEDI AL GESTIONALE',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: desktop ? 76 : 45,
+                      height: 1.02,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: desktop ? -3.8 : -2,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: 720),
+                    child: Text(
+                      'MatchInZona avvicina chi ama giocare e chi organizza lo sport. '
+                      'Scopri persone, attività e opportunità sportive vicino a te, '
+                      'oppure porta il tuo centro sportivo in una piattaforma pensata per crescere.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: _secondary,
+                        fontSize: 17,
+                        height: 1.7,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 38),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 14,
+                    runSpacing: 14,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () => _vaiAllaSezione(_giocatoriKey),
+                        icon: const Icon(Icons.sports_soccer_rounded),
+                        label: const Text('SONO UN GIOCATORE'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _green,
+                          foregroundColor: _bg,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 20,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _vaiAllaSezione(_gestoriKey),
+                        icon: const Icon(Icons.business_rounded),
+                        label: const Text('SONO UN GESTORE'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _orange,
+                          side: const BorderSide(color: _orange, width: 1.5),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 20,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          textStyle: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 45),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 22,
+                    runSpacing: 14,
+                    children: const [
+                      _HeroPill(
+                        icon: Icons.people_alt_rounded,
+                        text: 'Community di giocatori',
+                        accent: _green,
+                      ),
+                      _HeroPill(
+                        icon: Icons.place_rounded,
+                        text: 'Sport vicino a te',
+                        accent: _orange,
+                      ),
+                      _HeroPill(
+                        icon: Icons.calendar_month_rounded,
+                        text: 'Strumenti per i centri',
+                        accent: _green,
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ],
     );
@@ -373,7 +377,7 @@ class LandingGestoreWebPage extends StatelessWidget {
       child: Column(
         children: [
           const Text(
-            'UN UNICO GESTIONALE, PIÙ SPORT',
+            'UNO SPAZIO PER OGNI SPORT',
             style: TextStyle(
               color: _green,
               fontSize: 11,
@@ -527,8 +531,7 @@ class LandingGestoreWebPage extends StatelessWidget {
       title: 'Il tuo centro.\n',
       highlightedTitle: 'Sempre sotto controllo.',
       description:
-          'Un’esperienza pensata per aiutarti a organizzare le attività '
-          'del centro e rendere più semplice il lavoro di ogni giorno.',
+          'Gestisci campi, orari e prenotazioni in modo semplice e veloce, risparmiando tempo ogni giorno. Aumenta le opportunità di guadagno permettendo di creare partite aperte a cui i giocatori della zona possono unirsi. Riempi più facilmente i campi, riduci gli orari vuoti e fai crescere il tuo centro sportivo.',
       features: const [
         'Gestione di campi e sport',
         'Orari e disponibilità',
@@ -536,6 +539,36 @@ class LandingGestoreWebPage extends StatelessWidget {
         'Visibilità tra i giocatori della zona',
       ],
       orange: true,
+      actions: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          ElevatedButton(
+            onPressed: () => _accedi(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _orange,
+              foregroundColor: _bg,
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+            ),
+            child: const Text(
+              'ACCEDI AL GESTIONALE',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+          OutlinedButton(
+            onPressed: () => _apriPiani(context),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: _orange),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+            ),
+            child: const Text(
+              'VEDI I PIANI',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+        ],
+      ),
     );
 
     return Container(
@@ -575,6 +608,7 @@ class LandingGestoreWebPage extends StatelessWidget {
     required String description,
     required List<String> features,
     bool orange = false,
+    Widget? actions,
   }) {
     final accent = orange ? _orange : _green;
 
@@ -642,6 +676,7 @@ class LandingGestoreWebPage extends StatelessWidget {
             ),
           ),
         ),
+        if (actions != null) ...[const SizedBox(height: 20), actions],
       ],
     );
   }
@@ -743,10 +778,14 @@ class LandingGestoreWebPage extends StatelessWidget {
               ? Row(
                   children: [
                     Expanded(
-                      child: _PhoneMockup(
-                        imagePath: '/images/3.png',
-                        width: 280,
-                        height: 440,
+                      // Center impedisce a Expanded di dilatare la cornice.
+                      child: Center(
+                        child: _PhoneMockup(
+                          imagePath: '/images/3.png',
+                          showEntireImage: true,
+                          width: 280,
+                          height: 525,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 70),
@@ -755,12 +794,21 @@ class LandingGestoreWebPage extends StatelessWidget {
                 )
               : Column(
                   children: [
-                    _PhoneMockup(
-                      imagePath: '/images/3.png',
-                      width: (MediaQuery.sizeOf(context).width - 64)
-                          .clamp(240.0, 300.0)
-                          .toDouble(),
-                      height: 430,
+                    Builder(
+                      builder: (context) {
+                        final phoneWidth =
+                            (MediaQuery.sizeOf(context).width - 64)
+                                .clamp(220.0, 280.0)
+                                .toDouble();
+                        // 3.png: 720x1432. 16px sono la cornice del mockup.
+                        final phoneHeight = (phoneWidth - 16) * 1432 / 720;
+                        return _PhoneMockup(
+                          imagePath: '/images/3.png',
+                          showEntireImage: true,
+                          width: phoneWidth,
+                          height: phoneHeight,
+                        );
+                      },
                     ),
                     const SizedBox(height: 42),
                     _clientAppText(context, false),
@@ -778,22 +826,21 @@ class LandingGestoreWebPage extends StatelessWidget {
           : CrossAxisAlignment.center,
       children: [
         const Text(
-          'ANCHE I TUOI CLIENTI SONO PARTE DELLA PIATTAFORMA',
-          textAlign: TextAlign.center,
+          'PER CHI AMA GIOCARE',
           style: TextStyle(
             color: _green,
             fontSize: 11,
             fontWeight: FontWeight.w900,
-            letterSpacing: 1.4,
+            letterSpacing: 1.8,
           ),
         ),
         const SizedBox(height: 18),
         Text.rich(
           const TextSpan(
             children: [
-              TextSpan(text: 'I giocatori ti cercano.\n'),
+              TextSpan(text: 'Lo sport è più bello\n'),
               TextSpan(
-                text: 'Tu sei più facile da trovare.',
+                text: 'insieme.',
                 style: TextStyle(color: _green),
               ),
             ],
@@ -801,20 +848,35 @@ class LandingGestoreWebPage extends StatelessWidget {
           textAlign: desktop ? TextAlign.left : TextAlign.center,
           style: TextStyle(
             color: Colors.white,
-            fontSize: desktop ? 43 : 34,
+            fontSize: desktop ? 45 : 35,
             fontWeight: FontWeight.w900,
-            height: 1.1,
+            height: 1.09,
             letterSpacing: -1.8,
           ),
         ),
         const SizedBox(height: 22),
-        const Text(
-          'Con MatchInZona i giocatori possono scoprire le opportunità '
-          'sportive nella propria zona. Il tuo centro entra in contatto '
-          'con una community che vuole giocare.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: _secondary, fontSize: 16, height: 1.8),
+        Text(
+          'Che tu giochi spesso o voglia ricominciare, MatchInZona ti aiuta '
+          'a entrare nel mondo sportivo della tua zona. Crea il tuo profilo, '
+          'conosci altri giocatori e rimani in contatto con la community. Prenota un campo in pochi tap oppure unisciti alle partite organizzate da altri giocatori. Trova la tua prossima occasione per scendere in campo!',
+          textAlign: desktop ? TextAlign.left : TextAlign.center,
+          style: const TextStyle(color: _secondary, fontSize: 16, height: 1.8),
         ),
+        const SizedBox(height: 26),
+        const _BenefitRow(
+          text:
+              'Il tuo profilo sportivo, con livelli e informazioni per presentarti',
+        ),
+        const _BenefitRow(
+          text: 'Chat e messaggi per restare in contatto con altri giocatori',
+        ),
+        const _BenefitRow(
+          text: 'Scopri centri e opportunità sportive nella tua zona',
+        ),
+        const _BenefitRow(
+          text: 'Una community costruita attorno alla voglia di giocare',
+        ),
+        const SizedBox(height: 24),
       ],
     );
   }
@@ -844,7 +906,7 @@ class LandingGestoreWebPage extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           const Text(
-            'Il tuo centro, anche sul loro smartphone.',
+            'Entra in campo con MatchInZona.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white,
@@ -893,7 +955,7 @@ class LandingGestoreWebPage extends StatelessWidget {
           _brand(size: 23),
           const SizedBox(height: 12),
           const Text(
-            'Gestisci il tuo centro. Riempi ogni campo.',
+            'Un posto per chi gioca. Un alleato per chi gestisce.',
             textAlign: TextAlign.center,
             style: TextStyle(color: _secondary, fontSize: 13),
           ),
@@ -909,6 +971,69 @@ class LandingGestoreWebPage extends StatelessWidget {
   }
 }
 
+class _HeroPill extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color accent;
+  const _HeroPill({
+    required this.icon,
+    required this.text,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+    decoration: BoxDecoration(
+      color: _card,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: _cardBorder),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: accent, size: 20),
+        const SizedBox(width: 10),
+        Text(
+          text,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _BenefitRow extends StatelessWidget {
+  final String text;
+  const _BenefitRow({required this.text});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 13),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(Icons.check_circle_rounded, color: _green, size: 20),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              color: Colors.white,
+              height: 1.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 // ========================= CORNICE IMMAGINE =========================
 
 class _PhoneMockup extends StatelessWidget {
@@ -916,12 +1041,14 @@ class _PhoneMockup extends StatelessWidget {
   final double width;
   final double height;
   final bool orange;
+  final bool showEntireImage;
 
   const _PhoneMockup({
     required this.imagePath,
     required this.width,
     required this.height,
     this.orange = false,
+    this.showEntireImage = false,
   });
 
   @override
@@ -951,31 +1078,34 @@ class _PhoneMockup extends StatelessWidget {
           child: SizedBox(
             width: double.infinity,
             height: height,
-            child: Image.network(
-              Uri.base.resolve(imagePath).toString(),
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  color: _card,
-                  padding: const EdgeInsets.all(20),
-                  child: const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.image_not_supported_outlined,
-                        color: _secondary,
-                        size: 38,
-                      ),
-                      SizedBox(height: 12),
-                      Text(
-                        'Immagine non trovata.\nControlla il percorso del file.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: _secondary, height: 1.5),
-                      ),
-                    ],
-                  ),
-                );
-              },
+            child: ColoredBox(
+              color: _bg,
+              child: Image.network(
+                Uri.base.resolve(imagePath).toString(),
+                fit: showEntireImage ? BoxFit.contain : BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: _card,
+                    padding: const EdgeInsets.all(20),
+                    child: const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.image_not_supported_outlined,
+                          color: _secondary,
+                          size: 38,
+                        ),
+                        SizedBox(height: 12),
+                        Text(
+                          'Immagine non trovata.\nControlla il percorso del file.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: _secondary, height: 1.5),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         ),
