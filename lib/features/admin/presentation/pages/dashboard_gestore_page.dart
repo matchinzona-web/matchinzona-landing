@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:syncfusion_flutter_calendar/calendar.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -421,8 +422,773 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
     return Icons.stadium_rounded;
   }
 
+  // ================= PORTALE DESKTOP WEB =================
+  // Questa interfaccia viene utilizzata solo su Flutter Web >= 1050px.
+  // La dashboard mobile originale e i servizi esistenti restano invariati.
+  int _sezioneDesktop = 0; // 0 dashboard, 1 prenotazioni, 2 campi
+
+  Future<void> _apriProfiloDesktop() async {
+    Utente? utente = widget.utenteLoggato;
+    if (utente == null) {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return;
+      final dati = await Supabase.instance.client
+          .from('utenti')
+          .select()
+          .eq('id', userId)
+          .single();
+      utente = Utente.fromJson(dati);
+    }
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ProfiloGestore(utenteLoggato: utente!)),
+    );
+  }
+
+  Future<void> _logoutDesktop() async {
+    try {
+      await PushNotificationService.rimuoviTokenCorrente();
+      await Supabase.instance.client.auth.signOut(scope: SignOutScope.local);
+    } catch (e) {
+      debugPrint('Errore durante il logout: $e');
+    }
+    if (mounted) {
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+    }
+  }
+
+  void _impostazioniDesktop() {
+    final id = ref.read(dashboardProvider).actualIdSocieta;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppTheme.cardBg,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const ListTile(
+              title: Text(
+                'Impostazioni del centro',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.person_outline,
+                color: AppTheme.neonOrange,
+              ),
+              title: const Text(
+                'Profilo',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _apriProfiloDesktop();
+              },
+            ),
+            if (id != null) ...[
+              ListTile(
+                leading: const Icon(
+                  Icons.access_time,
+                  color: AppTheme.neonOrange,
+                ),
+                title: const Text(
+                  'Orari del centro',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _navigaConAggiornamento(ModificaOrari(idSocieta: id));
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.event_busy,
+                  color: AppTheme.neonOrange,
+                ),
+                title: const Text(
+                  'Chiusure straordinarie',
+                  style: TextStyle(color: Colors.white),
+                ),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _navigaConAggiornamento(ChiusureStraordinarie(idSocieta: id));
+                },
+              ),
+            ],
+            ListTile(
+              leading: const Icon(
+                Icons.help_outline,
+                color: AppTheme.neonOrange,
+              ),
+              title: const Text(
+                'Privacy e assistenza',
+                style: TextStyle(color: Colors.white),
+              ),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PrivacyAssistenzaGestore(),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _webNavItem(IconData icon, String title, int index) {
+    final selected = _sezioneDesktop == index;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Material(
+        color: selected
+            ? AppTheme.neonOrange.withOpacity(.14)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => setState(() => _sezioneDesktop = index),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 14),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 19,
+                  color: selected ? AppTheme.neonOrange : Colors.white70,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: selected ? Colors.white : Colors.white70,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _webMetric(String title, String value, IconData icon) => Container(
+    constraints: const BoxConstraints(minWidth: 180),
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: AppTheme.cardBg,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: Colors.white.withOpacity(.07)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(color: Colors.white60, fontSize: 12),
+            ),
+            Icon(icon, color: AppTheme.neonOrange, size: 20),
+          ],
+        ),
+        const SizedBox(height: 18),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 25,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> _webModificaCampo(Map<String, dynamic> campo) async {
+    final id = widget.idSocieta ?? ref.read(dashboardProvider).actualIdSocieta;
+    if (id == null) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AggiungiCampo(idSocieta: id, campoEsistente: campo),
+      ),
+    );
+    if (!mounted) return;
+    await _dashboardNotifier.inizializza(
+      idSocieta: widget.idSocieta,
+      utenteLoggato: widget.utenteLoggato,
+    );
+  }
+
+  Future<void> _webEliminaCampo(Map<String, dynamic> campo) async {
+    final conferma = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.cardBg,
+        title: const Text(
+          'Eliminare il campo?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          'Vuoi eliminare "${campo['nome_campo'] ?? 'Campo'}"?',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Annulla'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text(
+              'Elimina',
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (conferma != true || !mounted) return;
+    try {
+      await CampiService().eliminaCampo(campo['id']);
+      if (!mounted) return;
+      await _dashboardNotifier.inizializza(
+        idSocieta: widget.idSocieta,
+        utenteLoggato: widget.utenteLoggato,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', '')),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  Widget _webSelettoreCampi() {
+    final state = ref.watch(dashboardProvider);
+    if (state.isLoading)
+      return const LinearProgressIndicator(color: AppTheme.neonOrange);
+    if (state.campi.isEmpty)
+      return const Text(
+        'Non hai ancora configurato dei campi.',
+        style: TextStyle(color: Colors.white70),
+      );
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        for (var i = 0; i < state.campi.length; i++)
+          Builder(
+            builder: (context) {
+              final campo = state.campi[i];
+              final id = campo['id'].toString();
+              final bloccato = i >= state.limiteCampiConsentiti;
+              final selezionato = state.idCampoSelezionato == id;
+              return Container(
+                decoration: BoxDecoration(
+                  color: AppTheme.cardBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: selezionato ? AppTheme.neonOrange : Colors.white12,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        if (bloccato) {
+                          _mostraDialogCampoBloccato();
+                          return;
+                        }
+                        ref
+                            .read(dashboardProvider.notifier)
+                            .filtraEConvertiDatiCalendario(idCampo: id);
+                      },
+                      icon: Icon(
+                        bloccato ? Icons.lock_outline : _iconaCampo(campo),
+                        size: 17,
+                      ),
+                      label: Text((campo['nome_campo'] ?? 'Campo').toString()),
+                      style: TextButton.styleFrom(
+                        foregroundColor: bloccato
+                            ? Colors.white38
+                            : selezionato
+                            ? AppTheme.neonOrange
+                            : Colors.white70,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                      ),
+                    ),
+                    PopupMenuButton<String>(
+                      tooltip: 'Opzioni campo',
+                      icon: const Icon(
+                        Icons.more_vert,
+                        color: Colors.white70,
+                        size: 18,
+                      ),
+                      color: AppTheme.cardBg,
+                      onSelected: (action) {
+                        if (action == 'modifica') _webModificaCampo(campo);
+                        if (action == 'elimina') _webEliminaCampo(campo);
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(
+                          value: 'modifica',
+                          child: Text('Modifica'),
+                        ),
+                        PopupMenuItem(value: 'elimina', child: Text('Elimina')),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _webCalendario() {
+    final state = ref.watch(dashboardProvider);
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(.07)),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 16, 14),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Calendario prenotazioni',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Precedente',
+                  onPressed: () {
+                    final current = _calendarController.displayDate ?? _oggi;
+                    if (DateTime(
+                      current.year,
+                      current.month,
+                      current.day,
+                    ).isAfter(_dataMinimaCalendario)) {
+                      _calendarController.backward?.call();
+                    }
+                  },
+                  icon: const Icon(
+                    Icons.chevron_left,
+                    color: AppTheme.neonOrange,
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () async {
+                    final data = await showDatePicker(
+                      context: context,
+                      initialDate: _calendarController.displayDate ?? _oggi,
+                      firstDate: _dataMinimaCalendario,
+                      lastDate: _dataMassimaCalendario,
+                    );
+                    if (data != null) _calendarController.displayDate = data;
+                  },
+                  icon: const Icon(Icons.calendar_month, size: 18),
+                  label: Text(state.stringaDataCorrente),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.neonOrange,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Successivo',
+                  onPressed: () {
+                    final current = _calendarController.displayDate ?? _oggi;
+                    if (DateTime(
+                      current.year,
+                      current.month,
+                      current.day,
+                    ).isBefore(_dataMassimaCalendario)) {
+                      _calendarController.forward?.call();
+                    }
+                  },
+                  icon: const Icon(
+                    Icons.chevron_right,
+                    color: AppTheme.neonOrange,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(color: Colors.white10, height: 1),
+          SizedBox(
+            height: 660,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(16),
+              ),
+              child: WidgetCalendarioGestore(
+                controller: _calendarController,
+                isLoading: state.isLoading,
+                prenotazioniVisibili: state.prenotazioniVisibili,
+                startHour: state.startHour,
+                endHour: state.endHour,
+                giornoChiuso: state.giornoChiuso,
+                minDate: _dataMinimaCalendario,
+                onTap: _gestisciClickCalendario,
+                mainScrollController: _scrollController,
+                onViewChanged: (details) {
+                  if (details.visibleDates.isEmpty) return;
+                  final date = details.visibleDates.first;
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    final notifier = ref.read(dashboardProvider.notifier);
+                    notifier.aggiornaGiornoCalendario(date);
+                    notifier.aggiornaDataCorrente(
+                      '${date.day}/${date.month}/${date.year}',
+                    );
+                  });
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashboardDesktop() {
+    final state = ref.watch(dashboardProvider);
+    final notifiche = ref.watch(notificheStreamProvider);
+    final nonLette = notifiche.maybeWhen(
+      data: (items) => items.where((n) => !n.letto).length,
+      orElse: () => 0,
+    );
+    final id = state.actualIdSocieta;
+    const bg = Color(0xFF0B1118);
+    const sideBg = Color(0xFF121B26);
+    final titolo = 'Dashboard';
+
+    return Scaffold(
+      backgroundColor: bg,
+      body: Row(
+        children: [
+          Container(
+            width: 245,
+            color: sideBg,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(left: 10, bottom: 34),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.emoji_events_outlined,
+                            color: AppTheme.neonOrange,
+                            size: 24,
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'MATCHINZONA',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: .4,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _webNavItem(Icons.dashboard_outlined, 'Dashboard', 0),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                        ),
+                        leading: const Icon(
+                          Icons.bar_chart_outlined,
+                          color: Colors.white70,
+                          size: 20,
+                        ),
+                        title: const Text(
+                          'Guadagni',
+                          style: TextStyle(color: Colors.white70, fontSize: 14),
+                        ),
+                        onTap: id == null
+                            ? null
+                            : () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      StatisticheGuadagni(idSocieta: id),
+                                ),
+                              ),
+                      ),
+                    ),
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                      ),
+                      leading: const Icon(
+                        Icons.settings_outlined,
+                        color: Colors.white70,
+                        size: 20,
+                      ),
+                      title: const Text(
+                        'Impostazioni',
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+                      onTap: _impostazioniDesktop,
+                    ),
+                    const Spacer(),
+                    const Divider(color: Colors.white12),
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                      ),
+                      leading: const Icon(Icons.logout, color: Colors.white70),
+                      title: const Text(
+                        'Esci',
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                      onTap: _logoutDesktop,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Column(
+              children: [
+                Container(
+                  height: 78,
+                  padding: const EdgeInsets.symmetric(horizontal: 30),
+                  decoration: const BoxDecoration(
+                    color: sideBg,
+                    border: Border(bottom: BorderSide(color: Colors.white10)),
+                  ),
+
+                  child: Row(
+                    children: [
+                      Text(
+                        titolo,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const Spacer(),
+
+                      // Stato del centro sportivo
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: state.isCentroAttivo
+                              ? Colors.green.withOpacity(0.10)
+                              : Colors.redAccent.withOpacity(0.10),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: state.isCentroAttivo
+                                ? Colors.green.withOpacity(0.30)
+                                : Colors.redAccent.withOpacity(0.30),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.circle,
+                              size: 8,
+                              color: state.isCentroAttivo
+                                  ? Colors.greenAccent
+                                  : Colors.redAccent,
+                            ),
+                            const SizedBox(width: 7),
+                            Text(
+                              state.isCentroAttivo
+                                  ? 'Centro attivo'
+                                  : 'Centro non attivo',
+                              style: TextStyle(
+                                color: state.isCentroAttivo
+                                    ? Colors.greenAccent
+                                    : Colors.redAccent,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(width: 16),
+
+                      IconButton(
+                        tooltip: 'Notifiche',
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const NotifichePage(),
+                          ),
+                        ),
+                        icon: Badge(
+                          isLabelVisible: nonLette > 0,
+                          label: Text(nonLette > 99 ? '99+' : '$nonLette'),
+                          child: const Icon(
+                            Icons.notifications_none,
+                            color: AppTheme.neonOrange,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      IconButton(
+                        tooltip: 'Profilo',
+                        onPressed: _apriProfiloDesktop,
+                        icon: const Icon(
+                          Icons.account_circle_outlined,
+                          color: AppTheme.neonOrange,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: RefreshIndicator(
+                    color: AppTheme.neonOrange,
+                    onRefresh: () => _dashboardNotifier.inizializza(
+                      idSocieta: widget.idSocieta,
+                      utenteLoggato: widget.utenteLoggato,
+                    ),
+                    child: ListView(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(30),
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Gestisci il tuo centro sportivo',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 25,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Ciao ${widget.utenteLoggato?.nome ?? 'Gestore'} · Portale gestore',
+                                    style: const TextStyle(
+                                      color: Colors.white60,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            ElevatedButton.icon(
+                              onPressed: id == null || state.campi.isEmpty
+                                  ? null
+                                  : _apriPrenotazioneManuale,
+                              icon: const Icon(Icons.add, size: 19),
+                              label: const Text('Prenotazione'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.neonOrange,
+                                foregroundColor: Colors.black,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 18,
+                                  vertical: 18,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 28),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'I tuoi campi',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ),
+                            TextButton.icon(
+                              onPressed: id == null
+                                  ? null
+                                  : _tentaAggiuntaCampo,
+                              icon: const Icon(Icons.add),
+                              label: const Text('Nuovo campo'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppTheme.neonOrange,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _webSelettoreCampi(),
+                        const SizedBox(height: 24),
+                        _webCalendario(),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb && MediaQuery.sizeOf(context).width >= 1050) {
+      return _buildDashboardDesktop();
+    }
+
     final state = ref.watch(dashboardProvider);
 
     final larghezzaSchermo = MediaQuery.sizeOf(context).width;
