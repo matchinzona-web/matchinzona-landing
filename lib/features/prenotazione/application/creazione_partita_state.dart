@@ -18,6 +18,7 @@ class CreazionePartitaState {
   final int ospitiExtra;
   final bool isPartitaPrivata;
   final String sportSelezionato;
+  final int durataMinutiSelezionata;
   final String fasciaOraria;
   final Map<String, double> prezziPerSocieta;
   final MetodoPagamento metodoPagamentoScelto;
@@ -39,6 +40,7 @@ class CreazionePartitaState {
     this.ospitiExtra = 0,
     this.isPartitaPrivata = true,
     this.sportSelezionato = 'calcio_5',
+    this.durataMinutiSelezionata = 60,
     this.fasciaOraria = 'tutto',
     this.prezziPerSocieta = const {},
     this.metodoPagamentoScelto = MetodoPagamento.inSede,
@@ -61,6 +63,7 @@ class CreazionePartitaState {
     int? ospitiExtra,
     bool? isPartitaPrivata,
     String? sportSelezionato, // <-- PARAMETRO NELLA FIRMA
+    int? durataMinutiSelezionata,
     String? fasciaOraria, // <-- PARAMETRO NELLA FIRMA
     bool clearCampo = false,
     bool clearOrario = false,
@@ -91,6 +94,8 @@ class CreazionePartitaState {
       sportSelezionato:
           sportSelezionato ??
           this.sportSelezionato, // <-- VALORE REALE ASSEGNATO QUI
+      durataMinutiSelezionata:
+          durataMinutiSelezionata ?? this.durataMinutiSelezionata,
       fasciaOraria:
           fasciaOraria ?? this.fasciaOraria, // <-- VALORE REALE ASSEGNATO QUI
       prezziPerSocieta: prezziPerSocieta ?? this.prezziPerSocieta,

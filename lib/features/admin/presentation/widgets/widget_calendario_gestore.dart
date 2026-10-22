@@ -165,6 +165,21 @@ class _AppointmentCard extends StatelessWidget {
     return subject.contains('CHIUSO') || subject.contains('⛔');
   }
 
+  // Nasconde gli identificativi tecnici, mantenendo eventuali note utili.
+  String? _noteVisibili(String? valore) {
+    if (valore == null || valore.trim().isEmpty) return null;
+
+    final uuid = RegExp(
+      r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b',
+    );
+    final pulite = valore
+        .replaceAll(uuid, '')
+        .replaceAll(RegExp(r'^[\s,;|:–-]+|[\s,;|:–-]+$'), '')
+        .trim();
+
+    return pulite.isEmpty ? null : pulite;
+  }
+
   String _formatTime(DateTime dateTime) {
     final String hour = dateTime.hour.toString().padLeft(2, '0');
 
@@ -187,9 +202,7 @@ class _AppointmentCard extends StatelessWidget {
 
     final String subject = appointment.subject.trim();
 
-    final String? notes = appointment.notes?.trim().isNotEmpty == true
-        ? appointment.notes!.trim()
-        : null;
+    final String? notes = _noteVisibili(appointment.notes);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
@@ -220,10 +233,10 @@ class _AppointmentCard extends StatelessWidget {
             ),
 
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 7, 8, 7),
+              padding: const EdgeInsets.fromLTRB(10, 5, 8, 5),
               child: LayoutBuilder(
                 builder: (BuildContext context, BoxConstraints constraints) {
-                  final bool compatto = constraints.maxHeight < 58;
+                  final bool compatto = constraints.maxHeight < 52;
 
                   if (compatto) {
                     return _buildCompactContent(

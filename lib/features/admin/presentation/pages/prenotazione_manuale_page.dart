@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:app_campi/core/models/campo.dart';
+import 'package:app_campi/core/models/orario_societa.dart';
 import 'package:app_campi/core/repositories/campi_repository.dart';
 import 'package:app_campi/core/repositories/orario_societa_repository.dart';
 import 'package:app_campi/core/repositories/partita_repository.dart';
@@ -48,12 +49,72 @@ class _PrenotazioneManualePageState extends State<PrenotazioneManualePage> {
 
   Campo? _campoSelezionato;
   String? _orarioSelezionato;
+  String? _sportSelezionato;
+  int _durataSelezionata = 60;
 
   DateTime _dataSelezionata = DateTime.now();
 
   bool _isLoading = true;
   bool _isLoadingOrari = false;
   bool _isSaving = false;
+
+  List<int> _durateDisponibili() {
+    final campo = _campoSelezionato;
+    final sport = _sportSelezionato;
+
+    if (campo == null || sport == null) return [];
+
+    for (final tariffa in campo.tariffeSport) {
+      if (tariffa.sport.trim().toLowerCase() == sport.trim().toLowerCase()) {
+        return tariffa.durateDisponibili;
+      }
+    }
+
+    return [];
+  }
+
+  void _impostaCampoESport(Campo? campo) {
+    _campoSelezionato = campo;
+    _sportSelezionato = null;
+    _durataSelezionata = 60;
+    _orarioSelezionato = null;
+    _slotDisponibili = [];
+
+    if (campo == null || campo.tariffeSport.isEmpty) {
+      return;
+    }
+
+    final tariffa = campo.tariffeSport.first;
+    _sportSelezionato = tariffa.sport;
+
+    final durate = tariffa.durateDisponibili;
+
+    if (durate.isNotEmpty) {
+      _durataSelezionata = durate.contains(60) ? 60 : durate.first;
+    }
+  }
+
+  String _orarioFine(String inizio, int durata) {
+    final minuti = SlotUtils.orarioInMinuti(inizio) + durata;
+
+    return '${((minuti ~/ 60) % 24).toString().padLeft(2, '0')}:'
+        '${(minuti % 60).toString().padLeft(2, '0')}';
+  }
+
+  double? _prezzoSelezionato() {
+    final campo = _campoSelezionato;
+    final sport = _sportSelezionato;
+
+    if (campo == null || sport == null) return null;
+
+    for (final tariffa in campo.tariffeSport) {
+      if (tariffa.sport.trim().toLowerCase() == sport.trim().toLowerCase()) {
+        return tariffa.prezzoPerDurata(_durataSelezionata);
+      }
+    }
+
+    return null;
+  }
 
   @override
   void initState() {
@@ -104,7 +165,7 @@ class _PrenotazioneManualePageState extends State<PrenotazioneManualePage> {
 
       setState(() {
         _campi = campiAttivi;
-        _campoSelezionato = iniziale;
+        _impostaCampoESport(iniziale);
         _isLoading = false;
       });
 
@@ -120,12 +181,53 @@ class _PrenotazioneManualePageState extends State<PrenotazioneManualePage> {
     }
   }
 
+  List<String> _generaSlotPerDurata(OrarioSocieta orario) {
+    final slot = <String>[];
+    final durata = _durataSelezionata;
+    // Una durata disponibile: partenze ogni 60 o 90 minuti.
+    // Entrambe disponibili: partenze ogni 30 minuti.
+    final durate = _durateDisponibili();
+    final passoMinuti = durate.length == 1 ? durate.first : 30;
+
+    void aggiungiTurno(String? apertura, String? chiusura) {
+      if (apertura == null || chiusura == null) return;
+
+      var inizio = SlotUtils.orarioInMinuti(apertura);
+      var fine = SlotUtils.orarioInMinuti(chiusura);
+
+      if (fine == 0 && inizio > 0) {
+        fine = 24 * 60;
+      }
+
+      // Non gestiamo ancora turni che attraversano la
+      // mezzanotte e terminano dopo le 00:00.
+      if (fine <= inizio) return;
+
+      while (inizio + durata <= fine) {
+        final ora = (inizio ~/ 60).toString().padLeft(2, '0');
+        final minuti = (inizio % 60).toString().padLeft(2, '0');
+
+        slot.add('$ora:$minuti');
+        inizio += passoMinuti;
+      }
+    }
+
+    aggiungiTurno(orario.orarioApertura, orario.orarioChiusura);
+    aggiungiTurno(orario.orarioApertura2, orario.orarioChiusura2);
+
+    return slot.toSet().toList()..sort(
+      (a, b) =>
+          SlotUtils.orarioInMinuti(a).compareTo(SlotUtils.orarioInMinuti(b)),
+    );
+  }
+
   Future<void> _caricaSlot() async {
     final campo = _campoSelezionato;
+    if (campo == null) return;
 
-    if (campo == null) {
-      return;
-    }
+    final data = _dataSelezionata;
+    final durata = _durataSelezionata;
+    final sport = _sportSelezionato;
 
     setState(() {
       _isLoadingOrari = true;
@@ -136,7 +238,7 @@ class _PrenotazioneManualePageState extends State<PrenotazioneManualePage> {
     try {
       final orario = await _orarioRepository.getOrarioGiorno(
         widget.idSocieta,
-        _dataSelezionata.weekday,
+        data.weekday,
       );
 
       if (orario == null || orario.isChiuso) {
@@ -146,31 +248,28 @@ class _PrenotazioneManualePageState extends State<PrenotazioneManualePage> {
           _slotDisponibili = [];
           _isLoadingOrari = false;
         });
-
         return;
       }
 
-      final tuttiGliSlot = SlotUtils.generaSlotDoppioTurno(orario);
+      final tuttiGliSlot = _generaSlotPerDurata(orario);
 
-      final slotCompleti = await _partitaRepository.getSlotCompletiGiorno(
-        idCampo: campo.id,
-        dataPartita: _dataSelezionata,
-      );
+      final intervalliOccupati = await _partitaRepository
+          .getIntervalliOccupatiGiorno(idCampo: campo.id, data: data);
 
       final chiusure = await _chiusuraRepository.getChiusurePerData(
         widget.idSocieta,
-        _dataSelezionata,
+        data,
       );
 
       final disponibili = <String>[];
 
       for (final slot in tuttiGliSlot) {
-        final minutiSlot = SlotUtils.orarioInMinuti(slot);
+        final inizioSlot = SlotUtils.orarioInMinuti(slot);
+        final fineSlot = inizioSlot + durata;
 
         bool chiuso = false;
 
         for (final chiusura in chiusure) {
-          // Chiusura valida per l'intera giornata.
           if (chiusura.orarioInizio == null || chiusura.orarioFine == null) {
             chiuso = true;
             break;
@@ -180,28 +279,44 @@ class _PrenotazioneManualePageState extends State<PrenotazioneManualePage> {
             chiusura.orarioInizio!,
           );
 
-          final fineChiusura = SlotUtils.orarioInMinuti(chiusura.orarioFine!);
+          var fineChiusura = SlotUtils.orarioInMinuti(chiusura.orarioFine!);
 
-          if (minutiSlot >= inizioChiusura && minutiSlot < fineChiusura) {
+          if (fineChiusura == 0 && inizioChiusura > 0) {
+            fineChiusura = 24 * 60;
+          }
+
+          if (inizioSlot < fineChiusura && fineSlot > inizioChiusura) {
             chiuso = true;
             break;
           }
         }
 
-        if (chiuso) {
-          continue;
-        }
+        if (chiuso) continue;
 
-        if (slotCompleti.contains(slot)) {
-          continue;
-        }
+        final occupato = intervalliOccupati.any((partita) {
+          final inizio = SlotUtils.orarioInMinuti(
+            partita['orario_inizio'].toString(),
+          );
+
+          var fine = SlotUtils.orarioInMinuti(
+            partita['orario_fine'].toString(),
+          );
+
+          if (fine == 0 && inizio > 0) {
+            fine = 24 * 60;
+          }
+
+          return inizioSlot < fine && fineSlot > inizio;
+        });
+
+        if (occupato) continue;
 
         final parti = slot.split(':');
 
         final dataOraSlot = DateTime(
-          _dataSelezionata.year,
-          _dataSelezionata.month,
-          _dataSelezionata.day,
+          data.year,
+          data.month,
+          data.day,
           int.parse(parti[0]),
           int.parse(parti[1]),
         );
@@ -213,7 +328,13 @@ class _PrenotazioneManualePageState extends State<PrenotazioneManualePage> {
         disponibili.add(slot);
       }
 
-      if (!mounted) return;
+      if (!mounted ||
+          _campoSelezionato?.id != campo.id ||
+          _dataSelezionata != data ||
+          _durataSelezionata != durata ||
+          _sportSelezionato != sport) {
+        return;
+      }
 
       setState(() {
         _slotDisponibili = disponibili;
@@ -223,9 +344,13 @@ class _PrenotazioneManualePageState extends State<PrenotazioneManualePage> {
     } catch (e) {
       if (!mounted) return;
 
-      setState(() => _isLoadingOrari = false);
+      setState(() {
+        _slotDisponibili = [];
+        _orarioSelezionato = null;
+        _isLoadingOrari = false;
+      });
 
-      _mostraErrore('Errore caricamento disponibilità');
+      _mostraErrore('Errore caricamento disponibilità: $e');
     }
   }
 
@@ -287,6 +412,8 @@ class _PrenotazioneManualePageState extends State<PrenotazioneManualePage> {
   Future<void> _conferma() async {
     final campo = _campoSelezionato;
     final orario = _orarioSelezionato;
+    final sport = _sportSelezionato;
+    final durata = _durataSelezionata;
 
     if (campo == null || orario == null) {
       _mostraErrore('Seleziona campo e orario.');
@@ -305,12 +432,24 @@ class _PrenotazioneManualePageState extends State<PrenotazioneManualePage> {
     try {
       // Ricontrolliamo la disponibilità
       // immediatamente prima del salvataggio.
-      final libero = await _partitaRepository
-          .isSlotDisponibilePerPrenotazioneManuale(
-            idCampo: campo.id,
-            dataPartita: _dataSelezionata,
-            orarioInizio: '$orario:00',
-          );
+      if (sport == null ||
+          !_durateDisponibili().contains(durata) ||
+          _prezzoSelezionato() == null) {
+        throw Exception('Sport, durata o prezzo non validi.');
+      }
+
+      if (!_slotDisponibili.contains(orario)) {
+        throw Exception('L’orario selezionato non è disponibile.');
+      }
+
+      final occupato = await _partitaRepository.isIntervalloOccupato(
+        idCampo: campo.id,
+        data: _dataSelezionata,
+        orarioInizio: '$orario:00',
+        orarioFine: '${_orarioFine(orario, durata)}:00',
+      );
+
+      final libero = !occupato;
 
       if (!libero) {
         throw Exception(
@@ -324,6 +463,8 @@ class _PrenotazioneManualePageState extends State<PrenotazioneManualePage> {
         idGestore: idGestore,
         dataPartita: _dataSelezionata,
         orarioInizio: orario,
+        durataMinuti: durata,
+        sport: sport,
         nomeCliente: _nomeController.text,
         telefonoCliente: _telefonoController.text,
         notaGestore: _notaController.text,
@@ -434,7 +575,7 @@ class _PrenotazioneManualePageState extends State<PrenotazioneManualePage> {
                                 'Blocca rapidamente un campo '
                                 'per una prenotazione ricevuta '
                                 'al telefono o direttamente al centro. '
-                                'La durata è di 60 minuti.',
+                                'La durata e il prezzo dipendono dallo sport e dal campo scelti.',
                                 style: TextStyle(
                                   color: Colors.white70,
                                   height: 1.4,
@@ -481,7 +622,7 @@ class _PrenotazioneManualePageState extends State<PrenotazioneManualePage> {
                           }
 
                           setState(() {
-                            _campoSelezionato = campo;
+                            _impostaCampoESport(campo);
                           });
 
                           await _caricaSlot();
@@ -489,6 +630,59 @@ class _PrenotazioneManualePageState extends State<PrenotazioneManualePage> {
                       ),
 
                       const SizedBox(height: 22),
+
+                      if (_campoSelezionato != null &&
+                          _campoSelezionato!.tariffeSport.length > 1) ...[
+                        const Text(
+                          'SPORT',
+                          style: TextStyle(
+                            color: AppTheme.neonOrange,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+
+                        DropdownButtonFormField<String>(
+                          key: ValueKey(
+                            'sport_${_campoSelezionato!.id}_$_sportSelezionato',
+                          ),
+                          initialValue: _sportSelezionato,
+                          dropdownColor: AppTheme.cardBg,
+                          decoration: _inputDecoration(
+                            label: 'Sport da prenotare',
+                            icon: Icons.sports_rounded,
+                          ),
+                          items: _campoSelezionato!.tariffeSport.map((tariffa) {
+                            return DropdownMenuItem<String>(
+                              value: tariffa.sport,
+                              child: Text(
+                                tariffa.sport
+                                    .replaceAll('_', ' ')
+                                    .toUpperCase(),
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (sport) async {
+                            if (sport == null) return;
+
+                            setState(() {
+                              _sportSelezionato = sport;
+                              final durate = _durateDisponibili();
+                              _durataSelezionata = durate.contains(60)
+                                  ? 60
+                                  : (durate.isNotEmpty ? durate.first : 60);
+                              _orarioSelezionato = null;
+                            });
+
+                            await _caricaSlot();
+                          },
+                        ),
+
+                        const SizedBox(height: 22),
+                      ],
 
                       const Text(
                         'DATA',
@@ -541,9 +735,72 @@ class _PrenotazioneManualePageState extends State<PrenotazioneManualePage> {
 
                       const SizedBox(height: 24),
 
-                      const Row(
+                      const Text(
+                        'DURATA',
+                        style: TextStyle(
+                          color: AppTheme.neonOrange,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12,
+                          letterSpacing: 1,
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: _durateDisponibili().map((durata) {
+                          final selezionata = _durataSelezionata == durata;
+
+                          return ChoiceChip(
+                            label: Text('$durata minuti'),
+                            selected: selezionata,
+                            selectedColor: AppTheme.neonOrange,
+                            backgroundColor: AppTheme.cardBg,
+                            labelStyle: TextStyle(
+                              color: selezionata
+                                  ? Colors.black
+                                  : Colors.white70,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            onSelected: (_) async {
+                              if (_isLoadingOrari || _isSaving) return;
+
+                              setState(() {
+                                _durataSelezionata = durata;
+                                _orarioSelezionato = null;
+                              });
+
+                              await _caricaSlot();
+                            },
+                          );
+                        }).toList(),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      Builder(
+                        builder: (context) {
+                          final prezzo = _prezzoSelezionato();
+
+                          return Text(
+                            prezzo == null
+                                ? 'Prezzo non disponibile'
+                                : 'Prezzo campo: ${prezzo.toStringAsFixed(2)} €',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      Row(
                         children: [
-                          Expanded(
+                          const Expanded(
                             child: Text(
                               'ORARIO DISPONIBILE',
                               style: TextStyle(
@@ -555,8 +812,8 @@ class _PrenotazioneManualePageState extends State<PrenotazioneManualePage> {
                             ),
                           ),
                           Text(
-                            '60 min',
-                            style: TextStyle(
+                            '$_durataSelezionata min',
+                            style: const TextStyle(
                               color: Colors.white38,
                               fontSize: 12,
                             ),
@@ -615,7 +872,7 @@ class _PrenotazioneManualePageState extends State<PrenotazioneManualePage> {
                               },
                               label: Text(
                                 '$slot → '
-                                '${SlotUtils.calcolaOrarioFine(slot).substring(0, 5)}',
+                                '${_orarioFine(slot, _durataSelezionata)}',
                               ),
                               selectedColor: AppTheme.neonOrange,
                               backgroundColor: AppTheme.cardBg,

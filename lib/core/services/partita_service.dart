@@ -4,6 +4,7 @@ import '../models/utente.dart';
 import '../repositories/partita_repository.dart';
 import '../repositories/orario_societa_repository.dart';
 import '../repositories/chiusura_straordinaria_repository.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 enum MetodoPagamento { nessuno, pagaOra, inSede }
 
@@ -121,39 +122,62 @@ class PartitaService {
     required String orarioInizio,
     required String orarioFine,
   }) {
-    double prezzoOrario = campo.prezzo;
+    final inizio = orarioInizio.trim().split(':');
+    final fine = orarioFine.trim().split(':');
+
+    if (inizio.length < 2 || fine.length < 2) {
+      throw StateError('Formato degli orari non valido.');
+    }
+
+    final minutiInizio = int.parse(inizio[0]) * 60 + int.parse(inizio[1]);
+
+    int minutiFine = int.parse(fine[0]) * 60 + int.parse(fine[1]);
+
+    // Consente una partita che termina esattamente a mezzanotte.
+    if (minutiFine == 0 && minutiInizio > 0) {
+      minutiFine = 24 * 60;
+    }
+
+    final durata = minutiFine - minutiInizio;
+
+    if (durata != 60 && durata != 90) {
+      throw StateError('Durata non supportata: $durata minuti.');
+    }
 
     final sportNormalizzato = sport?.trim().toLowerCase();
 
-    if (sportNormalizzato != null &&
-        sportNormalizzato.isNotEmpty &&
-        campo.tariffeSport.isNotEmpty) {
-      for (final tariffa in campo.tariffeSport) {
-        if (tariffa.sport.trim().toLowerCase() == sportNormalizzato) {
-          prezzoOrario = tariffa.prezzo;
-          break;
+    // Compatibilità con il vecchio percorso di prenotazione
+    // manuale, che attualmente non riceve lo sport.
+    if (sportNormalizzato == null || sportNormalizzato.isEmpty) {
+      if (durata != 60) {
+        throw StateError(
+          'Per prenotare 90 minuti è necessario indicare lo sport.',
+        );
+      }
+
+      if (!campo.prezzo.isFinite || campo.prezzo <= 0) {
+        throw StateError('Prezzo del campo non valido.');
+      }
+
+      return campo.prezzo;
+    }
+
+    for (final tariffa in campo.tariffeSport) {
+      if (tariffa.sport.trim().toLowerCase() == sportNormalizzato) {
+        final prezzo = tariffa.prezzoPerDurata(durata);
+
+        if (prezzo == null || !prezzo.isFinite || prezzo <= 0) {
+          throw StateError(
+            'Tariffa non disponibile per '
+            '$sportNormalizzato da $durata minuti.',
+          );
         }
+
+        return prezzo;
       }
     }
 
-    try {
-      final inizio = orarioInizio.split(':');
-      final fine = orarioFine.split(':');
-
-      final minutiInizio = int.parse(inizio[0]) * 60 + int.parse(inizio[1]);
-
-      int minutiFine = int.parse(fine[0]) * 60 + int.parse(fine[1]);
-
-      if (minutiFine == 0 && minutiInizio > 0) {
-        minutiFine = 24 * 60;
-      }
-
-      final durataOre = (minutiFine - minutiInizio) / 60.0;
-
-      return prezzoOrario * durataOre;
-    } catch (_) {
-      return prezzoOrario;
-    }
+    throw StateError('Nessuna tariffa trovata per $sportNormalizzato.');
   }
 
   Future<RisultatoCreazionePartita> creaNuovaPartita({
@@ -177,6 +201,33 @@ class PartitaService {
       }
 
       final sportNormalizzato = sport.trim().toLowerCase();
+      final minutiInizio = _orarioInMinuti(orarioInizio);
+      var minutiFine = _orarioInMinuti(orarioFine);
+
+      if (minutiFine == 0 && minutiInizio > 0) {
+        minutiFine = 24 * 60;
+      }
+
+      final durataRichiesta = minutiFine - minutiInizio;
+
+      if (durataRichiesta != 60 && durataRichiesta != 90) {
+        return RisultatoCreazionePartita.fallimento(
+          'Sono consentite soltanto partite da 60 o 90 minuti.',
+        );
+      }
+
+      final tariffaValida = campo.tariffeSport.any(
+        (tariffa) =>
+            tariffa.sport.trim().toLowerCase() == sportNormalizzato &&
+            tariffa.supportaDurata(durataRichiesta),
+      );
+
+      if (!tariffaValida) {
+        return RisultatoCreazionePartita.fallimento(
+          'Lo sport non offre una tariffa valida '
+          'per la durata richiesta.',
+        );
+      }
 
       int maxGiocatori;
 
@@ -227,6 +278,37 @@ class PartitaService {
       final bool isPartitaAperta = !isPartitaPrivata && !isPartitaGiaCompleta;
 
       final inizioEsatto = _calcolaInizioEsatto(dataPartita, orarioInizio);
+      final partiFine = orarioFine.split(':');
+
+      if (partiFine.length < 2) {
+        return RisultatoCreazionePartita.fallimento(
+          'Orario finale non valido.',
+        );
+      }
+
+      final fineEsatta = DateTime(
+        dataPartita.year,
+        dataPartita.month,
+        dataPartita.day,
+        int.parse(partiFine[0]),
+        int.parse(partiFine[1]),
+      );
+
+      final mezzanotteSuccessiva = DateTime(
+        dataPartita.year,
+        dataPartita.month,
+        dataPartita.day + 1,
+      );
+
+      final fineEffettiva = fineEsatta.isBefore(inizioEsatto)
+          ? fineEsatta.add(const Duration(days: 1))
+          : fineEsatta;
+
+      if (fineEffettiva.isAfter(mezzanotteSuccessiva)) {
+        return RisultatoCreazionePartita.fallimento(
+          'La partita non può terminare dopo mezzanotte.',
+        );
+      }
       final adesso = DateTime.now();
 
       if (adesso.isAfter(inizioEsatto)) {
@@ -265,13 +347,17 @@ class PartitaService {
         );
       }
 
-      if (await _repository.isSlotOccupato(
-        campo.id,
-        dataPartita,
-        orarioInizio,
-      )) {
+      final intervalloOccupato = await _repository.isIntervalloOccupato(
+        idCampo: campo.id,
+        data: dataPartita,
+        orarioInizio: orarioInizio,
+        orarioFine: orarioFine,
+      );
+
+      if (intervalloOccupato) {
         return RisultatoCreazionePartita.fallimento(
-          'Lo slot è già occupato da una partita completa.',
+          'Il campo è già occupato durante '
+          'l’intervallo richiesto.',
         );
       }
 
@@ -369,11 +455,24 @@ class PartitaService {
     required String idGestore,
     required DateTime dataPartita,
     required String orarioInizio,
+    int durataMinuti = 60,
+    String? sport,
     String? nomeCliente,
     String? telefonoCliente,
     String? notaGestore,
   }) async {
     try {
+      if (durataMinuti != 60 && durataMinuti != 90) {
+        return RisultatoCreazionePartita.fallimento(
+          'Sono consentite soltanto prenotazioni da 60 o 90 minuti.',
+        );
+      }
+
+      if (durataMinuti == 90 && (sport == null || sport.trim().isEmpty)) {
+        return RisultatoCreazionePartita.fallimento(
+          'Per prenotare 90 minuti devi selezionare lo sport.',
+        );
+      }
       final parti = orarioInizio.split(':');
 
       final int ora = int.parse(parti[0]);
@@ -394,7 +493,19 @@ class PartitaService {
       }
 
       // Prenotazioni : durata fissa di 60 minuti.
-      final fineEsatto = inizioEsatto.add(const Duration(minutes: 60));
+      final fineEsatto = inizioEsatto.add(Duration(minutes: durataMinuti));
+
+      final mezzanotteSuccessiva = DateTime(
+        dataPartita.year,
+        dataPartita.month,
+        dataPartita.day + 1,
+      );
+
+      if (fineEsatto.isAfter(mezzanotteSuccessiva)) {
+        return RisultatoCreazionePartita.fallimento(
+          'La prenotazione non può terminare dopo mezzanotte.',
+        );
+      }
 
       final String inizioDb =
           '${ora.toString().padLeft(2, '0')}:'
@@ -417,12 +528,14 @@ class PartitaService {
         );
       }
 
-      final disponibile = await _repository
-          .isSlotDisponibilePerPrenotazioneManuale(
-            idCampo: campo.id,
-            dataPartita: dataPartita,
-            orarioInizio: inizioDb,
-          );
+      final intervalloOccupato = await _repository.isIntervalloOccupato(
+        idCampo: campo.id,
+        data: dataPartita,
+        orarioInizio: inizioDb,
+        orarioFine: orarioFine,
+      );
+
+      final disponibile = !intervalloOccupato;
 
       if (!disponibile) {
         return RisultatoCreazionePartita.fallimento(
@@ -432,8 +545,8 @@ class PartitaService {
 
       final double importoTotale = _calcolaImportoPartita(
         campo: campo,
-        sport: null,
-        orarioInizio: orarioInizio,
+        sport: sport,
+        orarioInizio: inizioDb,
         orarioFine: orarioFine,
       );
 
@@ -443,6 +556,7 @@ class PartitaService {
         dataPartita: dataPartita,
         orarioInizio: inizioDb,
         orarioFine: orarioFine,
+        sport: sport,
         maxGiocatori: campo.numeroDiGiocatori,
         nomeCliente: nomeCliente,
         telefonoCliente: telefonoCliente,
@@ -474,6 +588,12 @@ class PartitaService {
     int ospitiExtra = 0,
   }) async {
     try {
+      final utenteAutenticato = Supabase.instance.client.auth.currentUser;
+
+      if (utenteAutenticato == null ||
+          utenteAutenticato.id != nuovoGiocatore.id) {
+        return 'Devi accedere con il tuo account per iscriverti.';
+      }
       if (ospitiExtra < 0) {
         return 'Il numero di ospiti non può essere negativo.';
       }
@@ -511,27 +631,10 @@ class PartitaService {
         return 'Posti insufficienti per te e i tuoi ospiti.';
       }
 
-      await _repository.inserisciGiocatorePartita({
-        'id_partita': partita.id,
-        'id_utente': nuovoGiocatore.id,
-        'ospiti_extra': ospitiExtra,
-      });
-
-      if (nuovoTotale >= maxPosti) {
-        await _repository.completaPartitaEAnnullaSlotRpc(
-          idPartita: partita.id,
-          nuovoTotale: nuovoTotale,
-          idCampo: partita.campo.id,
-          dataPartita: partita.dataPartita,
-          orarioInizio: partita.orarioInizio,
-        );
-      } else {
-        await _repository.aggiornaGiocatoriEStato(
-          idPartita: partita.id,
-          nuovoTotale: nuovoTotale,
-          nuovoStato: 'aperta_a_rischio',
-        );
-      }
+      await _repository.iscrivitiPartitaAtomica(
+        idPartita: partita.id,
+        ospitiExtra: ospitiExtra,
+      );
 
       return null;
     } catch (e) {

@@ -165,11 +165,27 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
         sportDaUsare = campo.tariffeSport.first.sport.trim().toLowerCase();
       }
     }
+    int durataIniziale = 60;
+
+    if (campo != null && sportDaUsare != null) {
+      for (final tariffa in campo.tariffeSport) {
+        if (tariffa.sport.trim().toLowerCase() == sportDaUsare) {
+          final durate = tariffa.durateDisponibili;
+
+          if (durate.isNotEmpty) {
+            durataIniziale = durate.contains(60) ? 60 : durate.first;
+          }
+
+          break;
+        }
+      }
+    }
 
     state = state.copyWith(
       campoSelezionato: campo,
       clearCampo: campo == null,
       sportSelezionato: sportDaUsare,
+      durataMinutiSelezionata: durataIniziale,
       ospitiExtra: 0,
       clearOrario: true,
       giorniChiusi: [],
@@ -257,7 +273,11 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
       state = CreazionePartitaState(dataSelezionata: DateTime.now());
 
   Future<void> caricaOrari(DateTime data) async {
-    if (state.campoSelezionato == null) return;
+    final campo = state.campoSelezionato;
+    if (campo == null) return;
+
+    final durata = state.durataMinutiSelezionata;
+
     state = state.copyWith(
       isLoading: true,
       dataSelezionata: data,
@@ -266,90 +286,162 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
 
     try {
       final orari = await _orarioRepo.getOrarioGiorno(
-        state.campoSelezionato!.idSocieta,
+        campo.idSocieta,
         data.weekday,
       );
 
-      final statiOrari = await _partitaRepo.getStatoOrariGiorno(
-        state.campoSelezionato!.id,
-        data,
-      );
+      final statiOrari = await _partitaRepo.getStatoOrariGiorno(campo.id, data);
 
       final chiusure = await _chiusuraRepo.getChiusurePerData(
-        state.campoSelezionato!.idSocieta,
+        campo.idSocieta,
         data,
       );
 
-      if (orari != null && !orari.isChiuso) {
-        final slots = _generaSlotDoppioTurno(orari);
-
-        List<String> slotChiusi = [];
-        List<String> slotOccupati = [];
-        Map<String, int> apertePerSlot = {};
-        Map<String, String> mieiMatchPerSlot = {};
-
-        for (var slot in slots) {
-          int minSlot = _orarioInMinuti(slot);
-          bool isChiuso = false;
-
-          for (var c in chiusure) {
-            if (c.orarioInizio == null ||
-                c.orarioFine == null ||
-                (minSlot >= _orarioInMinuti(c.orarioInizio!) &&
-                    minSlot < _orarioInMinuti(c.orarioFine!))) {
-              slotChiusi.add(slot);
-              isChiuso = true;
-              break;
-            }
-          }
-
-          if (!isChiuso) {
-            final info = statiOrari[slot];
-            if (info != null) {
-              bool fisso = info['occupato_fisso'] as bool;
-              int aperte = info['aperte'] as int;
-              final String? mioMatchId = info['mio_match_aperto_id'] as String?;
-
-              if (fisso) {
-                slotOccupati.add(slot);
-              } else if (aperte > 0) {
-                apertePerSlot[slot] = aperte;
-
-                if (mioMatchId != null && mioMatchId.isNotEmpty) {
-                  mieiMatchPerSlot[slot] = mioMatchId;
-                }
-              }
-            }
-          }
-        }
-
-        final firstAvailable = slots.firstWhere(
-          (s) => !slotChiusi.contains(s) && !slotOccupati.contains(s),
-          orElse: () => '',
-        );
-
-        state = state.copyWith(
-          orariDisponibili: slots,
-          orariOccupati: slotOccupati,
-          orariChiusi: slotChiusi,
-          partiteApertePerSlot: apertePerSlot,
-          mieiMatchApertiPerSlot: mieiMatchPerSlot,
-          oraInizioSelezionata: firstAvailable.isNotEmpty
-              ? firstAvailable
-              : null,
-          isLoading: false,
-        );
-      } else {
+      if (orari == null || orari.isChiuso) {
         state = state.copyWith(
           isLoading: false,
           orariDisponibili: [],
           orariChiusi: [],
           orariOccupati: [],
+          partiteApertePerSlot: {},
+          mieiMatchApertiPerSlot: {},
+          clearOrario: true,
         );
+        return;
       }
+
+      final slots = _generaSlotDoppioTurno(orari);
+
+      final List<String> slotChiusi = [];
+      final List<String> slotOccupati = [];
+      final Map<String, int> apertePerSlot = {};
+      final Map<String, String> mieiMatchPerSlot = {};
+
+      // Verifica tutti gli slot anche quando iniziano a :30.
+      // Il controllo sul database considera l'intero intervallo.
+      final intervalliOccupati = await _partitaRepo.getIntervalliOccupatiGiorno(
+        idCampo: campo.id,
+        data: data,
+      );
+
+      for (final slot in slots) {
+        final inizioSlot = _orarioInMinuti(slot);
+        final fineSlot = inizioSlot + durata;
+
+        bool isChiuso = false;
+
+        // Controlla le chiusure sull'intera durata,
+        // non soltanto sull'orario di partenza.
+        for (final chiusura in chiusure) {
+          if (chiusura.orarioInizio == null || chiusura.orarioFine == null) {
+            isChiuso = true;
+            break;
+          }
+
+          final inizioChiusura = _orarioInMinuti(chiusura.orarioInizio!);
+
+          int fineChiusura = _orarioInMinuti(chiusura.orarioFine!);
+
+          if (fineChiusura == 0 && inizioChiusura > 0) {
+            fineChiusura = 24 * 60;
+          }
+
+          if (_intervalliSovrapposti(
+            inizioSlot,
+            fineSlot,
+            inizioChiusura,
+            fineChiusura,
+          )) {
+            isChiuso = true;
+            break;
+          }
+        }
+
+        if (isChiuso) {
+          slotChiusi.add(slot);
+          continue;
+        }
+
+        // Risultato della funzione SQL slot_occupato_reale.
+        final occupato = intervalliOccupati.any((prenotazione) {
+          final inizioOccupazione = _orarioInMinuti(
+            prenotazione['orario_inizio'].toString(),
+          );
+
+          int fineOccupazione = _orarioInMinuti(
+            prenotazione['orario_fine'].toString(),
+          );
+
+          if (fineOccupazione == 0 && inizioOccupazione > 0) {
+            fineOccupazione = 24 * 60;
+          }
+
+          return _intervalliSovrapposti(
+            inizioSlot,
+            fineSlot,
+            inizioOccupazione,
+            fineOccupazione,
+          );
+        });
+
+        if (occupato) {
+          slotOccupati.add(slot);
+          continue;
+        }
+
+        // Manteniamo temporaneamente il conteggio dei match
+        // aperti con lo stesso orario iniziale.
+        final info = statiOrari[slot];
+
+        if (info != null) {
+          final aperte = (info['aperte'] as num?)?.toInt() ?? 0;
+
+          final mioMatchId = info['mio_match_aperto_id'] as String?;
+
+          if (aperte > 0) {
+            apertePerSlot[slot] = aperte;
+          }
+
+          if (mioMatchId != null && mioMatchId.isNotEmpty) {
+            mieiMatchPerSlot[slot] = mioMatchId;
+          }
+        }
+      }
+
+      final primoLibero = slots.firstWhere(
+        (slot) => !slotChiusi.contains(slot) && !slotOccupati.contains(slot),
+        orElse: () => '',
+      );
+
+      // Se l'utente ha già cambiato campo, data o durata
+      // mentre caricavamo, non mostriamo risultati vecchi.
+      if (state.campoSelezionato?.id != campo.id ||
+          state.durataMinutiSelezionata != durata ||
+          state.dataSelezionata != data) {
+        return;
+      }
+
+      state = state.copyWith(
+        isLoading: false,
+        orariDisponibili: slots,
+        orariOccupati: slotOccupati,
+        orariChiusi: slotChiusi,
+        partiteApertePerSlot: apertePerSlot,
+        mieiMatchApertiPerSlot: mieiMatchPerSlot,
+        oraInizioSelezionata: primoLibero.isNotEmpty ? primoLibero : null,
+      );
     } catch (e) {
-      state = state.copyWith(isLoading: false);
-      debugPrint("Errore orari: $e");
+      debugPrint('Errore caricamento orari: $e');
+
+      state = state.copyWith(
+        isLoading: false,
+        orariDisponibili: [],
+        orariOccupati: [],
+        orariChiusi: [],
+        partiteApertePerSlot: {},
+        mieiMatchApertiPerSlot: {},
+        clearOrario: true,
+      );
     }
   }
 
@@ -414,6 +506,40 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
   }) async {
     if (state.oraInizioSelezionata == null || state.campoSelezionato == null) {
       throw Exception('Dati partita incompleti.');
+    }
+
+    final orarioScelto = state.oraInizioSelezionata;
+
+    if (orarioScelto == null ||
+        !state.orariDisponibili.contains(orarioScelto) ||
+        state.orariOccupati.contains(orarioScelto) ||
+        state.orariChiusi.contains(orarioScelto)) {
+      throw Exception(
+        'L’orario selezionato non è disponibile. '
+        'Aggiorna il calendario e riprova.',
+      );
+    }
+    final durateConsentite = getDurateDisponibiliCampo();
+
+    if (!durateConsentite.contains(state.durataMinutiSelezionata)) {
+      throw Exception(
+        'La durata selezionata non è disponibile per questo campo.',
+      );
+    }
+    final campoDaPrenotare = state.campoSelezionato!;
+    final durataDaPrenotare = state.durataMinutiSelezionata;
+
+    final tariffaPresente = campoDaPrenotare.tariffeSport.any(
+      (tariffa) =>
+          tariffa.sport.trim().toLowerCase() ==
+              state.sportSelezionato.trim().toLowerCase() &&
+          tariffa.supportaDurata(durataDaPrenotare),
+    );
+
+    if (!tariffaPresente) {
+      throw Exception(
+        'La tariffa per la durata selezionata non è più disponibile.',
+      );
     }
     state = state.copyWith(isLoading: true);
 
@@ -512,6 +638,10 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
 
   List<String> _generaSlotDoppioTurno(OrarioSocieta orari) {
     List<String> slotsValidi = [];
+    // Se lo sport prevede una sola durata, gli slot partono con quella
+    // cadenza. Se prevede sia 60 che 90 minuti, partono ogni 30 minuti.
+    final durate = getDurateDisponibiliCampo();
+    final passoMinuti = durate.length == 1 ? durate.first : 30;
 
     if (orari.orarioApertura != null && orari.orarioChiusura != null) {
       int minAttuale = _orarioInMinuti(orari.orarioApertura!);
@@ -521,11 +651,11 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
         minLimite = 24 * 60;
       }
 
-      while (minAttuale + 60 <= minLimite) {
+      while (minAttuale + state.durataMinutiSelezionata <= minLimite) {
         slotsValidi.add(
           "${(minAttuale ~/ 60 % 24).toString().padLeft(2, '0')}:${(minAttuale % 60).toString().padLeft(2, '0')}",
         );
-        minAttuale += 60;
+        minAttuale += passoMinuti;
       }
     }
 
@@ -537,13 +667,13 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
         minLimite2 = 24 * 60;
       }
 
-      while (minAttuale2 + 60 <= minLimite2) {
+      while (minAttuale2 + state.durataMinutiSelezionata <= minLimite2) {
         String slot =
             "${(minAttuale2 ~/ 60 % 24).toString().padLeft(2, '0')}:${(minAttuale2 % 60).toString().padLeft(2, '0')}";
         if (!slotsValidi.contains(slot)) {
           slotsValidi.add(slot);
         }
-        minAttuale2 += 60;
+        minAttuale2 += passoMinuti;
       }
     }
 
@@ -563,14 +693,22 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
     return (ore * 60) + minuti;
   }
 
+  bool _intervalliSovrapposti(int inizioA, int fineA, int inizioB, int fineB) {
+    return inizioA < fineB && fineA > inizioB;
+  }
+
+  int _minutiFine(String orarioInizio, int durata) {
+    return _orarioInMinuti(orarioInizio) + durata;
+  }
+
   String _calcolaOrarioFine(String oraInizio) {
-    int totalMinutes = _orarioInMinuti(oraInizio) + 60;
+    final int totalMinutes =
+        _orarioInMinuti(oraInizio) + state.durataMinutiSelezionata;
     return "${(totalMinutes ~/ 60 % 24).toString().padLeft(2, '0')}:${(totalMinutes % 60).toString().padLeft(2, '0')}:00";
   }
 
   void cambiaSportCampo(String sport) {
     final campo = state.campoSelezionato;
-
     if (campo == null) return;
 
     final sportNormalizzato = sport.trim().toLowerCase();
@@ -581,7 +719,69 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
 
     if (!supportato) return;
 
-    state = state.copyWith(sportSelezionato: sportNormalizzato, ospitiExtra: 0);
+    final nuovaDurata = durataPredefinitaPerSport(campo, sportNormalizzato);
+
+    state = state.copyWith(
+      sportSelezionato: sportNormalizzato,
+      durataMinutiSelezionata: nuovaDurata,
+      ospitiExtra: 0,
+      clearOrario: true,
+    );
+
+    caricaOrari(state.dataSelezionata);
+  }
+
+  int durataPredefinitaPerSport(Campo campo, String sport) {
+    final sportNormalizzato = sport.trim().toLowerCase();
+
+    for (final tariffa in campo.tariffeSport) {
+      if (tariffa.sport.trim().toLowerCase() == sportNormalizzato) {
+        final durate = tariffa.durateDisponibili;
+
+        if (durate.isEmpty) {
+          throw StateError('Nessuna durata disponibile per questo sport.');
+        }
+
+        return durate.contains(60) ? 60 : durate.first;
+      }
+    }
+
+    throw StateError('Sport non disponibile su questo campo.');
+  }
+
+  List<int> getDurateDisponibiliCampo() {
+    final campo = state.campoSelezionato;
+
+    if (campo == null) {
+      return [60];
+    }
+
+    for (final tariffa in campo.tariffeSport) {
+      if (tariffa.sport == state.sportSelezionato) {
+        return tariffa.durateDisponibili;
+      }
+    }
+
+    return [];
+  }
+
+  Future<void> cambiaDurataCampo(int durataMinuti) async {
+    final durateDisponibili = getDurateDisponibiliCampo();
+
+    if (!durateDisponibili.contains(durataMinuti)) {
+      return;
+    }
+
+    if (state.durataMinutiSelezionata == durataMinuti) {
+      return;
+    }
+
+    state = state.copyWith(
+      durataMinutiSelezionata: durataMinuti,
+      clearOrario: true,
+    );
+
+    await caricaOrari(state.dataSelezionata);
   }
 
   Future<void> impostaSport(String sport) async {
@@ -689,17 +889,28 @@ class CreazionePartitaController extends Notifier<CreazionePartitaState> {
   }
 
   double getPrezzoSportSelezionato() {
-    if (state.campoSelezionato == null) return 0.0;
-    final campo = state.campoSelezionato!;
+    final campo = state.campoSelezionato;
 
-    if (campo.tariffeSport.isNotEmpty) {
-      for (var t in campo.tariffeSport) {
-        if (t.sport == state.sportSelezionato) {
-          return t.prezzo;
+    if (campo == null) return 0.0;
+
+    final sport = state.sportSelezionato.trim().toLowerCase();
+    final durata = state.durataMinutiSelezionata;
+
+    for (final tariffa in campo.tariffeSport) {
+      if (tariffa.sport.trim().toLowerCase() == sport) {
+        final prezzo = tariffa.prezzoPerDurata(durata);
+
+        if (prezzo == null || !prezzo.isFinite || prezzo <= 0) {
+          throw StateError(
+            'Nessun prezzo valido per $sport da $durata minuti.',
+          );
         }
+
+        return prezzo;
       }
     }
-    return campo.prezzo;
+
+    throw StateError('Tariffa non disponibile per lo sport selezionato.');
   }
 
   Future<void> _caricaUltimoSport() async {

@@ -49,7 +49,10 @@ class _AggiungiCampoState extends State<AggiungiCampo> {
   ];
 
   final Map<String, bool> _sportSelezionati = {};
-  final Map<String, TextEditingController> _prezzoControllers = {};
+  final Map<String, Map<int, TextEditingController>> _prezziDurataControllers =
+      {};
+
+  final Map<String, Set<int>> _durateAbilitate = {};
 
   bool _isCoperto = false;
   bool _isCaricamento = false;
@@ -65,8 +68,15 @@ class _AggiungiCampoState extends State<AggiungiCampo> {
 
     for (var sport in _sportDisponibili) {
       final sportId = sport['id'] as String;
+
       _sportSelezionati[sportId] = false;
-      _prezzoControllers[sportId] = TextEditingController();
+
+      _prezziDurataControllers[sportId] = {
+        60: TextEditingController(),
+        90: TextEditingController(),
+      };
+
+      _durateAbilitate[sportId] = {60};
     }
 
     if (widget.campoEsistente != null) {
@@ -84,15 +94,37 @@ class _AggiungiCampoState extends State<AggiungiCampo> {
 
           if (_sportSelezionati.containsKey(sportId)) {
             _sportSelezionati[sportId] = true;
-            _prezzoControllers[sportId]?.text = prezzo > 0
-                ? prezzo.toStringAsFixed(2)
-                : '';
+
+            final raw = t['prezzi_durata'];
+
+            if (raw is Map) {
+              _durateAbilitate[sportId] = {};
+
+              for (final durata in [60, 90]) {
+                final valore = raw[durata.toString()];
+
+                if (valore is num && valore > 0) {
+                  _durateAbilitate[sportId]!.add(durata);
+                  _prezziDurataControllers[sportId]![durata]!.text = valore
+                      .toStringAsFixed(2);
+                }
+              }
+            } else {
+              // Tariffa precedente: soltanto 60 minuti.
+              _durateAbilitate[sportId] = {60};
+
+              _prezziDurataControllers[sportId]![60]!.text = prezzo > 0
+                  ? prezzo.toStringAsFixed(2)
+                  : '';
+            }
           }
         }
       } else {
         final double prezzoVecchio = (c['prezzo'] ?? 0).toDouble();
         _sportSelezionati['calcio_5'] = true;
-        _prezzoControllers['calcio_5']?.text = prezzoVecchio > 0
+        _durateAbilitate['calcio_5'] = {60};
+
+        _prezziDurataControllers['calcio_5']![60]!.text = prezzoVecchio > 0
             ? prezzoVecchio.toStringAsFixed(2)
             : '';
       }
@@ -106,8 +138,10 @@ class _AggiungiCampoState extends State<AggiungiCampo> {
   @override
   void dispose() {
     _nomeController.dispose();
-    for (var controller in _prezzoControllers.values) {
-      controller.dispose();
+    for (final controllers in _prezziDurataControllers.values) {
+      for (final controller in controllers.values) {
+        controller.dispose();
+      }
     }
     super.dispose();
   }
@@ -181,15 +215,47 @@ class _AggiungiCampoState extends State<AggiungiCampo> {
 
         for (var sport in _sportDisponibili) {
           final sportId = sport['id'] as String;
+
           if (_sportSelezionati[sportId] == true) {
-            final textPrezzo =
-                _prezzoControllers[sportId]?.text.trim().replaceAll(',', '.') ??
-                '0';
-            final double prezzoParsed = double.tryParse(textPrezzo) ?? 0.0;
+            final Map<String, double> prezziDurata = {};
+            final durateAttive = _durateAbilitate[sportId] ?? <int>{};
 
-            tariffeSport.add({'sport': sportId, 'prezzo': prezzoParsed});
+            if (durateAttive.isEmpty) {
+              throw Exception(
+                'Seleziona almeno una durata per ${sport['label']}.',
+              );
+            }
 
-            prezzoPrincipale ??= prezzoParsed;
+            for (final durata in [60, 90]) {
+              if (!durateAttive.contains(durata)) continue;
+
+              final testo = _prezziDurataControllers[sportId]![durata]!.text
+                  .trim()
+                  .replaceAll(',', '.');
+
+              final prezzo = double.tryParse(testo);
+
+              if (prezzo == null || !prezzo.isFinite || prezzo <= 0) {
+                throw Exception(
+                  'Inserisci un prezzo valido per ${sport['label']} '
+                  '($durata minuti).',
+                );
+              }
+
+              prezziDurata[durata.toString()] = prezzo;
+            }
+
+            // Mantiene il vecchio campo "prezzo" per compatibilità.
+            final prezzoRiferimento =
+                prezziDurata['60'] ?? prezziDurata['90'] ?? 0.0;
+
+            tariffeSport.add({
+              'sport': sportId,
+              'prezzo': prezzoRiferimento,
+              'prezzi_durata': prezziDurata,
+            });
+
+            prezzoPrincipale ??= prezzoRiferimento;
           }
         }
 
@@ -600,7 +666,7 @@ class _AggiungiCampoState extends State<AggiungiCampo> {
                         ),
                       ),
                       Text(
-                        '60 min standard',
+                        '60 / 90 minuti',
                         style: TextStyle(
                           color: Colors.grey.shade500,
                           fontSize: 11,
@@ -702,39 +768,77 @@ class _AggiungiCampoState extends State<AggiungiCampo> {
                               ],
                             ),
                           ),
+
                           if (isSelected) ...[
                             const SizedBox(height: 16),
-                            TextFormField(
-                              controller: _prezzoControllers[sportId],
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
+
+                            for (final durata in [60, 90]) ...[
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text(
+                                  '$durata minuti',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
                                   ),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                                ),
+                                activeThumbColor: AppTheme.neonOrange,
+                                value: _durateAbilitate[sportId]!.contains(
+                                  durata,
+                                ),
+                                onChanged: (attivo) {
+                                  setState(() {
+                                    if (attivo) {
+                                      _durateAbilitate[sportId]!.add(durata);
+                                    } else {
+                                      _durateAbilitate[sportId]!.remove(durata);
+                                    }
+                                  });
+                                },
                               ),
-                              decoration: _stileInput(
-                                'Tariffa Oraria',
-                                Icons.euro_symbol_rounded,
-                                prefixText: '€ ',
-                              ),
-                              validator: (val) {
-                                if (_sportSelezionati[sportId] == true) {
-                                  if (val == null || val.trim().isEmpty) {
-                                    return 'Inserisci la tariffa';
-                                  }
-                                  final parsed = double.tryParse(
-                                    val.trim().replaceAll(',', '.'),
-                                  );
-                                  if (parsed == null || parsed <= 0) {
-                                    return 'Inserisci una cifra valida';
-                                  }
-                                }
-                                return null;
-                              },
-                            ),
+
+                              if (_durateAbilitate[sportId]!.contains(durata))
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: TextFormField(
+                                    controller:
+                                        _prezziDurataControllers[sportId]![durata],
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                          decimal: true,
+                                        ),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    decoration: _stileInput(
+                                      'Prezzo per $durata minuti',
+                                      Icons.euro_symbol_rounded,
+                                      prefixText: '€ ',
+                                    ),
+                                    validator: (val) {
+                                      if (_sportSelezionati[sportId] != true ||
+                                          !_durateAbilitate[sportId]!.contains(
+                                            durata,
+                                          )) {
+                                        return null;
+                                      }
+
+                                      final prezzo = double.tryParse(
+                                        (val ?? '').trim().replaceAll(',', '.'),
+                                      );
+
+                                      if (prezzo == null ||
+                                          !prezzo.isFinite ||
+                                          prezzo <= 0) {
+                                        return 'Inserisci un prezzo valido';
+                                      }
+
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                            ],
                           ],
                         ],
                       ),

@@ -906,28 +906,14 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.only(left: 10, bottom: 34),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.emoji_events_outlined,
-                            color: AppTheme.neonOrange,
-                            size: 24,
-                          ),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'MATCHINZONA',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: .4,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                        ],
+                    Padding(
+                      padding: const EdgeInsets.only(left: 10, bottom: 34),
+                      child: Image.asset(
+                        'assets/images/logo_matchinzona_largo.png',
+                        width: 190,
+                        height: 55,
+                        fit: BoxFit.contain,
+                        alignment: Alignment.centerLeft,
                       ),
                     ),
                     _webNavItem(Icons.dashboard_outlined, 'Dashboard', 0),

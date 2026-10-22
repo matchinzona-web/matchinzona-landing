@@ -171,6 +171,61 @@ class PartitaRepository {
     return response != null;
   }
 
+  /// Recupera tutti gli intervalli occupati di un campo
+  /// in una data giornata con una sola chiamata SQL.
+  Future<List<Map<String, dynamic>>> getIntervalliOccupatiGiorno({
+    required String idCampo,
+    required DateTime data,
+  }) async {
+    final dataStr = _formatData(data);
+
+    final response = await _supabase.rpc(
+      'get_intervalli_occupati_campo',
+      params: {'p_id_campo': idCampo, 'p_data': dataStr},
+    );
+
+    if (response is! List) {
+      throw StateError(
+        'Risposta non valida durante il caricamento degli intervalli.',
+      );
+    }
+
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  /// Controlla se esiste una partita completa che si sovrappone
+  /// all'intero intervallo richiesto.
+  ///
+  /// Compatibile con prenotazioni da 60 e 90 minuti.
+  Future<bool> isIntervalloOccupato({
+    required String idCampo,
+    required DateTime data,
+    required String orarioInizio,
+    required String orarioFine,
+  }) async {
+    final dataStr = _formatData(data);
+
+    try {
+      final response = await _supabase.rpc(
+        'slot_occupato_reale',
+        params: {
+          'p_id_campo': idCampo,
+          'p_data': dataStr,
+          'p_inizio': orarioInizio,
+          'p_fine': orarioFine,
+        },
+      );
+
+      if (response is bool) {
+        return response;
+      }
+
+      throw Exception('Risposta non valida dal database.');
+    } on PostgrestException catch (e) {
+      throw Exception('Impossibile verificare la disponibilità: ${e.message}');
+    }
+  }
+
   Future<Map<String, dynamic>> creaPartitaDinamica(
     Map<String, dynamic> parametri,
   ) async {
@@ -197,6 +252,32 @@ class PartitaRepository {
     } catch (e) {
       throw Exception('Impossibile completare la creazione in questo momento.');
     }
+  }
+
+  Future<Map<String, dynamic>> iscrivitiPartitaAtomica({
+    required String idPartita,
+    int ospitiExtra = 0,
+  }) async {
+    if (ospitiExtra < 0) {
+      throw ArgumentError('Il numero di ospiti non può essere negativo.');
+    }
+
+    final response = await _supabase.rpc(
+      'iscriviti_partita_atomica',
+      params: {'p_id_partita': idPartita, 'p_ospiti_extra': ospitiExtra},
+    );
+
+    if (response is! Map) {
+      throw StateError('Risposta non valida durante l’iscrizione.');
+    }
+
+    final risultato = Map<String, dynamic>.from(response);
+
+    if (risultato['successo'] != true) {
+      throw StateError('Iscrizione non completata.');
+    }
+
+    return risultato;
   }
 
   Future<void> inserisciGiocatorePartita(
@@ -512,6 +593,7 @@ class PartitaRepository {
     required DateTime dataPartita,
     required String orarioInizio,
     required String orarioFine,
+    String? sport,
     required int maxGiocatori,
     String? nomeCliente,
     String? telefonoCliente,
@@ -529,6 +611,7 @@ class PartitaRepository {
             'data_partita': dataStr,
             'orario_inizio': orarioInizio,
             'orario_fine': orarioFine,
+            'sport': sport,
 
             // Prenotazione manuale = campo intero occupato.
             'numero_giocatori_prenotati': maxGiocatori,

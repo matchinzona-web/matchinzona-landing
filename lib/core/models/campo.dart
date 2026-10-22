@@ -2,15 +2,58 @@ import 'societa.dart';
 
 class TariffaSport {
   final String sport;
+
+  // Prezzo di riferimento mantenuto per compatibilità.
   final double prezzo;
 
-  TariffaSport({required this.sport, required this.prezzo});
+  // Tariffe effettivamente abilitate: 60 e/o 90 minuti.
+  final Map<int, double> prezziDurata;
+
+  TariffaSport({
+    required this.sport,
+    required this.prezzo,
+    Map<int, double>? prezziDurata,
+  }) : prezziDurata = prezziDurata ?? {60: prezzo};
 
   factory TariffaSport.fromJson(Map<String, dynamic> json) {
-    return TariffaSport(
-      sport: json['sport'] as String,
-      prezzo: (json['prezzo'] as num).toDouble(),
-    );
+    final sport = json['sport'] as String;
+    final prezzo = (json['prezzo'] as num).toDouble();
+    final raw = json['prezzi_durata'];
+
+    // I dati vecchi non hanno prezzi_durata:
+    // restano automaticamente prenotabili per 60 minuti.
+    if (raw is! Map) {
+      return TariffaSport(
+        sport: sport,
+        prezzo: prezzo,
+        prezziDurata: {60: prezzo},
+      );
+    }
+
+    final Map<int, double> durate = {};
+
+    for (final durata in [60, 90]) {
+      final valore = raw[durata.toString()];
+
+      if (valore is num && valore > 0) {
+        durate[durata] = valore.toDouble();
+      }
+    }
+
+    return TariffaSport(sport: sport, prezzo: prezzo, prezziDurata: durate);
+  }
+
+  List<int> get durateDisponibili {
+    final durate = prezziDurata.keys.toList()..sort();
+    return durate;
+  }
+
+  bool supportaDurata(int minuti) {
+    return prezziDurata.containsKey(minuti);
+  }
+
+  double? prezzoPerDurata(int minuti) {
+    return prezziDurata[minuti];
   }
 }
 
