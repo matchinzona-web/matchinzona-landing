@@ -137,19 +137,14 @@ class StatisticheState {
       }
 
       if (periodoSelezionato == 'Settimana') {
-        final inizioSettimana = adesso.subtract(
-          Duration(days: adesso.weekday - 1),
-        );
+        final oggi = DateTime(adesso.year, adesso.month, adesso.day);
 
-        final dataInizioPura = DateTime(
-          inizioSettimana.year,
-          inizioSettimana.month,
-          inizioSettimana.day,
-        );
+        final inizioSettimana = oggi.subtract(Duration(days: oggi.weekday - 1));
 
-        return dataPartita.isAfter(
-          dataInizioPura.subtract(const Duration(seconds: 1)),
-        );
+        final fineSettimana = inizioSettimana.add(const Duration(days: 7));
+
+        return !dataPartita.isBefore(inizioSettimana) &&
+            dataPartita.isBefore(fineSettimana);
       }
 
       if (periodoSelezionato == 'Mese') {

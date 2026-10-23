@@ -228,8 +228,8 @@ class _AccessoRiservatoGestoriState extends State<_AccessoRiservatoGestori> {
   static const String _playStoreUrl =
       'https://play.google.com/store/apps/details?id=com.matchly.app';
 
-  // LINK PROVVISORIO: sostituire con quello ufficiale.
-  static const String _appStoreUrl = 'https://apps.apple.com/it/';
+  static const String _appStoreUrl =
+      'https://apps.apple.com/app/matchinzona/id6822423689';
 
   @override
   void initState() {
@@ -374,7 +374,7 @@ class _AccessoRiservatoGestoriState extends State<_AccessoRiservatoGestori> {
                   TextButton(
                     onPressed: _tornaAllaLanding,
                     child: const Text(
-                      'TORNA ALLA LANDING',
+                      'TORNA ALLA HOME',
                       style: TextStyle(
                         color: Color(0xFFCFD8D0),
                         fontWeight: FontWeight.bold,

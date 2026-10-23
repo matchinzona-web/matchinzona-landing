@@ -7,9 +7,8 @@ import 'package:app_campi/core/theme/app_theme.dart';
 const String googlePlayUrl =
     'https://play.google.com/store/apps/details?id=com.matchly.app';
 
-// Inserisci qui il link della tua app quando sarà pubblicata su App Store.
-// Fino ad allora, il pulsante Apple rimane disabilitato.
-const String appleAppStoreUrl = '';
+const String appleAppStoreUrl =
+    'https://apps.apple.com/app/matchinzona/id6822423689';
 
 const Color _bg = Color(0xFF07100D);
 const Color _card = Color(0xFF0D1712);
@@ -917,24 +916,50 @@ class _LandingGestoreWebPageState extends State<LandingGestoreWebPage> {
           ),
           const SizedBox(height: 16),
           const Text(
-            'L’app per i giocatori è disponibile su Android. '
-            'Presto anche su iPhone.',
+            'Scarica gratuitamente MatchInZona su Google Play e App Store. '
+            'Trova giocatori, scopri campi sportivi e organizza le tue partite.',
             textAlign: TextAlign.center,
             style: TextStyle(color: _secondary, fontSize: 15, height: 1.7),
           ),
           const SizedBox(height: 28),
-          OutlinedButton.icon(
-            onPressed: () => _apriUrl(googlePlayUrl),
-            icon: const Icon(Icons.play_arrow_rounded, size: 26),
-            label: const Text('SCARICA DA GOOGLE PLAY'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              side: const BorderSide(color: _cardBorder),
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 17),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 14,
+            runSpacing: 14,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _apriUrl(googlePlayUrl),
+                icon: const Icon(Icons.play_arrow_rounded, size: 26),
+                label: const Text('SCARICA DA GOOGLE PLAY'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: _cardBorder),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 22,
+                    vertical: 17,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
               ),
-            ),
+              OutlinedButton.icon(
+                onPressed: () => _apriUrl(appleAppStoreUrl),
+                icon: const Icon(Icons.apple_rounded, size: 26),
+                label: const Text('SCARICA DA APP STORE'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: _cardBorder),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 22,
+                    vertical: 17,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

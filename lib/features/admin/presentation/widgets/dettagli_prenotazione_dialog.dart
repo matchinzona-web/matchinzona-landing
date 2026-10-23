@@ -236,29 +236,9 @@ class DettagliPrenotazioneDialog extends StatelessWidget {
         sportDisputato = 'Sport';
     }
 
-    // 🟢 3. CALCOLO DINAMICO DELL'INCASSO DAL DATABASE
-    // 🟢 3. CALCOLO DINAMICO DELL'INCASSO (FALLBACK MULTIPLO)
-    final List<dynamic> tariffeRaw =
-        campo['tariffe_sport'] as List<dynamic>? ?? [];
-
-    // Cerca il prezzo base prima nel campo, poi nella partita stessa
-    double incassoTotale =
-        (campo['prezzo'] as num?)?.toDouble() ??
-        (partita['prezzo'] as num?)?.toDouble() ??
-        (partita['prezzo_totale'] as num?)?.toDouble() ??
-        0.0;
-
-    // Se ci sono tariffe specifiche per sport, cerca quella per lo sport giocato
-    if (tariffeRaw.isNotEmpty && sportRaw.isNotEmpty) {
-      final tariffaTrovata = tariffeRaw.firstWhere(
-        (t) => (t['sport'] ?? '').toString().trim().toLowerCase() == sportRaw,
-        orElse: () => null,
-      );
-
-      if (tariffaTrovata != null && tariffaTrovata['prezzo'] != null) {
-        incassoTotale = (tariffaTrovata['prezzo'] as num).toDouble();
-      }
-    }
+    // Prezzo storico fissato al momento della prenotazione.
+    final double incassoTotale =
+        (partita['importo_totale'] as num?)?.toDouble() ?? 0.0;
 
     return AlertDialog(
       backgroundColor: AppTheme.cardBg,

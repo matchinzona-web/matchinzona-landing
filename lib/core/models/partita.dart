@@ -18,6 +18,7 @@ class Partita {
   final int? maxGiocatori; // 🟢 Campo opzionale dal DB
   final String? stripePaymentIntentId;
   final int? importoRimborsabileCentesimi;
+  final double? importoTotale;
 
   List<GiocatorePartita> listaGiocatoriIscritti;
 
@@ -36,6 +37,7 @@ class Partita {
     this.listaGiocatoriIscritti = const [],
     this.stripePaymentIntentId,
     this.importoRimborsabileCentesimi,
+    this.importoTotale,
     this.sport,
   });
 
@@ -48,30 +50,21 @@ class Partita {
     return campo.numeroDiGiocatori;
   }
 
-  /// 🟢 CALCOLO QUOTA SINGOLA DINAMICO (Prende la tariffa corretta dalle tariffe del campo)
-  double get quotaSingolaGiocatore {
-    final int maxPosti = maxGiocatoriReali;
-    if (maxPosti == 0) return 0.0;
-
-    double prezzoTotaleCampo = campo.prezzo;
-
-    // Se è Tennis Doppio (4 giocatori), cerca la tariffa "Tennis Doppio" in tariffeSport
-    if (isTennis && maxPosti == 4) {
-      final tariffaDoppio = campo.tariffeSport.firstWhere(
-        (t) => t.sport.toLowerCase().contains('doppio'),
-        orElse: () => TariffaSport(sport: 'doppio', prezzo: campo.prezzo),
-      );
-
-      // Se ha trovato la tariffa specifica (es. 20€), la usa. Altrimenti fallback intelligente a 20€ (o 1.33x)
-      if (tariffaDoppio.prezzo > campo.prezzo) {
-        prezzoTotaleCampo = tariffaDoppio.prezzo;
-      } else if (campo.prezzo == 15.0) {
-        prezzoTotaleCampo =
-            20.0; // Fallback se tariffeSport non è popolato nei Miei Match
-      }
+  double get prezzoTotalePrenotazione {
+    if (importoTotale != null) {
+      return importoTotale!;
     }
 
-    return prezzoTotaleCampo / maxPosti; // Es: 20€ / 4 = 5.00€
+    // Compatibilità temporanea con prenotazioni senza importo salvato.
+    return campo.prezzo;
+  }
+
+  double get quotaSingolaGiocatore {
+    final maxPosti = maxGiocatoriReali;
+
+    if (maxPosti <= 0) return 0.0;
+
+    return prezzoTotalePrenotazione / maxPosti;
   }
 
   /// 🟢 AGGIORNATI PER USARE maxGiocatoriReali AL POSTO DI campo.numeroDiGiocatori
@@ -151,6 +144,7 @@ class Partita {
       stripePaymentIntentId: json['stripe_payment_intent_id'] as String?,
       importoRimborsabileCentesimi:
           json['importo_rimborsabile_centesimi'] as int?,
+      importoTotale: (json['importo_totale'] as num?)?.toDouble(),
     );
   }
 
