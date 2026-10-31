@@ -15,10 +15,12 @@ const corsHeaders = {
 };
 
 const PRICE_IDS: Record<string, string> = {
-  BASE: "price_1UGdGWFxZCOuiQIA42y8kWez",
-  PRO: "price_1UGdHNFxZCOuiQIAbHY8idXK",
-  BUSINESS: "price_1UGdHzFxZCOuiQIARoCgLykS",
+  BASE: "price_1UVEqiFxZCOuiQIACGeAoiMk",
+  PRO: "price_1UVEs8FxZCOuiQIAYycswuuo",
+  BUSINESS: "price_1UVEslFxZCOuiQIAbjIY8noU",
 };
+
+const ORIGINI_CONSENTITE = ["https://matchinzona.it", "http://localhost:3000"];
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -120,6 +122,12 @@ serve(async (req) => {
 
     const priceId = PRICE_IDS[piano];
 
+    const origineRichiesta = body.origin?.toString();
+    const origine =
+      origineRichiesta && ORIGINI_CONSENTITE.includes(origineRichiesta)
+        ? origineRichiesta
+        : "https://matchinzona.it";
+
     // ---------------------------------------------------------
     // 3. VERIFICA CHE LA SOCIETÀ APPARTENGA ALL'UTENTE
     // ---------------------------------------------------------
@@ -164,6 +172,25 @@ serve(async (req) => {
       );
     }
 
+    // Chi ha già un abbonamento Stripe attivo non deve crearne un secondo:
+    // upgrade e downgrade passano dal portale clienti.
+    const statoAttuale = societa.status_abbonamento;
+    if (
+      societa.stripe_customer_id &&
+      (statoAttuale === "active" || statoAttuale === "payment_failed")
+    ) {
+      return new Response(
+        JSON.stringify({
+          error:
+            "Hai già un abbonamento attivo. Per cambiare piano usa la gestione abbonamento.",
+        }),
+        {
+          status: 409,
+          headers: corsHeaders,
+        },
+      );
+    }
+
     // ---------------------------------------------------------
     // 4. CREA CHECKOUT STRIPE
     // ---------------------------------------------------------
@@ -197,17 +224,15 @@ serve(async (req) => {
         },
       },
 
-      success_url:
-        "myapp://abbonamento?session_id={CHECKOUT_SESSION_ID}&status=success",
-
-      cancel_url: "myapp://abbonamento?status=cancel",
+      success_url: `${origine}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origine}/?checkout=cancel`,
     };
 
     // Se questo gestore possiede già un Customer Stripe,
     // riutilizziamo quello.
     if (
       societa.stripe_customer_id &&
-      societa.stripe_customer_id.toString().trim().isNotEmpty
+      societa.stripe_customer_id.toString().trim() !== ""
     ) {
       sessionConfig.customer = societa.stripe_customer_id.toString();
     } else {

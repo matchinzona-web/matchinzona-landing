@@ -943,6 +943,31 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                               ),
                       ),
                     ),
+
+                    /*
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                        ),
+                        leading: const Icon(
+                          Icons.credit_card_outlined,
+                          color: Colors.white70,
+                          size: 20,
+                        ),
+                        title: const Text(
+                          'Gestione abbonamento',
+                          style: TextStyle(color: Colors.white70, fontSize: 14),
+                        ),
+                        onTap: id == null
+                            ? null
+                            : () => _navigaConAggiornamento(
+                                SchermataAbbonamento(idSocieta: id),
+                              ),
+                      ),
+                    ),
+                    */
                     ListTile(
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14,

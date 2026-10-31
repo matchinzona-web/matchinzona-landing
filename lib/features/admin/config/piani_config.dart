@@ -8,7 +8,7 @@ class PianiConfig {
       'limiti': 'Fino a 2 campi',
       'descrizione':
           'Ideale per piccoli centri sportivi che vogliono partire subito con prenotazioni e gestione digitale.',
-      'priceId': 'price_1UGdGWFxZCOuiQIA42y8kWez',
+      'priceId': 'price_1UVEqiFxZCOuiQIACGeAoiMk',
     },
     {
       'titolo': 'PRO',
@@ -18,7 +18,7 @@ class PianiConfig {
       'limiti': 'Fino a 5 campi',
       'descrizione':
           'Pensato per strutture in crescita che vogliono più flessibilità e una gestione più completa.',
-      'priceId': 'price_1UGdHNFxZCOuiQIAbHY8idXK',
+      'priceId': 'price_1UVEs8FxZCOuiQIAYycswuuo',
     },
     {
       'titolo': 'BUSINESS',
@@ -28,7 +28,7 @@ class PianiConfig {
       'limiti': 'Da 6 campi in su',
       'descrizione':
           'La soluzione per centri sportivi con più campi e operatività più ampia.',
-      'priceId': 'price_1UGdHzFxZCOuiQIARoCgLykS',
+      'priceId': 'price_1UVEslFxZCOuiQIAbjIY8noU',
     },
   ];
 }

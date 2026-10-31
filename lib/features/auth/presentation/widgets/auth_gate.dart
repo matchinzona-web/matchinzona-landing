@@ -229,7 +229,7 @@ class _AccessoRiservatoGestoriState extends State<_AccessoRiservatoGestori> {
       'https://play.google.com/store/apps/details?id=com.matchly.app';
 
   static const String _appStoreUrl =
-      'https://apps.apple.com/app/matchinzona/id6822423689';
+      'https://apps.apple.com/it/app/matchinzona/id6822423689';
 
   @override
   void initState() {

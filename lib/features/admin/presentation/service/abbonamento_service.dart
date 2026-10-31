@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AbbonamentoService {
@@ -11,7 +12,10 @@ class AbbonamentoService {
     try {
       final response = await Supabase.instance.client.functions.invoke(
         'crea-portale-session',
-        body: {'stripe_customer_id': stripeCustomerId},
+        body: {
+          'stripe_customer_id': stripeCustomerId,
+          if (kIsWeb) 'origin': Uri.base.origin,
+        },
       );
 
       final String? urlPortale = response.data['url'];
@@ -20,6 +24,7 @@ class AbbonamentoService {
         await launchUrl(
           Uri.parse(urlPortale),
           mode: LaunchMode.externalApplication,
+          webOnlyWindowName: '_self',
         );
       } else {
         throw 'Impossibile generare l\'URL del portale';
@@ -70,7 +75,11 @@ class AbbonamentoService {
       final response = await supabase.functions.invoke(
         'crea-checkout-session',
         headers: {'Authorization': 'Bearer ${session.accessToken}'},
-        body: {'idSocieta': idSocieta, 'piano': piano},
+        body: {
+          'idSocieta': idSocieta,
+          'piano': piano,
+          if (kIsWeb) 'origin': Uri.base.origin,
+        },
       );
 
       debugPrint('Risposta checkout: ${response.data}');
@@ -90,13 +99,11 @@ class AbbonamentoService {
         await prefs.setString('stripe_checkout_piano_pending', piano);
       }
 
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-
-      if (url == null || url.isEmpty) {
-        throw 'Impossibile generare URL checkout';
-      }
-
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+        webOnlyWindowName: '_self',
+      );
     } catch (e) {
       debugPrint('ERRORE CHECKOUT STRIPE: $e');
 

@@ -8,7 +8,7 @@ const String googlePlayUrl =
     'https://play.google.com/store/apps/details?id=com.matchly.app';
 
 const String appleAppStoreUrl =
-    'https://apps.apple.com/app/matchinzona/id6822423689';
+    'https://apps.apple.com/it/app/matchinzona/id6822423689';
 
 const Color _bg = Color(0xFF07100D);
 const Color _card = Color(0xFF0D1712);

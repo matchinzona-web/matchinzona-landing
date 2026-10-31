@@ -103,7 +103,11 @@ class _PagamentoAbbonamentoPageState extends State<PagamentoAbbonamentoPage> {
         piano['nome'].toString(),
       );
 
-      final aperto = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final aperto = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+        webOnlyWindowName: '_self',
+      );
 
       if (!aperto) {
         throw Exception('Impossibile aprire Stripe.');
@@ -245,7 +249,7 @@ class _PagamentoAbbonamentoPageState extends State<PagamentoAbbonamentoPage> {
                         ),
 
                         Text(
-                          '/ mese + IVA',
+                          '/ mese',
                           style: TextStyle(
                             color: Colors.grey.shade500,
                             fontSize: 13,

@@ -1,3 +1,4 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@12.0.0?target=deno";
 
@@ -18,22 +19,70 @@ serve(async (req) => {
   }
 
   try {
-    const { stripe_customer_id } = await req.json();
+    // 1. Utente loggato
+    const token = req.headers
+      .get("Authorization")
+      ?.replace("Bearer ", "")
+      .trim();
+    if (!token) {
+      return new Response(JSON.stringify({ error: "Utente non autenticato" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    if (!stripe_customer_id) {
+    const supabaseAuth = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+    );
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseAuth.auth.getUser(token);
+
+    if (userError || !user) {
+      return new Response(JSON.stringify({ error: "Sessione non valida" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 2. Il customer si ricava dal database, non dal client
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
+    const { data: societa, error: societaError } = await supabaseAdmin
+      .from("societa")
+      .select("stripe_customer_id")
+      .eq("id_utente", user.id)
+      .maybeSingle();
+
+    if (societaError || !societa?.stripe_customer_id) {
       return new Response(
-        JSON.stringify({ error: "Manca lo stripe_customer_id" }),
+        JSON.stringify({ error: "Nessun abbonamento Stripe associato" }),
         {
-          status: 400,
+          status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         },
       );
     }
 
-    // Creiamo la sessione del Portale Clienti ufficiale di Stripe
+    // 3. Origine di ritorno (solo tra quelle consentite)
+    const body = await req.json().catch(() => ({}));
+    const ORIGINI_CONSENTITE = [
+      "https://matchinzona.it",
+      "http://localhost:3000",
+    ];
+    const origineRichiesta = body.origin?.toString();
+    const origine =
+      origineRichiesta && ORIGINI_CONSENTITE.includes(origineRichiesta)
+        ? origineRichiesta
+        : "https://matchinzona.it";
+
     const session = await stripe.billingPortal.sessions.create({
-      customer: stripe_customer_id,
-      return_url: "myapp://dashboard", // Dove torna l'utente quando chiude Stripe
+      customer: societa.stripe_customer_id,
+      return_url: `${origine}/?portale=chiuso`,
     });
 
     return new Response(JSON.stringify({ url: session.url }), {
