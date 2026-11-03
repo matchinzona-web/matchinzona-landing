@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Scarica MatchInZona</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #121212;
+        color: #fff;
+        font-family: Arial, sans-serif;
+        text-align: center;
+      }
+      .box {
+        padding: 24px;
+        max-width: 360px;
+      }
+      h1 {
+        font-size: 26px;
+        margin-bottom: 8px;
+      }
+      p {
+        color: #aaa;
+      }
+      a.btn {
+        display: block;
+        margin: 12px 0;
+        padding: 16px;
+        border-radius: 30px;
+        background: #ff6b00;
+        color: #121212;
+        font-weight: bold;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <h1>MatchInZona</h1>
+      <p>Trova il campo. Trova i giocatori. Gioca.</p>
+      <a
+        class="btn"
+        id="ios"
+        href="https://apps.apple.com/it/app/matchinzona/id6822423689"
+        >Scarica per iPhone</a
+      >
+      <a
+        class="btn"
+        id="android"
+        href="https://play.google.com/store/apps/details?id=com.matchly.app"
+        >Scarica per Android</a
+      >
+    </div>
+    <script>
+      var ua = navigator.userAgent || "";
+      var isIOS =
+        /iPhone|iPad|iPod/i.test(ua) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      var isAndroid = /Android/i.test(ua);
+      if (isIOS) {
+        location.replace(document.getElementById("ios").href);
+      } else if (isAndroid) {
+        location.replace(document.getElementById("android").href);
+      }
+      // Su PC resta visibile la pagina con i due pulsanti.
+    </script>
+  </body>
+</html>
