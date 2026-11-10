@@ -643,10 +643,11 @@ class _LandingGestoreWebPageState extends State<LandingGestoreWebPage> {
           ),
         ),
         const SizedBox(height: 22),
-        Text(
+                Text(
           description,
           style: const TextStyle(color: _secondary, fontSize: 16, height: 1.8),
         ),
+        if (actions != null) ...[const SizedBox(height: 28), actions],
         const SizedBox(height: 28),
         ...features.map(
           (feature) => Container(
@@ -675,7 +676,6 @@ class _LandingGestoreWebPageState extends State<LandingGestoreWebPage> {
             ),
           ),
         ),
-        if (actions != null) ...[const SizedBox(height: 20), actions],
       ],
     );
   }
