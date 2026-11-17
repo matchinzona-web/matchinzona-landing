@@ -294,7 +294,10 @@ class _ChiusureStraordinarieState extends State<ChiusureStraordinarie> {
                     }
 
                     if (!interoGiorno &&
-                        toMinuti(fineStrCheck) <= toMinuti(inizioStrCheck)) {
+                        (fineStrCheck == "00:00"
+                                ? 1440
+                                : toMinuti(fineStrCheck)) <=
+                            toMinuti(inizioStrCheck)) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
@@ -595,14 +598,20 @@ class _ChiusureStraordinarieState extends State<ChiusureStraordinarie> {
           .lte('data_inizio', dataFineStr)
           .gte('data_fine', dataInizioStr);
 
-      int strToMinuti(String valore) {
+      int strToMinuti(String valore, {bool isFine = false}) {
         final parti = valore.substring(0, 5).split(':');
+        final ore = int.parse(parti[0]);
+        final minuti = int.parse(parti[1]);
 
-        return int.parse(parti[0]) * 60 + int.parse(parti[1]);
+        if (isFine && ore == 0 && minuti == 0) {
+          return 1440;
+        }
+
+        return ore * 60 + minuti;
       }
 
       final nuovoInizio = strToMinuti(oraInizioStr);
-      final nuovaFine = strToMinuti(oraFineStr);
+      final nuovaFine = strToMinuti(oraFineStr, isFine: true);
 
       for (final chiusura in result) {
         final vecchioInizio = chiusura['orario_inizio']?.toString() ?? '00:00';
@@ -610,7 +619,7 @@ class _ChiusureStraordinarieState extends State<ChiusureStraordinarie> {
         final vecchiaFine = chiusura['orario_fine']?.toString() ?? '23:59';
 
         final vecchioInizioMin = strToMinuti(vecchioInizio);
-        final vecchiaFineMin = strToMinuti(vecchiaFine);
+        final vecchiaFineMin = strToMinuti(vecchiaFine, isFine: true);
 
         // Sovrapposizione reale degli orari
         if (nuovoInizio < vecchiaFineMin && nuovaFine > vecchioInizioMin) {
@@ -640,13 +649,20 @@ class _ChiusureStraordinarieState extends State<ChiusureStraordinarie> {
           .select()
           .eq('id_societa', widget.idSocieta);
 
-      int strToMinuti(String s) {
+      int strToMinuti(String s, {bool isChiusura = false}) {
         final p = s.split(':');
-        return int.parse(p[0]) * 60 + int.parse(p[1]);
+        final ore = int.parse(p[0]);
+        final minuti = int.parse(p[1]);
+
+        if (isChiusura && ore == 0 && minuti == 0) {
+          return 1440;
+        }
+
+        return ore * 60 + minuti;
       }
 
       final int minInizio = strToMinuti(inizioStr);
-      final int minFine = strToMinuti(fineStr);
+      final int minFine = strToMinuti(fineStr, isChiusura: true);
 
       DateTime giorno = dataInizio;
       while (!giorno.isAfter(dataFine)) {
@@ -663,6 +679,7 @@ class _ChiusureStraordinarieState extends State<ChiusureStraordinarie> {
           );
           final int chMin = strToMinuti(
             orarioGiorno['orario_chiusura'].toString().substring(0, 5),
+            isChiusura: true,
           );
 
           if (minInizio < chMin && minFine > apMin) return true;
@@ -671,7 +688,10 @@ class _ChiusureStraordinarieState extends State<ChiusureStraordinarie> {
           final ch2 = orarioGiorno['orario_chiusura_2']?.toString();
           if (ap2 != null && ch2 != null) {
             final int ap2Min = strToMinuti(ap2.substring(0, 5));
-            final int ch2Min = strToMinuti(ch2.substring(0, 5));
+            final int ch2Min = strToMinuti(
+              ch2.substring(0, 5),
+              isChiusura: true,
+            );
             if (minInizio < ch2Min && minFine > ap2Min) return true;
           }
         }

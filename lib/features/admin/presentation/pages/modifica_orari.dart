@@ -212,19 +212,17 @@ class _ModificaOrariState extends State<ModificaOrari> {
             })
             .eq('id', o['id']);
 
-        if (o['is_chiuso'] == false) {
-          await supabase.rpc(
-            'annulla_partite_fuori_orario',
-            params: {
-              'p_id_societa': widget.idSocieta,
-              'p_giorno_settimana': o['giorno_settimana'],
-              'p_orario_apertura': o['orario_apertura'],
-              'p_orario_chiusura': hasSecondo
-                  ? o['orario_chiusura_2']
-                  : o['orario_chiusura'],
-            },
-          );
-        }
+        await supabase.rpc(
+          'annulla_partite_fuori_orario',
+          params: {
+            'p_id_societa': widget.idSocieta,
+            'p_giorno_settimana': o['giorno_settimana'],
+            'p_orario_apertura': o['orario_apertura'],
+            'p_orario_chiusura': hasSecondo
+                ? o['orario_chiusura_2']
+                : o['orario_chiusura'],
+          },
+        );
       }
 
       if (mounted) {
