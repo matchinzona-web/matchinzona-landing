@@ -36,7 +36,11 @@ class WidgetCalendarioGestore extends StatelessWidget {
       );
     }
 
-    final double oreVisibili = giornoChiuso ? 3.0 : (endHour - startHour);
+    final bool isH24 = !giornoChiuso && startHour == 0.0 && endHour == 0.0;
+
+    final double fineEffettiva = isH24 ? 24.0 : endHour;
+
+    final double oreVisibili = giornoChiuso ? 3.0 : (fineEffettiva - startHour);
 
     final double altezzaCalendario = oreVisibili * 60 + 40;
 
@@ -130,7 +134,7 @@ class WidgetCalendarioGestore extends StatelessWidget {
                     ),
 
                     startHour: giornoChiuso ? 8.0 : startHour,
-                    endHour: giornoChiuso ? 11.0 : endHour,
+                    endHour: giornoChiuso ? 11.0 : fineEffettiva,
 
                     timeInterval: const Duration(hours: 1),
                     timeIntervalHeight: 60,

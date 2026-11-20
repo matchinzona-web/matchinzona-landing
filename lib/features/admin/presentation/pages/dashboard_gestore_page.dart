@@ -458,90 +458,155 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
     }
   }
 
-  void _impostazioniDesktop() {
-    final id = ref.read(dashboardProvider).actualIdSocieta;
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: AppTheme.cardBg,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            const ListTile(
-              title: Text(
-                'Impostazioni del centro',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+  Widget _webImpostazioni() {
+    final id = ref.watch(dashboardProvider).actualIdSocieta;
+
+    Widget voce(
+      IconData icona,
+      String titolo,
+      String descrizione,
+      VoidCallback onTap,
+    ) {
+      return Material(
+        color: AppTheme.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          hoverColor: AppTheme.neonOrange.withOpacity(0.06),
+          child: Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white12),
             ),
-            ListTile(
-              leading: const Icon(
-                Icons.person_outline,
-                color: AppTheme.neonOrange,
-              ),
-              title: const Text(
-                'Profilo',
-                style: TextStyle(color: Colors.white),
-              ),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _apriProfiloDesktop();
-              },
-            ),
-            if (id != null) ...[
-              ListTile(
-                leading: const Icon(
-                  Icons.access_time,
-                  color: AppTheme.neonOrange,
-                ),
-                title: const Text(
-                  'Orari del centro',
-                  style: TextStyle(color: Colors.white),
-                ),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _navigaConAggiornamento(ModificaOrari(idSocieta: id));
-                },
-              ),
-              ListTile(
-                leading: const Icon(
-                  Icons.event_busy,
-                  color: AppTheme.neonOrange,
-                ),
-                title: const Text(
-                  'Chiusure straordinarie',
-                  style: TextStyle(color: Colors.white),
-                ),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _navigaConAggiornamento(ChiusureStraordinarie(idSocieta: id));
-                },
-              ),
-            ],
-            ListTile(
-              leading: const Icon(
-                Icons.help_outline,
-                color: AppTheme.neonOrange,
-              ),
-              title: const Text(
-                'Privacy e assistenza',
-                style: TextStyle(color: Colors.white),
-              ),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const PrivacyAssistenzaGestore(),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(13),
+                  decoration: BoxDecoration(
+                    color: AppTheme.neonOrange.withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                );
-              },
+                  child: Icon(icona, color: AppTheme.neonOrange, size: 24),
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        titolo,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        descrizione,
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: Colors.white38,
+                  size: 16,
+                ),
+              ],
             ),
-          ],
+          ),
         ),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(30),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Impostazioni del centro',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 26,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Gestisci le informazioni e le preferenze della tua struttura.',
+            style: TextStyle(color: Colors.white54, fontSize: 14),
+          ),
+          const SizedBox(height: 30),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final larghezza = constraints.maxWidth >= 760
+                  ? (constraints.maxWidth - 16) / 2
+                  : constraints.maxWidth;
+
+              return Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                children: [
+                  SizedBox(
+                    width: larghezza,
+                    child: voce(
+                      Icons.person_outline,
+                      'Profilo',
+                      'Gestisci i dati del tuo profilo.',
+                      _apriProfiloDesktop,
+                    ),
+                  ),
+                  if (id != null) ...[
+                    SizedBox(
+                      width: larghezza,
+                      child: voce(
+                        Icons.access_time_rounded,
+                        'Orari del centro',
+                        'Modifica gli orari settimanali di apertura.',
+                        () => _navigaConAggiornamento(
+                          ModificaOrari(idSocieta: id),
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: larghezza,
+                      child: voce(
+                        Icons.event_busy_outlined,
+                        'Chiusure straordinarie',
+                        'Gestisci le chiusure e le date speciali.',
+                        () => _navigaConAggiornamento(
+                          ChiusureStraordinarie(idSocieta: id),
+                        ),
+                      ),
+                    ),
+                  ],
+                  SizedBox(
+                    width: larghezza,
+                    child: voce(
+                      Icons.help_outline_rounded,
+                      'Privacy e assistenza',
+                      'Consulta le informazioni e richiedi supporto.',
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const PrivacyAssistenzaGestore(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -552,11 +617,13 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
       padding: const EdgeInsets.only(bottom: 6),
       child: Material(
         color: selected
-            ? AppTheme.neonOrange.withOpacity(.14)
+            ? AppTheme.neonOrange.withOpacity(0.12)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
+          hoverColor: AppTheme.neonOrange.withOpacity(0.07),
+          splashColor: AppTheme.neonOrange.withOpacity(0.10),
           onTap: () => setState(() => _sezioneDesktop = index),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 14),
@@ -846,7 +913,9 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
           ),
           const Divider(color: Colors.white10, height: 1),
           SizedBox(
-            height: 660,
+            height: (MediaQuery.sizeOf(context).height - 260)
+                .clamp(560.0, 900.0)
+                .toDouble(),
             child: ClipRRect(
               borderRadius: const BorderRadius.vertical(
                 bottom: Radius.circular(16),
@@ -891,7 +960,7 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
     final id = state.actualIdSocieta;
     const bg = Color(0xFF0B1118);
     const sideBg = Color(0xFF121B26);
-    final titolo = 'Dashboard';
+    final titolo = _sezioneDesktop == 1 ? 'Impostazioni' : 'Dashboard';
 
     return Scaffold(
       backgroundColor: bg,
@@ -916,6 +985,19 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                         alignment: Alignment.centerLeft,
                       ),
                     ),
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(14, 0, 0, 12),
+                      child: Text(
+                        'PANORAMICA',
+                        style: TextStyle(
+                          color: Colors.white38,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.6,
+                        ),
+                      ),
+                    ),
+
                     _webNavItem(Icons.dashboard_outlined, 'Dashboard', 0),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 6),
@@ -944,7 +1026,7 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                       ),
                     ),
 
-                    
+                    /*
                     Padding(
                       padding: const EdgeInsets.only(bottom: 6),
                       child: ListTile(
@@ -967,22 +1049,8 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                               ),
                       ),
                     ),
-                    
-                    ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                      ),
-                      leading: const Icon(
-                        Icons.settings_outlined,
-                        color: Colors.white70,
-                        size: 20,
-                      ),
-                      title: const Text(
-                        'Impostazioni',
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
-                      ),
-                      onTap: _impostazioniDesktop,
-                    ),
+                    */
+                    _webNavItem(Icons.settings_outlined, 'Impostazioni', 1),
                     const Spacer(),
                     const Divider(color: Colors.white12),
                     ListTile(
@@ -1100,91 +1168,98 @@ class _DashboardGestoreState extends ConsumerState<DashboardGestore> {
                   ),
                 ),
                 Expanded(
-                  child: RefreshIndicator(
-                    color: AppTheme.neonOrange,
-                    onRefresh: () => _dashboardNotifier.inizializza(
-                      idSocieta: widget.idSocieta,
-                      utenteLoggato: widget.utenteLoggato,
-                    ),
-                    child: ListView(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.all(30),
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                  child: _sezioneDesktop == 1
+                      ? _webImpostazioni()
+                      : RefreshIndicator(
+                          color: AppTheme.neonOrange,
+                          onRefresh: () => _dashboardNotifier.inizializza(
+                            idSocieta: widget.idSocieta,
+                            utenteLoggato: widget.utenteLoggato,
+                          ),
+                          child: ListView(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.all(30),
+                            children: [
+                              Row(
                                 children: [
-                                  Text(
-                                    'Gestisci il tuo centro sportivo',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 25,
-                                      fontWeight: FontWeight.w900,
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Gestisci il tuo centro sportivo',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 25,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          'Ciao ${widget.utenteLoggato?.nome ?? 'Gestore'} · Portale gestore',
+                                          style: const TextStyle(
+                                            color: Colors.white60,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Ciao ${widget.utenteLoggato?.nome ?? 'Gestore'} · Portale gestore',
-                                    style: const TextStyle(
-                                      color: Colors.white60,
+                                  const SizedBox(width: 12),
+                                  ElevatedButton.icon(
+                                    onPressed: id == null || state.campi.isEmpty
+                                        ? null
+                                        : _apriPrenotazioneManuale,
+                                    icon: const Icon(Icons.add, size: 19),
+                                    label: const Text('Prenotazione'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.neonOrange,
+                                      foregroundColor: Colors.black,
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 22,
+                                        vertical: 18,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            ElevatedButton.icon(
-                              onPressed: id == null || state.campi.isEmpty
-                                  ? null
-                                  : _apriPrenotazioneManuale,
-                              icon: const Icon(Icons.add, size: 19),
-                              label: const Text('Prenotazione'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.neonOrange,
-                                foregroundColor: Colors.black,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 18,
-                                  vertical: 18,
-                                ),
+                              const SizedBox(height: 28),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'I tuoi campi',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 18,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton.icon(
+                                    onPressed: id == null
+                                        ? null
+                                        : _tentaAggiuntaCampo,
+                                    icon: const Icon(Icons.add),
+                                    label: const Text('Nuovo campo'),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: AppTheme.neonOrange,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 12),
+                              _webSelettoreCampi(),
+                              const SizedBox(height: 24),
+                              _webCalendario(),
+                              const SizedBox(height: 20),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 28),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'I tuoi campi',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 18,
-                                ),
-                              ),
-                            ),
-                            TextButton.icon(
-                              onPressed: id == null
-                                  ? null
-                                  : _tentaAggiuntaCampo,
-                              icon: const Icon(Icons.add),
-                              label: const Text('Nuovo campo'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: AppTheme.neonOrange,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        _webSelettoreCampi(),
-                        const SizedBox(height: 24),
-                        _webCalendario(),
-                        const SizedBox(height: 20),
-                      ],
-                    ),
-                  ),
                 ),
               ],
             ),

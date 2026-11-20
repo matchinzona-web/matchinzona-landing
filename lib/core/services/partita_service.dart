@@ -703,7 +703,7 @@ class PartitaService {
 
       int chiusura1 = _orarioInMinuti(o.orarioChiusura!);
 
-      if (chiusura1 == 0 && apertura1 > 0) {
+      if (chiusura1 == 0) {
         chiusura1 = 24 * 60;
       }
 
@@ -716,7 +716,7 @@ class PartitaService {
 
       int chiusura2 = _orarioInMinuti(o.orarioChiusura2!);
 
-      if (chiusura2 == 0 && apertura2 > 0) {
+      if (chiusura2 == 0) {
         chiusura2 = 24 * 60;
       }
 

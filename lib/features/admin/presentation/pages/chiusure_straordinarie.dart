@@ -280,6 +280,25 @@ class _ChiusureStraordinarieState extends State<ChiusureStraordinarie> {
                     final String dataInizioStr = _formattaDataDb(dataInizio);
                     final String dataFineStr = _formattaDataDb(dataFine);
 
+                    // Impedisce di inserire manualmente 00:00–00:00.
+                    // Per la chiusura totale va usato "Tutto il giorno".
+                    if (!interoGiorno &&
+                        oraInizio.hour == 0 &&
+                        oraInizio.minute == 0 &&
+                        oraFine.hour == 0 &&
+                        oraFine.minute == 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Per chiudere l’intera giornata, seleziona "Tutto il giorno".',
+                          ),
+                          backgroundColor: Colors.orange,
+                          duration: Duration(seconds: 4),
+                        ),
+                      );
+                      return;
+                    }
+
                     final String inizioStrCheck = interoGiorno
                         ? "00:00"
                         : "${oraInizio.hour.toString().padLeft(2, '0')}:${oraInizio.minute.toString().padLeft(2, '0')}";
@@ -433,17 +452,6 @@ class _ChiusureStraordinarieState extends State<ChiusureStraordinarie> {
                             ),
                           );
                         }
-                      }
-
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Chiusura salvata con successo!'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                        _scaricaChiusure();
-                        Navigator.pop(context);
                       }
                     } catch (e) {
                       debugPrint("Errore salvataggio chiusura straordinaria");
@@ -612,7 +620,6 @@ class _ChiusureStraordinarieState extends State<ChiusureStraordinarie> {
 
       final nuovoInizio = strToMinuti(oraInizioStr);
       final nuovaFine = strToMinuti(oraFineStr, isFine: true);
-
       for (final chiusura in result) {
         final vecchioInizio = chiusura['orario_inizio']?.toString() ?? '00:00';
 

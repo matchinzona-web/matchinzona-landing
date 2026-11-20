@@ -316,7 +316,7 @@ class DashboardNotifier extends Notifier<DashboardState> {
 
       // 00:00 come orario di CHIUSURA significa fine giornata,
       // quindi deve essere trattato come 24:00 e non come 0:00.
-      if (end == 0.0 && start > 0.0) {
+      if (end == 0.0) {
         end = 24.0;
       }
 
@@ -379,10 +379,15 @@ class DashboardNotifier extends Notifier<DashboardState> {
           p['data_partita'].toString(),
           p['orario_inizio'].toString(),
         );
-        final end = _parseDateTimeSicuro(
+
+        DateTime end = _parseDateTimeSicuro(
           p['data_partita'].toString(),
           p['orario_fine'].toString(),
         );
+
+        if (!end.isAfter(start)) {
+          end = end.add(const Duration(days: 1));
+        }
         final String nomeCampo = p['campo']?['nome_campo'] ?? 'Campo';
         final bool isPrenotazioneManuale =
             p['origine_prenotazione'] == 'gestore';
@@ -447,10 +452,14 @@ class DashboardNotifier extends Notifier<DashboardState> {
           c['orario_inizio'].toString(),
         );
 
-        final end = _parseDateTimeSicuro(
+        DateTime end = _parseDateTimeSicuro(
           c['data_fine'].toString(),
           c['orario_fine'].toString(),
         );
+
+        if (!end.isAfter(start)) {
+          end = end.add(const Duration(days: 1));
+        }
 
         tempAppointments.add(
           Appointment(

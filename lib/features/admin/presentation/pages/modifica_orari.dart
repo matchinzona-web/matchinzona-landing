@@ -251,325 +251,338 @@ class _ModificaOrariState extends State<ModificaOrari> {
     }
   }
 
+  Widget _webPulsanteOra(
+    int index,
+    bool apertura,
+    bool secondoTurno,
+    TimeOfDay ora,
+  ) {
+    return OutlinedButton.icon(
+      onPressed: () => _selezionaOra(index, apertura, secondoTurno),
+      icon: const Icon(Icons.schedule_rounded, size: 16),
+      label: Text(
+        '${ora.hour.toString().padLeft(2, '0')}:'
+        '${ora.minute.toString().padLeft(2, '0')}',
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+      ),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.white,
+        backgroundColor: const Color(0xFF192532),
+        side: const BorderSide(color: Colors.white12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  Widget _webRigaGiorno(int index) {
+    final o = _orari[index];
+
+    final int giornoNum = o['giorno_settimana'] ?? 1;
+    final bool isChiuso = o['is_chiuso'] ?? false;
+    final bool hasSecondoTurno = o['has_secondo_turno'] ?? false;
+
+    final tApertura1 = _convertiInTimeOfDay(o['orario_apertura']);
+    final tChiusura1 = _convertiInTimeOfDay(o['orario_chiusura']);
+    final tApertura2 = _convertiInTimeOfDay(o['orario_apertura_2']);
+    final tChiusura2 = _convertiInTimeOfDay(o['orario_chiusura_2']);
+
+    Widget intervallo(bool secondo, TimeOfDay apertura, TimeOfDay chiusura) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _webPulsanteOra(index, true, secondo, apertura),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10),
+            child: Text('—', style: TextStyle(color: Colors.white38)),
+          ),
+          _webPulsanteOra(index, false, secondo, chiusura),
+        ],
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isChiuso
+              ? Colors.redAccent.withOpacity(0.22)
+              : Colors.white.withOpacity(0.08),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 145,
+            child: Text(
+              _nomiGiorni[giornoNum],
+              style: TextStyle(
+                color: isChiuso ? Colors.white54 : Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+
+          SizedBox(
+            width: 135,
+            child: Row(
+              children: [
+                Switch(
+                  value: !isChiuso,
+                  activeThumbColor: AppTheme.neonOrange,
+                  onChanged: (valore) =>
+                      setState(() => _orari[index]['is_chiuso'] = !valore),
+                ),
+                Text(
+                  isChiuso ? 'Chiuso' : 'Aperto',
+                  style: TextStyle(
+                    color: isChiuso ? Colors.redAccent : Colors.greenAccent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Expanded(
+            child: isChiuso
+                ? const Text(
+                    'Chiuso tutto il giorno',
+                    style: TextStyle(color: Colors.white38, fontSize: 14),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (hasSecondoTurno)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 6),
+                          child: Text(
+                            'PRIMO TURNO',
+                            style: TextStyle(
+                              color: Colors.white38,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ),
+
+                      intervallo(false, tApertura1, tChiusura1),
+
+                      if (hasSecondoTurno) ...[
+                        const SizedBox(height: 15),
+                        const Text(
+                          'SECONDO TURNO',
+                          style: TextStyle(
+                            color: Colors.white38,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        intervallo(true, tApertura2, tChiusura2),
+                      ],
+
+                      const SizedBox(height: 10),
+
+                      TextButton.icon(
+                        onPressed: () => setState(
+                          () => _orari[index]['has_secondo_turno'] =
+                              !hasSecondoTurno,
+                        ),
+                        icon: Icon(
+                          hasSecondoTurno
+                              ? Icons.remove_circle_outline
+                              : Icons.add_circle_outline,
+                          size: 17,
+                        ),
+                        label: Text(
+                          hasSecondoTurno ? 'Rimuovi pausa' : 'Aggiungi pausa',
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppTheme.neonOrange,
+                          padding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+
+          if (!isChiuso)
+            Tooltip(
+              message: 'Applica questi orari a tutta la settimana',
+              child: IconButton(
+                onPressed: () => _copiaOrarioATutti(index),
+                icon: const Icon(
+                  Icons.copy_all_outlined,
+                  color: Colors.white54,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.darkBg,
+      backgroundColor: const Color(0xFF0B1118),
       appBar: AppBar(
-        title: const Text('Modifica Orari'),
-        backgroundColor: AppTheme.darkBg,
+        backgroundColor: const Color(0xFF121B26),
+        toolbarHeight: 76,
+        elevation: 0,
         iconTheme: const IconThemeData(color: AppTheme.neonOrange),
+        title: const Text(
+          'Orari del centro',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 30),
+            child: Center(
+              child: ElevatedButton.icon(
+                onPressed: _isSaving ? null : _salvaTutto,
+                icon: _isSaving
+                    ? const SizedBox(
+                        width: 17,
+                        height: 17,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.black,
+                        ),
+                      )
+                    : const Icon(Icons.save_outlined, size: 19),
+                label: Text(_isSaving ? 'Salvataggio...' : 'Salva modifiche'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.neonOrange,
+                  foregroundColor: Colors.black,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 22,
+                    vertical: 17,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: AppTheme.neonOrange),
             )
-          : Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 650),
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Text(
-                        'Modifica gli orari standard del tuo centro. Puoi gestire turni unici o spezzati e copiare le impostazioni su tutti i giorni per velocizzare.',
-                        style: TextStyle(
-                          color: Colors.grey.shade400,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.only(bottom: 20),
-                        itemCount: _orari.length,
-                        itemBuilder: (context, index) {
-                          final o = _orari[index];
-                          final int giornoNum = o['giorno_settimana'] ?? 1;
-                          final bool isChiuso = o['is_chiuso'] ?? false;
-                          final bool hasSecondoTurno =
-                              o['has_secondo_turno'] ?? false;
-                          final tApertura1 = _convertiInTimeOfDay(
-                            o['orario_apertura'],
-                          );
-                          final tChiusura1 = _convertiInTimeOfDay(
-                            o['orario_chiusura'],
-                          );
-                          final tApertura2 = _convertiInTimeOfDay(
-                            o['orario_apertura_2'],
-                          );
-                          final tChiusura2 = _convertiInTimeOfDay(
-                            o['orario_chiusura_2'],
-                          );
-
-                          return Card(
-                            color: AppTheme.cardBg,
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 6,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              side: BorderSide(
-                                color: isChiuso
-                                    ? Colors.redAccent.withValues(alpha: 0.5)
-                                    : AppTheme.neonOrange.withValues(
-                                        alpha: 0.4,
-                                      ),
-                                width: 1,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(14.0),
-                              child: Column(
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Switch(
-                                            value: !isChiuso,
-                                            activeThumbColor:
-                                                AppTheme.neonOrange,
-                                            inactiveThumbColor: Colors.grey,
-                                            onChanged: (valore) => setState(
-                                              () => _orari[index]['is_chiuso'] =
-                                                  !valore,
-                                            ),
-                                          ),
-                                          Text(
-                                            _nomiGiorni[giornoNum],
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              color: isChiuso
-                                                  ? Colors.grey
-                                                  : Colors.white,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      if (!isChiuso)
-                                        TextButton.icon(
-                                          onPressed: () =>
-                                              _copiaOrarioATutti(index),
-                                          icon: const Icon(
-                                            Icons.copy_all,
-                                            color: Colors.grey,
-                                            size: 18,
-                                          ),
-                                          label: const Text(
-                                            'Applica a tutti',
-                                            style: TextStyle(
-                                              color: Colors.grey,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                          style: TextButton.styleFrom(
-                                            padding: EdgeInsets.zero,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  if (!isChiuso) ...[
-                                    const Divider(color: Colors.white10),
-                                    const SizedBox(height: 5),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          hasSecondoTurno
-                                              ? 'Turno 1:'
-                                              : 'Orario Continuo:',
-                                          style: const TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                        Row(
-                                          children: [
-                                            TextButton(
-                                              onPressed: () => _selezionaOra(
-                                                index,
-                                                true,
-                                                false,
-                                              ),
-                                              child: Text(
-                                                tApertura1.format(context),
-                                                style: const TextStyle(
-                                                  color: AppTheme.neonOrange,
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ),
-                                            const Text(
-                                              '-',
-                                              style: TextStyle(
-                                                color: Colors.white30,
-                                              ),
-                                            ),
-                                            TextButton(
-                                              onPressed: () => _selezionaOra(
-                                                index,
-                                                false,
-                                                false,
-                                              ),
-                                              child: Text(
-                                                tChiusura1.format(context),
-                                                style: const TextStyle(
-                                                  color: AppTheme.neonOrange,
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                    if (hasSecondoTurno)
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          const Text(
-                                            'Turno 2:',
-                                            style: TextStyle(
-                                              color: Colors.white70,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                          Row(
-                                            children: [
-                                              TextButton(
-                                                onPressed: () => _selezionaOra(
-                                                  index,
-                                                  true,
-                                                  true,
-                                                ),
-                                                child: Text(
-                                                  tApertura2.format(context),
-                                                  style: const TextStyle(
-                                                    color: AppTheme.neonOrange,
-                                                    fontSize: 15,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                              const Text(
-                                                '-',
-                                                style: TextStyle(
-                                                  color: Colors.white30,
-                                                ),
-                                              ),
-                                              TextButton(
-                                                onPressed: () => _selezionaOra(
-                                                  index,
-                                                  false,
-                                                  true,
-                                                ),
-                                                child: Text(
-                                                  tChiusura2.format(context),
-                                                  style: const TextStyle(
-                                                    color: AppTheme.neonOrange,
-                                                    fontSize: 15,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    Align(
-                                      alignment: Alignment.centerRight,
-                                      child: TextButton.icon(
-                                        style: TextButton.styleFrom(
-                                          padding: EdgeInsets.zero,
-                                          minimumSize: const Size(50, 30),
-                                        ),
-                                        onPressed: () => setState(
-                                          () =>
-                                              _orari[index]['has_secondo_turno'] =
-                                                  !hasSecondoTurno,
-                                        ),
-                                        icon: Icon(
-                                          hasSecondoTurno
-                                              ? Icons.remove_circle_outline
-                                              : Icons.add_circle_outline,
-                                          size: 16,
-                                          color: Colors.grey,
-                                        ),
-                                        label: Text(
-                                          hasSecondoTurno
-                                              ? 'Rimuovi pausa'
-                                              : 'Aggiungi pausa (Spezzato)',
-                                          style: const TextStyle(
-                                            color: Colors.grey,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ] else ...[
-                                    const SizedBox(height: 10),
-                                    const Text(
-                                      'CHIUSO TUTTO IL GIORNO',
-                                      style: TextStyle(
-                                        color: Colors.redAccent,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 5),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _isSaving ? null : _salvaTutto,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.neonOrange,
-                            foregroundColor: AppTheme.darkBg,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(30),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1250),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Orari di apertura',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 27,
+                              fontWeight: FontWeight.w900,
                             ),
                           ),
-                          child: _isSaving
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.black,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  'Salva Tutti gli Orari',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Configura gli orari settimanali del tuo centro sportivo. '
+                            'Puoi impostare un turno unico, aggiungere una pausa '
+                            'oppure chiudere un giorno.',
+                            style: TextStyle(
+                              color: Colors.white54,
+                              fontSize: 14,
+                              height: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 30),
+
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 17,
+                            ),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF121B26),
+                              borderRadius: BorderRadius.vertical(
+                                top: Radius.circular(14),
+                              ),
+                            ),
+                            child: const Row(
+                              children: [
+                                SizedBox(width: 145, child: Text('GIORNO')),
+                                SizedBox(width: 135, child: Text('STATO')),
+                                Expanded(child: Text('ORARI DI APERTURA')),
+                                SizedBox(width: 48, child: Text('COPIA')),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          for (int i = 0; i < _orari.length; i++)
+                            _webRigaGiorno(i),
+
+                          const SizedBox(height: 20),
+
+                          Container(
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: AppTheme.neonOrange.withOpacity(0.06),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: AppTheme.neonOrange.withOpacity(0.16),
+                              ),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: AppTheme.neonOrange,
+                                ),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Le modifiche saranno applicate solo dopo '
+                                    'aver premuto "Salva modifiche". '
+                                    'Le prenotazioni esistenti verranno '
+                                    'verificate automaticamente.',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 13,
+                                      height: 1.5,
+                                    ),
                                   ),
                                 ),
-                        ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
+                  ),
+                );
+              },
             ),
     );
   }
