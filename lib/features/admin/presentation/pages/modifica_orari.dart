@@ -291,143 +291,175 @@ class _ModificaOrariState extends State<ModificaOrari> {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _webPulsanteOra(index, true, secondo, apertura),
+          Flexible(child: _webPulsanteOra(index, true, secondo, apertura)),
           const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10),
+            padding: EdgeInsets.symmetric(horizontal: 6),
             child: Text('—', style: TextStyle(color: Colors.white38)),
           ),
-          _webPulsanteOra(index, false, secondo, chiusura),
+          Flexible(child: _webPulsanteOra(index, false, secondo, chiusura)),
         ],
       );
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isChiuso
-              ? Colors.redAccent.withOpacity(0.22)
-              : Colors.white.withOpacity(0.08),
+    final stato = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Switch(
+          value: !isChiuso,
+          activeThumbColor: AppTheme.neonOrange,
+          onChanged: (valore) =>
+              setState(() => _orari[index]['is_chiuso'] = !valore),
         ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 145,
-            child: Text(
-              _nomiGiorni[giornoNum],
-              style: TextStyle(
-                color: isChiuso ? Colors.white54 : Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
+        Text(
+          isChiuso ? 'Chiuso' : 'Aperto',
+          style: TextStyle(
+            color: isChiuso ? Colors.redAccent : Colors.greenAccent,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
           ),
+        ),
+      ],
+    );
 
-          SizedBox(
-            width: 135,
-            child: Row(
-              children: [
-                Switch(
-                  value: !isChiuso,
-                  activeThumbColor: AppTheme.neonOrange,
-                  onChanged: (valore) =>
-                      setState(() => _orari[index]['is_chiuso'] = !valore),
-                ),
-                Text(
-                  isChiuso ? 'Chiuso' : 'Aperto',
-                  style: TextStyle(
-                    color: isChiuso ? Colors.redAccent : Colors.greenAccent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+    final orari = isChiuso
+        ? const Text(
+            'Chiuso tutto il giorno',
+            style: TextStyle(color: Colors.white38, fontSize: 14),
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (hasSecondoTurno)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    'PRIMO TURNO',
+                    style: TextStyle(
+                      color: Colors.white38,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1,
+                    ),
                   ),
                 ),
+
+              intervallo(false, tApertura1, tChiusura1),
+
+              if (hasSecondoTurno) ...[
+                const SizedBox(height: 15),
+                const Text(
+                  'SECONDO TURNO',
+                  style: TextStyle(
+                    color: Colors.white38,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                intervallo(true, tApertura2, tChiusura2),
               ],
+
+              const SizedBox(height: 10),
+
+              TextButton.icon(
+                onPressed: () => setState(
+                  () => _orari[index]['has_secondo_turno'] = !hasSecondoTurno,
+                ),
+                icon: Icon(
+                  hasSecondoTurno
+                      ? Icons.remove_circle_outline
+                      : Icons.add_circle_outline,
+                  size: 17,
+                ),
+                label: Text(
+                  hasSecondoTurno ? 'Rimuovi pausa' : 'Aggiungi pausa',
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.neonOrange,
+                  padding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          );
+
+    final copia = !isChiuso
+        ? Tooltip(
+            message: 'Applica questi orari a tutta la settimana',
+            child: IconButton(
+              onPressed: () => _copiaOrarioATutti(index),
+              icon: const Icon(Icons.copy_all_outlined, color: Colors.white54),
+            ),
+          )
+        : const SizedBox.shrink();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compatto = constraints.maxWidth < 720;
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: EdgeInsets.all(compatto ? 14 : 20),
+          decoration: BoxDecoration(
+            color: AppTheme.cardBg,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isChiuso
+                  ? Colors.redAccent.withOpacity(0.22)
+                  : Colors.white.withOpacity(0.08),
             ),
           ),
-
-          Expanded(
-            child: isChiuso
-                ? const Text(
-                    'Chiuso tutto il giorno',
-                    style: TextStyle(color: Colors.white38, fontSize: 14),
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (hasSecondoTurno)
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 6),
+          child: compatto
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
                           child: Text(
-                            'PRIMO TURNO',
+                            _nomiGiorni[giornoNum],
                             style: TextStyle(
-                              color: Colors.white38,
-                              fontSize: 10,
+                              color: isChiuso ? Colors.white54 : Colors.white,
+                              fontSize: 16,
                               fontWeight: FontWeight.w800,
-                              letterSpacing: 1,
                             ),
                           ),
                         ),
-
-                      intervallo(false, tApertura1, tChiusura1),
-
-                      if (hasSecondoTurno) ...[
-                        const SizedBox(height: 15),
-                        const Text(
-                          'SECONDO TURNO',
-                          style: TextStyle(
-                            color: Colors.white38,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        intervallo(true, tApertura2, tChiusura2),
+                        if (!isChiuso) copia,
                       ],
-
-                      const SizedBox(height: 10),
-
-                      TextButton.icon(
-                        onPressed: () => setState(
-                          () => _orari[index]['has_secondo_turno'] =
-                              !hasSecondoTurno,
-                        ),
-                        icon: Icon(
-                          hasSecondoTurno
-                              ? Icons.remove_circle_outline
-                              : Icons.add_circle_outline,
-                          size: 17,
-                        ),
-                        label: Text(
-                          hasSecondoTurno ? 'Rimuovi pausa' : 'Aggiungi pausa',
-                        ),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppTheme.neonOrange,
-                          padding: EdgeInsets.zero,
+                    ),
+                    const SizedBox(height: 4),
+                    stato,
+                    if (!isChiuso) ...[
+                      const Divider(color: Colors.white12, height: 24),
+                      orari,
+                    ] else ...[
+                      const SizedBox(height: 8),
+                      orari,
+                    ],
+                  ],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 145,
+                      child: Text(
+                        _nomiGiorni[giornoNum],
+                        style: TextStyle(
+                          color: isChiuso ? Colors.white54 : Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                    ],
-                  ),
-          ),
-
-          if (!isChiuso)
-            Tooltip(
-              message: 'Applica questi orari a tutta la settimana',
-              child: IconButton(
-                onPressed: () => _copiaOrarioATutti(index),
-                icon: const Icon(
-                  Icons.copy_all_outlined,
-                  color: Colors.white54,
+                    ),
+                    SizedBox(width: 135, child: stato),
+                    Expanded(child: orari),
+                    SizedBox(width: 48, child: copia),
+                  ],
                 ),
-              ),
-            ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -450,7 +482,9 @@ class _ModificaOrariState extends State<ModificaOrari> {
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 30),
+            padding: EdgeInsets.only(
+              right: MediaQuery.sizeOf(context).width < 600 ? 12 : 30,
+            ),
             child: Center(
               child: ElevatedButton.icon(
                 onPressed: _isSaving ? null : _salvaTutto,
@@ -464,14 +498,22 @@ class _ModificaOrariState extends State<ModificaOrari> {
                         ),
                       )
                     : const Icon(Icons.save_outlined, size: 19),
-                label: Text(_isSaving ? 'Salvataggio...' : 'Salva modifiche'),
+                label: Text(
+                  _isSaving
+                      ? 'Salvataggio...'
+                      : MediaQuery.sizeOf(context).width < 600
+                      ? 'Salva'
+                      : 'Salva modifiche',
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.neonOrange,
                   foregroundColor: Colors.black,
                   elevation: 0,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 22,
-                    vertical: 17,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: MediaQuery.sizeOf(context).width < 600
+                        ? 12
+                        : 22,
+                    vertical: 14,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -489,7 +531,7 @@ class _ModificaOrariState extends State<ModificaOrari> {
           : LayoutBuilder(
               builder: (context, constraints) {
                 return SingleChildScrollView(
-                  padding: const EdgeInsets.all(30),
+                  padding: EdgeInsets.all(constraints.maxWidth < 600 ? 12 : 30),
                   child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 1250),
@@ -517,26 +559,27 @@ class _ModificaOrariState extends State<ModificaOrari> {
                           ),
                           const SizedBox(height: 30),
 
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 17,
-                            ),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF121B26),
-                              borderRadius: BorderRadius.vertical(
-                                top: Radius.circular(14),
+                          if (constraints.maxWidth >= 780)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 17,
+                              ),
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF121B26),
+                                borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(14),
+                                ),
+                              ),
+                              child: const Row(
+                                children: [
+                                  SizedBox(width: 145, child: Text('GIORNO')),
+                                  SizedBox(width: 135, child: Text('STATO')),
+                                  Expanded(child: Text('ORARI DI APERTURA')),
+                                  SizedBox(width: 48, child: Text('COPIA')),
+                                ],
                               ),
                             ),
-                            child: const Row(
-                              children: [
-                                SizedBox(width: 145, child: Text('GIORNO')),
-                                SizedBox(width: 135, child: Text('STATO')),
-                                Expanded(child: Text('ORARI DI APERTURA')),
-                                SizedBox(width: 48, child: Text('COPIA')),
-                              ],
-                            ),
-                          ),
 
                           const SizedBox(height: 12),
 
